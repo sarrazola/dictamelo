@@ -321,6 +321,89 @@ async function refreshKeyStatus() {
   $("#btn-delete-key").textContent = t("models.delete");
 }
 
+// ---------- Archivos ----------
+
+function formatSize(bytes) {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function renderFileJobs(jobs) {
+  ui.fileJobs = jobs;
+  const list = $("#file-jobs");
+  list.innerHTML = "";
+  $("#files-empty").hidden = jobs.length > 0;
+  $("#btn-clear-files").disabled = jobs.length === 0;
+  for (const job of jobs) {
+    const li = document.createElement("li");
+    li.className = "job";
+    const head = document.createElement("div");
+    head.className = "job-head";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = job.name;
+    name.title = job.path;
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    meta.textContent = job.durationSecs > 0 ? t("files.minutes", { m: (job.durationSecs / 60).toFixed(1) }) : formatSize(job.sizeBytes);
+    const state = document.createElement("span");
+    state.className = `state ${job.stage}`;
+    if (job.stage === "converting" || job.stage === "transcribing" || job.stage === "queued") {
+      const spin = document.createElement("span");
+      spin.className = "spinner";
+      state.appendChild(spin);
+    }
+    const label = document.createElement("span");
+    label.textContent = job.stage === "transcribing"
+      ? t("files.transcribing", { i: job.chunk, n: job.chunks })
+      : t(`files.${job.stage}`);
+    state.appendChild(label);
+    head.append(name, meta, state);
+    li.appendChild(head);
+
+    if (job.stage === "done") {
+      const text = document.createElement("div");
+      text.className = "text";
+      text.textContent = job.text;
+      li.appendChild(text);
+    } else if (job.stage === "failed") {
+      const err = document.createElement("div");
+      err.className = "error";
+      err.textContent = job.error || t("files.failed");
+      li.appendChild(err);
+    }
+
+    const tools = document.createElement("div");
+    tools.className = "tools";
+    if (job.stage === "done") {
+      const copy = document.createElement("button");
+      copy.className = "ghost small";
+      copy.dataset.fileCopy = job.id;
+      copy.textContent = t("files.copy");
+      const save = document.createElement("button");
+      save.className = "ghost small";
+      save.dataset.fileSave = job.id;
+      save.textContent = t("files.save");
+      tools.append(copy, save);
+    }
+    const remove = document.createElement("button");
+    remove.className = "ghost small danger";
+    remove.dataset.fileRemove = job.id;
+    remove.textContent = t("files.remove");
+    tools.appendChild(remove);
+    li.appendChild(tools);
+    list.appendChild(li);
+  }
+}
+
+async function refreshFileJobs() {
+  try {
+    renderFileJobs(await invoke("get_file_jobs"));
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 async function refreshHistory() {
   try {
     const entries = await invoke("get_history");
@@ -391,6 +474,7 @@ function renderAll() {
   applyStaticText();
   showPage(ui.page);
   if (ui.lastStatus) renderStatus(ui.lastStatus);
+  if (ui.fileJobs) renderFileJobs(ui.fileJobs);
   renderSidebar();
   renderGeneral();
   renderModels();
@@ -611,6 +695,27 @@ function wireEvents() {
   });
   $("#btn-clear-history").addEventListener("click", () =>
     invoke("clear_history").catch((e) => toast(String(e), true)));
+
+  // Archivos: arrastrar a cualquier parte de la ventana, o elegir con el diálogo.
+  $("#btn-pick-file").addEventListener("click", () => invoke("pick_audio_files").catch((e) => toast(String(e), true)));
+  $("#btn-clear-files").addEventListener("click", () => invoke("clear_file_jobs").catch(console.error));
+  $("#file-jobs").addEventListener("click", async (e) => {
+    const copy = e.target.closest("[data-file-copy]");
+    const save = e.target.closest("[data-file-save]");
+    const remove = e.target.closest("[data-file-remove]");
+    try {
+      if (copy) {
+        await invoke("copy_file_transcript", { id: copy.dataset.fileCopy });
+        toast(t("toast.copied"));
+      } else if (save) {
+        await invoke("save_file_transcript", { id: save.dataset.fileSave });
+      } else if (remove) {
+        await invoke("remove_file_job", { id: remove.dataset.fileRemove });
+      }
+    } catch (err) {
+      toast(String(err), true);
+    }
+  });
   $("#btn-logs").addEventListener("click", () =>
     invoke("open_log_dir").catch((e) => toast(String(e), true)));
 
@@ -629,11 +734,23 @@ async function init() {
 
   renderAll();
   wireEvents();
-  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices()]);
+  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs()]);
   renderStatus(await invoke("get_status"));
 
   await listen("status", (e) => renderStatus(e.payload));
   await listen("history-changed", refreshHistory);
+  await listen("file-jobs-changed", (e) => renderFileJobs(e.payload));
+  const dropzone = $("#dropzone");
+  await listen("tauri://drag-enter", () => dropzone.classList.add("over"));
+  await listen("tauri://drag-leave", () => dropzone.classList.remove("over"));
+  await listen("tauri://drag-drop", (e) => {
+    dropzone.classList.remove("over");
+    const paths = e.payload?.paths || [];
+    if (paths.length) {
+      showPage("files");
+      invoke("transcribe_files", { paths }).catch((err) => toast(String(err), true));
+    }
+  });
   await listen("permissions-changed", refreshPermissions);
   await listen("settings-changed", (e) => {
     ui.settings = e.payload;

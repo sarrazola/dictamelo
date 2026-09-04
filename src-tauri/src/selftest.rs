@@ -11,23 +11,27 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 pub fn enabled() -> bool {
-    std::env::var_os("DICTADO_SELFTEST_WAV").is_some() || std::env::var_os("DICTADO_SELFTEST_HOTKEY_SECS").is_some()
+    std::env::var_os("DICTADO_SELFTEST_WAV").is_some()
+        || std::env::var_os("DICTADO_SELFTEST_HOTKEY_SECS").is_some()
+        || std::env::var_os("DICTADO_SELFTEST_FILE").is_some()
 }
 
 pub fn maybe_run(app: &AppHandle) {
     let wav = std::env::var("DICTADO_SELFTEST_WAV").ok();
     let hotkey_secs = std::env::var("DICTADO_SELFTEST_HOTKEY_SECS").ok().and_then(|s| s.parse::<f64>().ok());
-    if wav.is_none() && hotkey_secs.is_none() {
+    let file = std::env::var("DICTADO_SELFTEST_FILE").ok();
+    if wav.is_none() && hotkey_secs.is_none() && file.is_none() {
         return;
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         // Deja que bandeja, ventanas y atajo terminen de registrarse.
         tokio::time::sleep(Duration::from_millis(1500)).await;
-        let result = match (wav, hotkey_secs) {
-            (Some(path), _) => run(&app, Path::new(&path)).await,
-            (None, Some(secs)) => run_with_hotkey(&app, secs).await,
-            (None, None) => unreachable!(),
+        let result = match (wav, hotkey_secs, file) {
+            (Some(path), _, _) => run(&app, Path::new(&path)).await,
+            (None, Some(secs), _) => run_with_hotkey(&app, secs).await,
+            (None, None, Some(path)) => run_file(&app, Path::new(&path)).await,
+            (None, None, None) => unreachable!(),
         };
         match &result {
             Ok(text) => {
@@ -120,5 +124,32 @@ async fn run(app: &AppHandle, path: &Path) -> Result<String, String> {
     match pipeline::transcribe_and_deliver(app, prepared).await {
         Some(text) => Ok(text),
         None => Err(pipeline::current_status(app).label("en")),
+    }
+}
+
+/// Modo archivo: encola un audio como si lo hubieran arrastrado y espera el resultado.
+async fn run_file(app: &AppHandle, path: &Path) -> Result<String, String> {
+    use crate::file_transcription::{self, Stage};
+    use crate::state::AppState;
+    use crate::util::lock;
+    use std::time::Instant;
+    use tauri::Manager;
+
+    file_transcription::enqueue(app, vec![path.to_path_buf()]);
+    let deadline = Instant::now() + Duration::from_secs(900);
+    loop {
+        let job = lock(&app.state::<AppState>().file_jobs).first().cloned();
+        match job {
+            Some(job) if job.stage == Stage::Done => {
+                return Ok(format!("{} [{} tramo(s), {:.0}s]", job.text, job.chunks, job.duration_secs));
+            }
+            Some(job) if job.stage == Stage::Failed => return Err(job.error.unwrap_or_default()),
+            None => return Err("el trabajo desapareció de la cola".into()),
+            _ => {}
+        }
+        if Instant::now() > deadline {
+            return Err("tiempo de espera agotado".into());
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }

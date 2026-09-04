@@ -36,6 +36,18 @@
 | Esc cancela (real) | Atajo sintético mantenido 6 s y Esc pulsado a los 2 s: «Grabación cancelada con Esc», sin transcribir. Hallazgo: registrar Esc como atajo global de Carbon mientras el atajo principal está pulsado provoca una liberación falsa (la grabación se cortaba a 0,5 s); por eso Esc se detecta con un monitor global de AppKit (`NSEvent.addGlobalMonitorForEvents`), que no interfiere. Verificado: con el monitor, 3 s pulsados = 2,94 s grabados. |
 | Sonidos | Sonidos del sistema (Pop, Tink, Basso) vía `NSSound`, sin avisos en el registro; que suenen no se puede comprobar de forma automática |
 
+## Transcripción de archivos (app instalada, modo `DICTADO_SELFTEST_FILE`)
+
+| Archivo | Ruta seguida | Resultado |
+| --- | --- | --- |
+| M4A de 31 KB (AAC) | Formato nativo → subida directa | 94 caracteres correctos en ~1 s |
+| AIFF de 162 KB | No nativo → `afconvert` a WAV 16 kHz mono | 66 caracteres correctos en ~1 s |
+| WAV de 26 min / 50 MB (frase repetida con pausas) | Supera 24 MB → conversión + 3 tramos cortados en silencios | 13.564 caracteres, 1563 s de audio, 59 s en total |
+
+Tras las tres pruebas no quedó ningún temporal en `~/Library/Caches/com.sarrazola.dictado/audio/`.
+Pruebas unitarias del troceado: un audio corto queda en un tramo; uno largo se corta dentro del
+silencio más cercano a la frontera, los tramos son contiguos, cubren todo y ninguno supera el máximo.
+
 ## Flujo real con el atajo (app instalada y firmada, permisos concedidos)
 
 Ejecutado con el modo `DICTADO_SELFTEST_HOTKEY_SECS`, que hace que la app pulse su propio atajo con

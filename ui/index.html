@@ -35,6 +35,12 @@
         </svg>
         <span data-i18n="nav.models"></span>
       </button>
+      <button class="nav-item" data-page="files">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>
+        </svg>
+        <span data-i18n="nav.files"></span>
+      </button>
       <button class="nav-item" data-page="history">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 7.5V12l3 1.8"/>
@@ -174,6 +180,27 @@
       </div>
 
       <p class="footnote" data-i18n="models.privacy"></p>
+    </section>
+
+    <!-- Archivos -->
+    <section class="page" data-page="files">
+      <div id="dropzone" class="dropzone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+        </svg>
+        <strong data-i18n="files.drop"></strong>
+        <span class="or" data-i18n="files.or"></span>
+        <button id="btn-pick-file" class="primary" data-i18n="files.pick"></button>
+        <span class="formats" data-i18n="files.formats"></span>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" data-i18n="files.title"></span>
+          <button id="btn-clear-files" class="ghost danger small" data-i18n="files.clear"></button>
+        </div>
+        <ul id="file-jobs" class="job-list"></ul>
+        <p id="files-empty" class="empty" data-i18n="files.empty" hidden></p>
+      </div>
     </section>
 
     <!-- Historial -->

@@ -233,6 +233,74 @@ pub fn retry_last_transcription(app: AppHandle) {
     tauri::async_runtime::spawn(async move { pipeline::retry_last(&app).await });
 }
 
+// ---------- Archivos de audio ----------
+
+#[tauri::command]
+pub fn transcribe_files(app: AppHandle, paths: Vec<String>) {
+    let paths: Vec<std::path::PathBuf> = paths.into_iter().map(std::path::PathBuf::from).filter(|p| p.is_file()).collect();
+    if !paths.is_empty() {
+        crate::file_transcription::enqueue(&app, paths);
+    }
+}
+
+/// Abre el selector de archivos del sistema y encola lo elegido.
+#[tauri::command]
+pub fn pick_audio_files(app: AppHandle) {
+    use tauri_plugin_dialog::DialogExt;
+    let handle = app.clone();
+    app.dialog()
+        .file()
+        .add_filter("Audio", &crate::file_transcription::PICKER_EXTENSIONS)
+        .pick_files(move |picked| {
+            let paths: Vec<std::path::PathBuf> =
+                picked.unwrap_or_default().into_iter().filter_map(|p| p.into_path().ok()).collect();
+            if !paths.is_empty() {
+                crate::file_transcription::enqueue(&handle, paths);
+            }
+        });
+}
+
+#[tauri::command]
+pub fn get_file_jobs(state: State<'_, AppState>) -> Vec<crate::file_transcription::FileJob> {
+    lock(&state.file_jobs).clone()
+}
+
+#[tauri::command]
+pub fn remove_file_job(app: AppHandle, id: String) {
+    crate::file_transcription::remove(&app, &id);
+}
+
+#[tauri::command]
+pub fn clear_file_jobs(app: AppHandle) {
+    crate::file_transcription::clear(&app);
+}
+
+#[tauri::command]
+pub fn copy_file_transcript(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let text = lock(&state.file_jobs).iter().find(|j| j.id == id).map(|j| j.text.clone()).ok_or("")?;
+    paste::copy_text(&text).map_err(|e| e.to_string())
+}
+
+/// Guarda la transcripción como .txt donde el usuario elija.
+#[tauri::command]
+pub fn save_file_transcript(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<(), String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (name, text) = lock(&state.file_jobs)
+        .iter()
+        .find(|j| j.id == id)
+        .map(|j| (j.name.clone(), j.text.clone()))
+        .ok_or("")?;
+    let suggested = format!("{}.txt", std::path::Path::new(&name).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or(name));
+    app.dialog().file().set_file_name(suggested).add_filter("Texto", &["txt"]).save_file(move |target| {
+        if let Some(path) = target.and_then(|p| p.into_path().ok()) {
+            if let Err(e) = std::fs::write(&path, text) {
+                log::warn!("No se pudo guardar la transcripción en {}: {e}", path.display());
+            }
+        }
+    });
+    Ok(())
+}
+
 /// El indicador flotante informa el tamaño de su contenido para ajustar la ventana.
 #[tauri::command]
 pub fn overlay_layout(app: AppHandle, width: f64, height: f64) {

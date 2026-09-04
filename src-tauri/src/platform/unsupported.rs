@@ -39,6 +39,11 @@ pub fn activate_app() {}
 
 pub fn refresh_window_shadow(_window: &WebviewWindow) {}
 
+/// Conversión de audio: pendiente (en Windows, Media Foundation o ffmpeg).
+pub fn decode_audio_to_wav(_input: &std::path::Path, _output: &std::path::Path) -> Result<(), PlatformError> {
+    Err(PlatformError::Unsupported("conversión de audio no implementada en esta plataforma".into()))
+}
+
 /// Esc para cancelar: pendiente (en Windows, un hook de teclado de bajo nivel).
 pub fn install_cancel_key_monitor(_on_escape: std::sync::Arc<dyn Fn() + Send + Sync>) {}
 

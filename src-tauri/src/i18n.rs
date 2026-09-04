@@ -188,6 +188,40 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Impossibile usare la scorciatoia «{k}»; si usa {d}",
         ]),
 
+        // --- Archivos ---
+        "file.unsupported" => pick(lang, [
+            "Formato no compatible. Conviértelo a MP3, M4A o WAV.",
+            "Unsupported format. Convert it to MP3, M4A or WAV.",
+            "Formato não suportado. Converta para MP3, M4A ou WAV.",
+            "Format non pris en charge. Convertissez-le en MP3, M4A ou WAV.",
+            "Format nicht unterstützt. Wandle es in MP3, M4A oder WAV um.",
+            "Formato non supportato. Convertilo in MP3, M4A o WAV.",
+        ]),
+        "file.convert_failed" => pick(lang, [
+            "No se pudo convertir el audio: {e}",
+            "Could not convert the audio: {e}",
+            "Não foi possível converter o áudio: {e}",
+            "Impossible de convertir l'audio : {e}",
+            "Audio konnte nicht konvertiert werden: {e}",
+            "Impossibile convertire l'audio: {e}",
+        ]),
+        "file.read_failed" => pick(lang, [
+            "No se pudo leer el archivo: {e}",
+            "Could not read the file: {e}",
+            "Não foi possível ler o arquivo: {e}",
+            "Impossible de lire le fichier : {e}",
+            "Datei konnte nicht gelesen werden: {e}",
+            "Impossibile leggere il file: {e}",
+        ]),
+        "file.empty" => pick(lang, [
+            "El archivo no contiene audio",
+            "The file contains no audio",
+            "O arquivo não contém áudio",
+            "Le fichier ne contient pas d'audio",
+            "Die Datei enthält kein Audio",
+            "Il file non contiene audio",
+        ]),
+
         // --- Errores de audio ---
         "audio.no_device" => pick(lang, [
             "No se encontró ningún micrófono",

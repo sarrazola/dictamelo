@@ -61,6 +61,13 @@ if (!window.__TAURI__) {
     open_url: () => null,
     ui_ready: () => null,
     overlay_layout: () => null,
+    get_file_jobs: () => [
+      { id: "f1", name: "reunion-lunes.m4a", path: "/Users/yo/reunion-lunes.m4a", sizeBytes: 31_400_000, stage: "transcribing", chunk: 2, chunks: 5, text: "", error: null, durationSecs: 0 },
+      { id: "f2", name: "nota-de-voz.mp3", path: "/Users/yo/nota-de-voz.mp3", sizeBytes: 2_100_000, stage: "done", chunk: 1, chunks: 1, text: "Esta es una nota de voz de prueba transcrita desde un archivo.", error: null, durationSecs: 84 },
+      { id: "f3", name: "cancion.wma", path: "/Users/yo/cancion.wma", sizeBytes: 5_000_000, stage: "failed", chunk: 0, chunks: 0, text: "", error: "Formato no compatible. Conviértelo a MP3, M4A o WAV.", durationSecs: 0 },
+    ],
+    transcribe_files: () => null, pick_audio_files: () => null, remove_file_job: () => null,
+    clear_file_jobs: () => null, copy_file_transcript: () => null, save_file_transcript: () => null,
   };
   window.__TAURI__ = {
     core: {

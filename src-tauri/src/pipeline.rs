@@ -314,7 +314,7 @@ async fn clean_text(state: &AppState, settings: &Settings, text: &str) -> Result
         .await
 }
 
-async fn transcribe_with_retry(
+pub(crate) async fn transcribe_with_retry(
     provider: &dyn TranscriptionProvider,
     api_key: Option<&str>,
     request: &TranscriptionRequest,

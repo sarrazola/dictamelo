@@ -272,6 +272,36 @@ button:disabled { opacity: .45; cursor: default; }
 .model .info strong { font-weight: 570; }
 .model .info span { color: var(--muted); font-size: 12px; }
 
+/* ---------- Archivos ---------- */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 28px 20px 22px; border-radius: var(--radius);
+  border: 1.5px dashed var(--border-strong); background: var(--card); color: var(--text);
+  text-align: center; transition: border-color .15s, background .15s;
+}
+.dropzone svg { width: 30px; height: 30px; color: var(--accent); margin-bottom: 4px; }
+.dropzone strong { font-weight: 600; }
+.dropzone .or { color: var(--faint); font-size: 12px; }
+.dropzone .formats { color: var(--faint); font-size: 11.5px; margin-top: 8px; max-width: 460px; line-height: 1.4; }
+.dropzone.over { border-color: var(--accent); background: var(--accent-soft); }
+.job-list { list-style: none; margin: 0; padding: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.job { padding: 10px 12px; border-radius: 9px; background: var(--field); border: 1px solid var(--border); }
+.job-head { display: flex; align-items: center; gap: 10px; }
+.job-head .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 570; }
+.job-head .meta { color: var(--faint); font-size: 11.5px; flex: none; }
+.job-head .state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); flex: none; }
+.job-head .state.done { color: var(--ok); }
+.job-head .state.failed { color: var(--err); }
+.job-head .spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); animation: hud-spin .8s linear infinite; }
+.job .text {
+  margin-top: 8px; padding: 8px 10px; border-radius: 7px; background: var(--card);
+  border: 1px solid var(--border); max-height: 180px; overflow: auto;
+  white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.5;
+  -webkit-user-select: text; user-select: text;
+}
+.job .error { margin-top: 6px; color: var(--err); font-size: 12px; }
+.job .tools { display: flex; gap: 6px; margin-top: 8px; }
+
 /* ---------- Historial ---------- */
 .history-list {
   list-style: none; margin: 0; padding: 0 0 14px;

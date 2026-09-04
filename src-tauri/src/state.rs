@@ -2,6 +2,7 @@
 
 use crate::audio::{self, PreparedAudio, Recorder};
 use crate::cleanup::CleanerRegistry;
+use crate::file_transcription::FileJob;
 use crate::history::History;
 use crate::secrets::{KeyringSecretStore, SecretError, SecretStore};
 use crate::settings::Settings;
@@ -34,6 +35,8 @@ pub struct AppState {
     /// Se incrementa en cada cambio de estado; permite descartar temporizadores obsoletos.
     pub status_generation: AtomicU64,
     pub last_failed: Mutex<Option<PendingTranscription>>,
+    /// Archivos de audio en cola o ya transcritos (solo en memoria).
+    pub file_jobs: Mutex<Vec<FileJob>>,
     /// Directorio para los WAV temporales (se limpian al arrancar y tras cada uso).
     pub temp_dir: PathBuf,
     pub log_dir: PathBuf,
@@ -73,6 +76,7 @@ impl AppState {
             status: Mutex::new(Status::Idle),
             status_generation: AtomicU64::new(0),
             last_failed: Mutex::new(None),
+            file_jobs: Mutex::new(Vec::new()),
             temp_dir,
             log_dir,
             config_dir,

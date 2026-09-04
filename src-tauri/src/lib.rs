@@ -15,6 +15,7 @@ mod app_windows;
 mod audio;
 mod autostart;
 mod cleanup;
+mod file_transcription;
 mod clipboard;
 mod commands;
 mod history;
@@ -58,6 +59,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .macos_launcher(tauri_plugin_autostart::MacosLauncher::LaunchAgent)
@@ -91,6 +93,13 @@ pub fn run() {
             commands::open_url,
             commands::ui_ready,
             commands::overlay_layout,
+            commands::transcribe_files,
+            commands::pick_audio_files,
+            commands::get_file_jobs,
+            commands::remove_file_job,
+            commands::clear_file_jobs,
+            commands::copy_file_transcript,
+            commands::save_file_transcript,
         ])
         .setup(|app| {
             // App de barra de menú: sin ícono en el Dock ni menú de aplicación.

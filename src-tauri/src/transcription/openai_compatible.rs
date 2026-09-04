@@ -56,9 +56,10 @@ impl OpenAiCompatibleClient {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "audio.wav".into());
+        let mime = mime_for(&request.audio_path);
         let audio = Part::bytes(bytes)
             .file_name(file_name)
-            .mime_str("audio/wav")
+            .mime_str(mime)
             .map_err(|e| TranscriptionError::InvalidResponse(e.to_string()))?;
 
         let mut form = Form::new()
@@ -95,6 +96,19 @@ impl OpenAiCompatibleClient {
             language: parsed.language,
             duration_secs: parsed.duration,
         })
+    }
+}
+
+/// Tipo MIME según la extensión (el proveedor lo usa como pista para decodificar).
+fn mime_for(path: &std::path::Path) -> &'static str {
+    match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+        Some("mp3") | Some("mpga") | Some("mpeg") => "audio/mpeg",
+        Some("m4a") => "audio/mp4",
+        Some("mp4") => "video/mp4",
+        Some("flac") => "audio/flac",
+        Some("ogg") | Some("oga") => "audio/ogg",
+        Some("webm") => "audio/webm",
+        _ => "audio/wav",
     }
 }
 

@@ -1,5 +1,6 @@
 //! Implementación macOS: TCC (micrófono/accesibilidad), CGEvent (⌘V), NSPasteboard y NSWindow.
 
+mod audio_decode;
 mod clipboard;
 mod locale;
 mod keyboard;
@@ -7,6 +8,7 @@ mod permissions;
 mod sound;
 mod window;
 
+pub use audio_decode::decode_audio_to_wav;
 pub use clipboard::clipboard_backend;
 pub use locale::system_language;
 pub use sound::play_sound;

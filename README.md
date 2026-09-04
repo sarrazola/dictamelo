@@ -27,6 +27,12 @@ interfaz que permite cambiarlo sin tocar el resto de la app.
   la puntuación y aplica tus autocorrecciones («no, mejor el viernes»). Usa GPT-OSS en Groq con la
   misma API key; viene con unas instrucciones predeterminadas que puedes editar o restablecer. Si la
   limpieza falla, se pega el texto original y se avisa.
+- **Transcribir archivos**: arrastra un audio a la ventana (o elígelo) y el texto aparece en la
+  sección Archivos, con copiar y guardar como .txt. Sin servidores propios: MP3, M4A, WAV, FLAC,
+  OGG, WebM y MP4 de hasta 24 MB se envían tal cual al proveedor; el resto (AIFF, CAF, AAC, MOV…)
+  y los archivos grandes se convierten en local con CoreAudio (`afconvert`, incluido en macOS) a
+  WAV 16 kHz mono y, si duran más de 10 minutos, se parten en tramos cortando en el silencio más
+  cercano. Los temporales se borran; el archivo original no se toca.
 - Historial local pequeño (JSON) con copiar/borrar/vaciar.
 - Los WAV temporales se borran justo después de usarse y también al arrancar (por si hubo un cierre
   abrupto). Si una transcripción falla, el audio se conserva **en memoria** para «Reintentar última
@@ -53,6 +59,7 @@ src-tauri/
     transcription/       Trait TranscriptionProvider, registro, cliente OpenAI-compatible, Groq, OpenAI
     cleanup/             Trait TextCleaner, instrucciones predeterminadas, cliente de chat, Groq (GPT-OSS)
     autostart.rs         Inicio con el sistema
+    file_transcription.rs Cola de archivos: subida directa o conversión local + tramos
     clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
     platform/            TODO lo dependiente del SO: macos/ (completo) y windows/ (esqueleto)
     i18n.rs              Textos del menú de la barra, estados y errores (mismos 6 idiomas)
@@ -92,7 +99,9 @@ La prueba `every_language_has_all_keys` avisa si queda alguna traducción vacía
 
 `src/platform/windows/mod.rs` ya expone la misma API que la implementación de macOS para que la app
 compile; falta implementar (y probar) el pegado (`SendInput` Ctrl+V), el portapapeles completo
-(`GetClipboardSequenceNumber` + todos los formatos) y la ventana flotante sin foco. Atajo global,
+(`GetClipboardSequenceNumber` + todos los formatos), la ventana flotante sin foco, los sonidos, el
+monitor de Esc y la conversión local de audio (Media Foundation o ffmpeg; mientras tanto solo se
+transcriben archivos en formatos nativos del proveedor de hasta 24 MB). Atajo global,
 bandeja, audio (WASAPI vía cpal), Llavero (Credential Manager), red, historial y configuración ya
 son multiplataforma. **No se ha compilado ni probado en Windows.**
 

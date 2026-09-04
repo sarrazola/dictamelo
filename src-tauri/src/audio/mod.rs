@@ -40,6 +40,71 @@ pub fn prepare(raw: &RawRecording) -> PreparedAudio {
     PreparedAudio { samples, sample_rate: TARGET_SAMPLE_RATE }
 }
 
+/// Divide una grabación larga en tramos de como mucho `max_secs`, cortando en el punto más
+/// silencioso de los 5 s anteriores a cada frontera para no partir palabras.
+pub fn split_for_upload(samples: &[i16], sample_rate: u32, max_secs: u32) -> Vec<std::ops::Range<usize>> {
+    let max_len = (sample_rate * max_secs) as usize;
+    if samples.len() <= max_len || max_len == 0 {
+        return vec![0..samples.len()];
+    }
+    let search = (sample_rate * 5) as usize;
+    let window = (sample_rate as usize * 3) / 10; // 300 ms
+    let mut ranges = Vec::new();
+    let mut start = 0;
+    while samples.len() - start > max_len {
+        let target = start + max_len;
+        let lo = target.saturating_sub(search).max(start + window);
+        let mut best = target;
+        let mut best_energy = f64::MAX;
+        let mut pos = lo;
+        while pos + window <= target {
+            let energy: f64 = samples[pos..pos + window].iter().map(|s| (*s as f64) * (*s as f64)).sum();
+            // `<=`: entre varios mínimos iguales (p. ej. sin silencios) se prefiere el más tardío,
+            // para aprovechar al máximo la longitud del tramo.
+            if energy <= best_energy {
+                best_energy = energy;
+                best = pos + window / 2;
+            }
+            pos += window / 3;
+        }
+        ranges.push(start..best);
+        start = best;
+    }
+    ranges.push(start..samples.len());
+    ranges
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::split_for_upload;
+
+    #[test]
+    fn short_audio_is_one_chunk() {
+        let samples = vec![1000i16; 16_000 * 30];
+        assert_eq!(split_for_upload(&samples, 16_000, 600), vec![0..samples.len()]);
+    }
+
+    #[test]
+    fn long_audio_cuts_at_silence_and_covers_everything() {
+        let rate = 16_000u32;
+        // 25 s de "voz" con un silencio de 1 s justo a los 8,5 s; tramos de 10 s.
+        let mut samples = vec![8000i16; (rate * 25) as usize];
+        let silence = (rate as f32 * 8.5) as usize..(rate as f32 * 9.5) as usize;
+        for s in &mut samples[silence.clone()] {
+            *s = 0;
+        }
+        let ranges = split_for_upload(&samples, rate, 10);
+        assert_eq!(ranges.len(), 3, "{ranges:?}");
+        assert!(silence.contains(&ranges[0].end), "el primer corte debería caer en el silencio: {:?}", ranges[0]);
+        assert_eq!(ranges[0].start, 0);
+        assert_eq!(ranges.last().unwrap().end, samples.len());
+        for pair in ranges.windows(2) {
+            assert_eq!(pair[0].end, pair[1].start);
+        }
+        assert!(ranges.iter().all(|r| r.len() <= (rate * 10) as usize));
+    }
+}
+
 /// Nombres de los dispositivos de entrada disponibles.
 pub fn list_input_devices() -> Vec<String> {
     let host = cpal::default_host();
