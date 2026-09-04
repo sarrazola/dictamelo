@@ -15,8 +15,11 @@ interfaz que permite cambiarlo sin tocar el resto de la app.
   anterior** con todos sus formatos (texto, imágenes, archivos…), salvo que el usuario haya copiado
   algo nuevo mientras tanto: entonces se conserva lo nuevo.
 - Indicador flotante (no roba el foco) con el estado y el nivel del micrófono.
-- Ventana de configuración: permisos, proveedor, API key (en el Llavero), modelo, idioma, atajo,
-  pegado automático, restauración del portapapeles, micrófono, duración máxima e historial.
+- Ventana de configuración con barra lateral (General · Modelos · Historial · Avanzado · Acerca de),
+  para que no aparezcan decenas de opciones de corrido. El aviso de permisos solo sale cuando falta
+  alguno; el resto del tiempo no estorba.
+- **Interfaz en 6 idiomas** (español, inglés, portugués, francés, alemán, italiano), incluidos el menú
+  de la barra y los mensajes de error. Por defecto sigue el idioma del sistema.
 - Historial local pequeño (JSON) con copiar/borrar/vaciar.
 - Los WAV temporales se borran justo después de usarse y también al arrancar (por si hubo un cierre
   abrupto). Si una transcripción falla, el audio se conserva **en memoria** para «Reintentar última
@@ -29,6 +32,8 @@ interfaz que permite cambiarlo sin tocar el resto de la app.
 
 ```
 ui/                      Interfaz (HTML/CSS/JS sin framework; solo pinta y llama comandos)
+  i18n.js                Textos de la ventana en los 6 idiomas
+  main.js                Navegación lateral, render y llamadas a los comandos
 src-tauri/
   Cargo.toml             Dependencias (rustls, sin OpenSSL; keyring → Llavero/Credential Manager)
   tauri.conf.json        Configuración de Tauri y del bundle
@@ -41,6 +46,7 @@ src-tauri/
     transcription/       Trait TranscriptionProvider, registro, cliente OpenAI-compatible, Groq, OpenAI
     clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
     platform/            TODO lo dependiente del SO: macos/ (completo) y windows/ (esqueleto)
+    i18n.rs              Textos del menú de la barra, estados y errores (mismos 6 idiomas)
     hotkey.rs, tray.rs, app_windows.rs, commands.rs, settings.rs, history.rs, secrets.rs, selftest.rs
 scripts/
   build-release.sh       Compila .app + .dmg firmados con Developer ID
@@ -59,6 +65,13 @@ assets/make_icons.py     Genera el ícono de la app y los de la barra de menú
 
 La UI, la configuración, el Llavero (una key por proveedor), el historial y el pipeline no cambian.
 `openai.rs` está incluido como ejemplo de esta extensibilidad, marcado como «sin probar».
+
+### Cómo añadir un idioma
+
+1. Copia un bloque de `ui/i18n.js`, tradúcelo y añade el nombre nativo a `UI_LANGUAGE_NAMES`.
+2. Añade el código a `LANGS` en `src-tauri/src/i18n.rs` y amplía el array de cada clave.
+
+La prueba `every_language_has_all_keys` avisa si queda alguna traducción vacía.
 
 ### Portabilidad a Windows
 

@@ -57,6 +57,22 @@ pub enum TranscriptionError {
 }
 
 impl TranscriptionError {
+    /// Mensaje para el usuario en el idioma indicado.
+    pub fn localized(&self, lang: &str) -> String {
+        use crate::i18n::{t, tf};
+        match self {
+            TranscriptionError::MissingApiKey => t(lang, "tr.missing_key").into(),
+            TranscriptionError::Unauthorized => t(lang, "tr.unauthorized").into(),
+            TranscriptionError::RateLimited => t(lang, "tr.rate").into(),
+            TranscriptionError::Network(_) => t(lang, "tr.network").into(),
+            TranscriptionError::Timeout => t(lang, "tr.timeout").into(),
+            TranscriptionError::Server { status, .. } => tf(lang, "tr.server", &[("s", &status.to_string())]),
+            TranscriptionError::Rejected(e) => tf(lang, "tr.rejected", &[("e", e)]),
+            TranscriptionError::InvalidResponse(_) => t(lang, "tr.invalid").into(),
+            TranscriptionError::Io(e) => tf(lang, "tr.io", &[("e", &e.to_string())]),
+        }
+    }
+
     /// Errores transitorios que merecen un reintento automático.
     pub fn is_retryable(&self) -> bool {
         matches!(

@@ -27,6 +27,23 @@ pub enum AudioError {
     Unavailable,
 }
 
+impl AudioError {
+    /// Mensaje para el usuario en el idioma indicado (el `Display` en español va al registro).
+    pub fn localized(&self, lang: &str) -> String {
+        use crate::i18n::{t, tf};
+        match self {
+            AudioError::NoDevice => t(lang, "audio.no_device").into(),
+            AudioError::DeviceNotFound(d) => tf(lang, "audio.device_not_found", &[("d", d)]),
+            AudioError::PermissionDenied => t(lang, "audio.permission").into(),
+            AudioError::Open(e) => tf(lang, "audio.open", &[("e", e)]),
+            AudioError::Stream(e) => tf(lang, "audio.stream", &[("e", e)]),
+            AudioError::NotRecording | AudioError::AlreadyRecording | AudioError::Unavailable => {
+                t(lang, "audio.unavailable").into()
+            }
+        }
+    }
+}
+
 /// Muestras tal como las entrega el dispositivo (intercaladas por canal, f32 en [-1, 1]).
 #[derive(Debug, Clone)]
 pub struct RawRecording {

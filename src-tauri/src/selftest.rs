@@ -109,6 +109,6 @@ async fn run(app: &AppHandle, path: &Path) -> Result<String, String> {
     pipeline::set_status(app, Status::Transcribing);
     match pipeline::transcribe_and_deliver(app, prepared).await {
         Some(text) => Ok(text),
-        None => Err(pipeline::current_status(app).label()),
+        None => Err(pipeline::current_status(app).label("en")),
     }
 }

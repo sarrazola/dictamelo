@@ -16,6 +16,7 @@ mod audio;
 mod clipboard;
 mod commands;
 mod history;
+mod i18n;
 mod hotkey;
 mod paste;
 mod pipeline;

@@ -40,6 +40,10 @@ pub fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Setti
     if old.auto_paste != new.auto_paste {
         tray::set_autopaste_checked(&app, new.auto_paste);
     }
+    // El menú de la barra muestra el atajo y usa el idioma de la interfaz.
+    if old.ui_language != new.ui_language || old.hotkey != new.hotkey {
+        tray::relabel(&app);
+    }
     if !new.show_overlay {
         app_windows::hide_overlay(&app);
     }
@@ -181,6 +185,10 @@ pub struct AppInfo {
     pub default_hotkey: String,
     pub log_dir: String,
     pub config_dir: String,
+    /// Idiomas de interfaz disponibles (códigos ISO-639-1).
+    pub ui_languages: Vec<String>,
+    /// Idioma realmente en uso, ya resuelto si la preferencia es "auto".
+    pub resolved_ui_language: String,
 }
 
 #[tauri::command]
@@ -191,6 +199,8 @@ pub fn get_app_info(state: State<'_, AppState>) -> AppInfo {
         default_hotkey: DEFAULT_HOTKEY.into(),
         log_dir: state.log_dir.display().to_string(),
         config_dir: state.config_dir.display().to_string(),
+        ui_languages: crate::i18n::LANGS.iter().map(|s| s.to_string()).collect(),
+        resolved_ui_language: state.settings().ui_lang(),
     }
 }
 

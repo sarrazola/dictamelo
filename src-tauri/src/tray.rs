@@ -1,5 +1,6 @@
-//! Ícono y menú de la barra de menú; refleja el estado actual.
+//! Ícono y menú de la barra de menú; refleja el estado actual y el idioma elegido.
 
+use crate::i18n::{t, tf};
 use crate::state::AppState;
 use crate::status::Status;
 use crate::util::write;
@@ -12,19 +13,30 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 pub struct TrayHandles {
     tray: tauri::tray::TrayIcon<Wry>,
     status_item: MenuItem<Wry>,
+    hint_item: MenuItem<Wry>,
+    open_item: MenuItem<Wry>,
     retry_item: MenuItem<Wry>,
     autopaste_item: CheckMenuItem<Wry>,
+    quit_item: MenuItem<Wry>,
 }
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let settings = app.state::<AppState>().settings();
+    let lang = settings.ui_lang();
 
-    let status_item = MenuItem::with_id(app, "status", "Listo", false, None::<&str>)?;
-    let hint_item = MenuItem::with_id(app, "hint", format!("Mantén {} y habla", pretty_hotkey(&settings.hotkey)), false, None::<&str>)?;
-    let open_item = MenuItem::with_id(app, "open", "Configuración…", true, None::<&str>)?;
-    let retry_item = MenuItem::with_id(app, "retry", "Reintentar última transcripción", false, None::<&str>)?;
-    let autopaste_item = CheckMenuItem::with_id(app, "autopaste", "Pegado automático", true, settings.auto_paste, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", "Salir de Dictado", true, None::<&str>)?;
+    let status_item = MenuItem::with_id(app, "status", t(&lang, "status.idle"), false, None::<&str>)?;
+    let hint_item = MenuItem::with_id(
+        app,
+        "hint",
+        tf(&lang, "tray.hint", &[("k", &pretty_hotkey(&settings.hotkey))]),
+        false,
+        None::<&str>,
+    )?;
+    let open_item = MenuItem::with_id(app, "open", t(&lang, "tray.settings"), true, None::<&str>)?;
+    let retry_item = MenuItem::with_id(app, "retry", t(&lang, "tray.retry"), false, None::<&str>)?;
+    let autopaste_item =
+        CheckMenuItem::with_id(app, "autopaste", t(&lang, "tray.autopaste"), true, settings.auto_paste, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", t(&lang, "tray.quit"), true, None::<&str>)?;
 
     let menu = Menu::with_items(
         app,
@@ -49,7 +61,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| handle_menu(app, event.id().as_ref()))
         .build(app)?;
 
-    app.manage(TrayHandles { tray, status_item, retry_item, autopaste_item });
+    app.manage(TrayHandles { tray, status_item, hint_item, open_item, retry_item, autopaste_item, quit_item });
     Ok(())
 }
 
@@ -83,10 +95,24 @@ fn handle_menu(app: &AppHandle, id: &str) {
 
 pub fn update(app: &AppHandle, status: &Status) {
     let Some(handles) = app.try_state::<TrayHandles>() else { return };
+    let lang = app.state::<AppState>().settings().ui_lang();
     let _ = handles.tray.set_icon(Some(icon_for(status)));
     let _ = handles.tray.set_icon_as_template(matches!(status, Status::Idle | Status::Done { .. }));
-    let _ = handles.tray.set_title(title_for(status));
-    let _ = handles.status_item.set_text(status.label());
+    let _ = handles.tray.set_title(title_for(status, &lang));
+    let _ = handles.status_item.set_text(status.label(&lang));
+}
+
+/// Vuelve a escribir el menú tras cambiar el idioma o el atajo.
+pub fn relabel(app: &AppHandle) {
+    let Some(handles) = app.try_state::<TrayHandles>() else { return };
+    let settings = app.state::<AppState>().settings();
+    let lang = settings.ui_lang();
+    let _ = handles.hint_item.set_text(tf(&lang, "tray.hint", &[("k", &pretty_hotkey(&settings.hotkey))]));
+    let _ = handles.open_item.set_text(t(&lang, "tray.settings"));
+    let _ = handles.retry_item.set_text(t(&lang, "tray.retry"));
+    let _ = handles.autopaste_item.set_text(t(&lang, "tray.autopaste"));
+    let _ = handles.quit_item.set_text(t(&lang, "tray.quit"));
+    let _ = handles.status_item.set_text(pipeline::current_status(app).label(&lang));
 }
 
 pub fn set_retry_enabled(app: &AppHandle, enabled: bool) {
@@ -112,14 +138,15 @@ fn icon_for(status: &Status) -> Image<'static> {
     Image::from_bytes(bytes).expect("los íconos PNG embebidos son válidos")
 }
 
-fn title_for(status: &Status) -> Option<&'static str> {
+/// Texto junto al ícono. Solo se muestra mientras hay algo en curso.
+fn title_for(status: &Status, lang: &str) -> Option<String> {
     match status {
         Status::Idle => None,
-        Status::Recording => Some("Grabando"),
-        Status::Transcribing => Some("Transcribiendo…"),
-        Status::Pasting => Some("Pegando…"),
-        Status::Done { .. } => Some("✓"),
-        Status::Error { .. } => Some("Error"),
+        Status::Recording => Some(t(lang, "status.recording").into()),
+        Status::Transcribing => Some(t(lang, "status.transcribing").into()),
+        Status::Pasting => Some(t(lang, "status.pasting").into()),
+        Status::Done { .. } => Some("✓".into()),
+        Status::Error { .. } => Some(t(lang, "status.error").into()),
     }
 }
 
@@ -132,7 +159,7 @@ pub fn pretty_hotkey(hotkey: &str) -> String {
             "alt" | "option" => if cfg!(target_os = "macos") { "⌥" } else { "Alt+" }.to_string(),
             "control" | "ctrl" => if cfg!(target_os = "macos") { "⌃" } else { "Ctrl+" }.to_string(),
             "shift" => if cfg!(target_os = "macos") { "⇧" } else { "Shift+" }.to_string(),
-            "space" => "Espacio".to_string(),
+            "space" => "Space".to_string(),
             other => other.trim_start_matches("key").trim_start_matches("digit").to_uppercase(),
         })
         .collect::<String>()

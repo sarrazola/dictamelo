@@ -1,5 +1,6 @@
 //! Estado visible de la app (barra de menú, indicador flotante y ventana de configuración).
 
+use crate::i18n::t;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -21,14 +22,16 @@ impl Status {
         matches!(self, Status::Recording | Status::Transcribing | Status::Pasting)
     }
 
-    pub fn label(&self) -> String {
+    /// Texto corto del estado en el idioma indicado. Los mensajes de `Done`/`Error`
+    /// ya vienen traducidos desde el pipeline.
+    pub fn label(&self, lang: &str) -> String {
         match self {
-            Status::Idle => "Listo".into(),
-            Status::Recording => "Grabando…".into(),
-            Status::Transcribing => "Transcribiendo…".into(),
-            Status::Pasting => "Pegando…".into(),
+            Status::Idle => t(lang, "status.idle").into(),
+            Status::Recording => t(lang, "status.recording").into(),
+            Status::Transcribing => t(lang, "status.transcribing").into(),
+            Status::Pasting => t(lang, "status.pasting").into(),
             Status::Done { message } => message.clone(),
-            Status::Error { message } => format!("Error: {message}"),
+            Status::Error { message } => format!("{}: {message}", t(lang, "status.error")),
         }
     }
 }

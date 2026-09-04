@@ -7,130 +7,208 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
+<div class="app">
+
+  <aside class="sidebar">
     <div class="brand">
-      <span class="logo">🎙</span>
-      <div>
-        <h1>Dictado</h1>
-        <p class="subtitle">Mantén <kbd id="hotkey-inline">…</kbd> en cualquier app, habla y suelta.</p>
-      </div>
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="9" y="2.5" width="6" height="10.5" rx="3" fill="currentColor" stroke="none"/>
+          <path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/><path d="M8.5 21h7"/>
+        </svg>
+      </span>
+      <span class="brand-name">Dictado</span>
     </div>
-    <div id="status-pill" class="pill idle"><span class="dot"></span><span id="status-text">Listo</span></div>
-  </header>
 
-  <main>
-    <section class="card" id="card-permissions">
-      <h2>Permisos de macOS</h2>
-      <p class="lead">Dictado necesita dos permisos: el <strong>micrófono</strong> para grabar tu voz y <strong>Accesibilidad</strong> para pulsar ⌘V en la app donde estás escribiendo. Nada se graba hasta que mantienes el atajo.</p>
-      <div class="row">
-        <div class="label">
-          <strong>Micrófono</strong>
-          <span>Se pide la primera vez que grabas. Si lo negaste, actívalo en Ajustes del Sistema → Privacidad y seguridad → Micrófono.</span>
-        </div>
-        <div class="actions">
-          <span id="perm-mic" class="badge">…</span>
-          <button id="btn-mic-request" class="small" hidden>Solicitar acceso</button>
-          <button id="btn-mic-settings" class="small" hidden>Abrir Ajustes</button>
-        </div>
+    <nav id="nav">
+      <button class="nav-item" data-page="general">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--card)"/>
+          <circle cx="15" cy="12" r="2" fill="var(--card)"/><circle cx="8" cy="18" r="2" fill="var(--card)"/>
+        </svg>
+        <span data-i18n="nav.general"></span>
+      </button>
+      <button class="nav-item" data-page="models">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+          <rect x="7" y="7" width="10" height="10" rx="2.5"/>
+          <path d="M10 3v3M14 3v3M10 18v3M14 18v3M3 10h3M3 14h3M18 10h3M18 14h3" stroke-linecap="round"/>
+        </svg>
+        <span data-i18n="nav.models"></span>
+      </button>
+      <button class="nav-item" data-page="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 7.5V12l3 1.8"/>
+        </svg>
+        <span data-i18n="nav.history"></span>
+      </button>
+      <button class="nav-item" data-page="advanced">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/>
+        </svg>
+        <span data-i18n="nav.advanced"></span>
+      </button>
+      <button class="nav-item" data-page="about">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r="1.1" fill="currentColor" stroke="none"/>
+        </svg>
+        <span data-i18n="nav.about"></span>
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span id="foot-dot" class="foot-dot"></span>
+      <span id="foot-model" class="foot-model"></span>
+      <span id="foot-version" class="foot-version"></span>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="page-head">
+      <div>
+        <h1 id="page-title"></h1>
+        <p id="page-sub"></p>
       </div>
-      <div class="row">
-        <div class="label">
-          <strong>Accesibilidad</strong>
-          <span>Permite a Dictado enviar la pulsación ⌘V. En Ajustes del Sistema → Privacidad y seguridad → Accesibilidad, activa «Dictado».</span>
+      <div id="status-pill" class="pill idle"><span class="dot"></span><span id="status-text"></span></div>
+    </header>
+
+    <div id="perm-banner" class="banner" hidden>
+      <div class="banner-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <path d="M12 3.5 3.5 19h17L12 3.5Z"/><path d="M12 10v4"/><circle cx="12" cy="16.8" r="1" fill="currentColor" stroke="none"/>
+        </svg>
+        <div><strong data-i18n="perm.title"></strong><span data-i18n="perm.desc"></span></div>
+      </div>
+      <div id="perm-rows"></div>
+    </div>
+
+    <!-- General -->
+    <section class="page" data-page="general">
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="general.shortcut"></strong><span data-i18n="general.shortcut.desc"></span></div>
+          <div class="actions">
+            <button id="hotkey-display" class="keycap"></button>
+            <button id="btn-change-hotkey" class="ghost"></button>
+            <button id="btn-reset-hotkey" class="ghost icon" title="reset">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+                <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="actions">
-          <span id="perm-ax" class="badge">…</span>
-          <button id="btn-ax-request" class="small" hidden>Solicitar acceso</button>
-          <button id="btn-ax-settings" class="small" hidden>Abrir Ajustes</button>
+        <p class="hint" id="hotkey-hint"></p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="general.autopaste"></strong><span data-i18n="general.autopaste.desc"></span></div>
+          <div class="actions"><label class="switch"><input type="checkbox" id="auto-paste"><span class="track"></span></label></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="general.dictlang"></strong><span data-i18n="general.dictlang.desc"></span></div>
+          <div class="actions"><select id="language"></select></div>
         </div>
       </div>
     </section>
 
-    <section class="card" id="card-provider">
-      <h2>Transcripción</h2>
-      <p class="lead">El audio se envía al proveedor elegido y se elimina del disco en cuanto termina. La API key se guarda en el Llavero de macOS, nunca en archivos.</p>
-      <div class="row">
-        <div class="label"><strong>Proveedor</strong><span id="provider-note"></span></div>
-        <div class="actions"><select id="provider"></select></div>
+    <!-- Modelos -->
+    <section class="page" data-page="models">
+      <div class="card">
+        <div class="card-title" data-i18n="models.provider"></div>
+        <div id="provider-chips" class="chips"></div>
+        <div class="row stack">
+          <div class="label"><strong data-i18n="models.apikey"></strong><span id="key-status"></span></div>
+          <div class="actions full">
+            <input id="api-key" type="password" autocomplete="off" spellcheck="false">
+            <button id="btn-save-key" class="primary" data-i18n="models.save"></button>
+            <button id="btn-delete-key" class="ghost danger" hidden data-i18n="models.delete"></button>
+          </div>
+        </div>
+        <p class="hint"><button id="link-key" class="link" data-i18n="models.getkey"></button></p>
       </div>
-      <div class="row stacked">
-        <div class="label"><strong>API key</strong><span id="key-status">…</span></div>
-        <div class="actions wide">
-          <input id="api-key" type="password" placeholder="Pega tu API key" autocomplete="off" spellcheck="false">
-          <button id="btn-save-key" class="primary">Guardar</button>
-          <button id="btn-delete-key" class="danger" hidden>Eliminar</button>
+
+      <div class="card">
+        <div class="card-title" data-i18n="models.model"></div>
+        <div id="model-list" class="model-list"></div>
+      </div>
+
+      <p class="footnote" data-i18n="models.privacy"></p>
+    </section>
+
+    <!-- Historial -->
+    <section class="page" data-page="history">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" data-i18n="history.title"></span>
+          <button id="btn-clear-history" class="ghost danger small" data-i18n="history.clear"></button>
+        </div>
+        <ul id="history" class="history-list"></ul>
+        <p id="history-empty" class="empty" data-i18n="history.empty" hidden></p>
+      </div>
+    </section>
+
+    <!-- Avanzado -->
+    <section class="page" data-page="advanced">
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="advanced.mic"></strong><span data-i18n="advanced.mic.desc"></span></div>
+          <div class="actions"><select id="input-device"></select></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="advanced.maxsecs"></strong><span data-i18n="advanced.maxsecs.desc"></span></div>
+          <div class="actions"><input type="number" id="max-secs" min="5" max="900" step="5"></div>
         </div>
       </div>
-      <div class="row">
-        <div class="label"><strong>Modelo</strong><span id="model-note"></span></div>
-        <div class="actions"><select id="model"></select></div>
-      </div>
-      <div class="row">
-        <div class="label"><strong>Idioma</strong><span>«Automático» detecta el idioma; fijarlo mejora la precisión.</span></div>
-        <div class="actions"><select id="language"></select></div>
-      </div>
-      <p class="hint"><span class="link" id="link-key">Obtener una API key del proveedor ↗</span></p>
-    </section>
-
-    <section class="card" id="card-hotkey">
-      <h2>Atajo global</h2>
-      <p class="lead">Mantén presionado el atajo para grabar; al soltarlo se transcribe. Elige una combinación que ninguna otra app use.</p>
-      <div class="row">
-        <div class="label"><strong>Combinación</strong><span id="hotkey-raw"></span></div>
-        <div class="actions">
-          <kbd id="hotkey-display" class="hotkey-display">…</kbd>
-          <button id="btn-change-hotkey">Cambiar</button>
-          <button id="btn-reset-hotkey" class="small">Restablecer</button>
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="advanced.restore"></strong><span data-i18n="advanced.restore.desc"></span></div>
+          <div class="actions"><label class="switch"><input type="checkbox" id="restore-clipboard"><span class="track"></span></label></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="advanced.overlay"></strong><span data-i18n="advanced.overlay.desc"></span></div>
+          <div class="actions"><label class="switch"><input type="checkbox" id="show-overlay"><span class="track"></span></label></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="advanced.maxhistory"></strong><span data-i18n="advanced.maxhistory.desc"></span></div>
+          <div class="actions"><input type="number" id="max-history" min="1" max="500" step="1"></div>
         </div>
       </div>
-      <p class="hint" id="hotkey-hint"></p>
     </section>
 
-    <section class="card" id="card-behavior">
-      <h2>Comportamiento</h2>
-      <div class="row">
-        <div class="label"><strong>Pegado automático</strong><span>Escribe el texto donde estaba el cursor. Desactivado: solo se copia al portapapeles.</span></div>
-        <div class="actions"><label class="switch"><input type="checkbox" id="auto-paste"><span class="track"></span></label></div>
+    <!-- Acerca de -->
+    <section class="page" data-page="about">
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="about.uilang"></strong><span data-i18n="about.uilang.desc"></span></div>
+          <div class="actions"><select id="ui-language"></select></div>
+        </div>
       </div>
-      <div class="row">
-        <div class="label"><strong>Restaurar el portapapeles</strong><span>Tras pegar, recupera lo que tenías copiado (si no lo cambiaste mientras tanto).</span></div>
-        <div class="actions"><label class="switch"><input type="checkbox" id="restore-clipboard"><span class="track"></span></label></div>
+      <div class="card">
+        <div class="card-title" data-i18n="about.permissions"></div>
+        <div id="about-perm-rows"></div>
       </div>
-      <div class="row">
-        <div class="label"><strong>Indicador flotante</strong><span>Muestra «Grabando», «Transcribiendo»… sobre las demás ventanas.</span></div>
-        <div class="actions"><label class="switch"><input type="checkbox" id="show-overlay"><span class="track"></span></label></div>
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="about.version"></strong><span id="about-version"></span></div>
+          <div class="actions"></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="about.logs"></strong><span data-i18n="about.logs.desc"></span></div>
+          <div class="actions"><button id="btn-logs" class="ghost" data-i18n="about.openlogs"></button></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="about.config"></strong><span id="about-config" class="mono"></span></div>
+          <div class="actions"></div>
+        </div>
       </div>
-      <div class="row">
-        <div class="label"><strong>Micrófono</strong><span>Dispositivo de entrada que se graba.</span></div>
-        <div class="actions"><select id="input-device"><option value="">Predeterminado del sistema</option></select></div>
-      </div>
-      <div class="row">
-        <div class="label"><strong>Duración máxima</strong><span>Segundos por grabación (5–900). Al llegar al límite se transcribe automáticamente.</span></div>
-        <div class="actions"><input type="number" id="max-secs" min="5" max="900" step="5"></div>
-      </div>
-      <div class="row">
-        <div class="label"><strong>Historial</strong><span>Cantidad de transcripciones que se conservan localmente (1–500).</span></div>
-        <div class="actions"><input type="number" id="max-history" min="1" max="500" step="1"></div>
-      </div>
-    </section>
-
-    <section class="card" id="card-history">
-      <div class="row" style="border-top:0;padding-top:0">
-        <div class="label"><h2 style="margin:0">Historial</h2><span>Guardado solo en este equipo.</span></div>
-        <div class="actions"><button id="btn-clear-history" class="small danger">Vaciar</button></div>
-      </div>
-      <ul id="history" class="history-list"></ul>
-      <p id="history-empty" class="empty" hidden>Todavía no hay transcripciones.</p>
     </section>
   </main>
+</div>
 
-  <footer>
-    <span id="about">Dictado</span>
-    <span><button id="btn-logs">Abrir registros</button></span>
-  </footer>
-
-  <div id="toast" class="toast" hidden></div>
-  <script src="dev-mock.js"></script>
-  <script src="main.js"></script>
+<div id="toast" class="toast" hidden></div>
+<script src="i18n.js"></script>
+<script src="dev-mock.js"></script>
+<script src="main.js"></script>
 </body>
 </html>

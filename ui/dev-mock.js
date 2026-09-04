@@ -3,7 +3,8 @@
 if (!window.__TAURI__) {
   const settings = {
     hotkey: "Alt+Shift+Space", provider: "groq", model: "whisper-large-v3-turbo", language: "auto",
-    autoPaste: true, restoreClipboard: true, showOverlay: true, inputDevice: null, maxHistory: 50, maxRecordingSecs: 300,
+    uiLanguage: "auto", autoPaste: true, restoreClipboard: true, showOverlay: true,
+    inputDevice: null, maxHistory: 50, maxRecordingSecs: 300,
   };
   const history = [
     { id: "1", timestamp: new Date().toISOString(), text: "Hola, esto es una prueba de dictado por voz. El texto debería aparecer donde estaba el cursor.", durationMs: 6300, provider: "groq", model: "whisper-large-v3-turbo", language: "Spanish", pasted: true },
@@ -21,10 +22,16 @@ if (!window.__TAURI__) {
   ];
   let keyConfigured = true;
   const commands = {
-    get_app_info: () => ({ version: "0.1.0 (vista previa)", platform: "macos", defaultHotkey: "Alt+Shift+Space", logDir: "~/Library/Logs/com.sarrazola.dictado", configDir: "~/Library/Application Support/com.sarrazola.dictado" }),
+    get_app_info: () => ({
+      version: "0.1.0", platform: "macos", defaultHotkey: "Alt+Shift+Space",
+      logDir: "~/Library/Logs/com.sarrazola.dictado",
+      configDir: "~/Library/Application Support/com.sarrazola.dictado",
+      uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",
+    }),
     get_providers: () => providers,
     get_settings: () => settings,
     save_settings: ({ settings: s }) => Object.assign(settings, s),
+    ui_ready: () => null,
     get_status: () => ({ state: "idle" }),
     get_api_key_status: () => ({ configured: keyConfigured, hint: keyConfigured ? "…abcd" : null }),
     set_api_key: () => { keyConfigured = true; },
@@ -59,7 +66,7 @@ if (!window.__TAURI__) {
     },
   };
   const emit = (name, payload) => (listeners[name] || []).forEach((cb) => cb({ payload }));
-  const cycle = [{ state: "recording" }, { state: "transcribing" }, { state: "pasting" }, { state: "done", message: "Texto pegado" }, { state: "idle" }, { state: "error", message: "Sin conexión con el servicio" }];
+  const cycle = [{ state: "recording" }, { state: "transcribing" }, { state: "pasting" }, { state: "done", message: "Text pasted" }, { state: "idle" }, { state: "error", message: "No connection to the service" }];
   let i = 0;
   setInterval(() => emit("status", cycle[i++ % cycle.length]), 2500);
   setInterval(() => emit("audio-level", Math.random() * 0.15), 100);

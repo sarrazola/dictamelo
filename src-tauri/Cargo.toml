@@ -35,7 +35,7 @@ uuid = { version = "1", features = ["v4"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSString", "NSEnumerator", "NSObject"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSString", "NSEnumerator", "NSObject", "NSLocale"] }
 objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem", "NSWindow", "NSApplication", "NSResponder", "NSScreen"] }
 objc2-av-foundation = { version = "0.3", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
 block2 = "0.6"

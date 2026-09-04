@@ -16,8 +16,10 @@ pub struct Settings {
     pub provider: String,
     /// Identificador del modelo dentro del proveedor.
     pub model: String,
-    /// Código ISO-639-1 del idioma o "auto" para detección automática.
+    /// Código ISO-639-1 del idioma del dictado, o "auto" para detección automática.
     pub language: String,
+    /// Idioma de la interfaz y de los mensajes ("auto" = el del sistema).
+    pub ui_language: String,
     /// Pegar automáticamente donde estaba el cursor. Si es `false`, solo se copia al portapapeles.
     pub auto_paste: bool,
     /// Restaurar el contenido anterior del portapapeles después de pegar.
@@ -39,6 +41,7 @@ impl Default for Settings {
             provider: DEFAULT_PROVIDER.to_string(),
             model: DEFAULT_MODEL.to_string(),
             language: "auto".to_string(),
+            ui_language: "auto".to_string(),
             auto_paste: true,
             restore_clipboard: true,
             show_overlay: true,
@@ -72,6 +75,11 @@ impl Settings {
         std::fs::write(path, json)
     }
 
+    /// Idioma resuelto de la interfaz (nunca "auto").
+    pub fn ui_lang(&self) -> String {
+        crate::i18n::resolve(&self.ui_language)
+    }
+
     /// Idioma para la API (`None` = detección automática).
     pub fn language_code(&self) -> Option<String> {
         let lang = self.language.trim();
@@ -97,6 +105,9 @@ impl Settings {
         }
         if self.language.trim().is_empty() {
             self.language = "auto".to_string();
+        }
+        if self.ui_language.trim().is_empty() {
+            self.ui_language = "auto".to_string();
         }
         if matches!(self.input_device.as_deref(), Some("")) {
             self.input_device = None;

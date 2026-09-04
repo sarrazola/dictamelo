@@ -1,5 +1,6 @@
 //! Registro del atajo global (mantener presionado = grabar) con `tauri-plugin-global-shortcut`.
 
+use crate::i18n::tf;
 use crate::pipeline;
 use crate::settings::DEFAULT_HOTKEY;
 use crate::state::AppState;
@@ -35,10 +36,13 @@ pub fn apply_from_settings(app: &AppHandle) {
     if let Err(e) = apply(app, &hotkey) {
         log::error!("{e}");
         if hotkey != DEFAULT_HOTKEY {
+            let lang = app.state::<AppState>().settings().ui_lang();
             match apply(app, DEFAULT_HOTKEY) {
                 Ok(()) => pipeline::set_status(
                     app,
-                    Status::Error { message: format!("No se pudo usar el atajo «{hotkey}»; se usa {DEFAULT_HOTKEY}") },
+                    Status::Error {
+                        message: tf(&lang, "err.hotkey_failed", &[("k", &hotkey), ("d", DEFAULT_HOTKEY)]),
+                    },
                 ),
                 Err(e2) => pipeline::set_status(app, Status::Error { message: e2 }),
             };

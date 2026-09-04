@@ -1,11 +1,13 @@
 //! Implementación macOS: TCC (micrófono/accesibilidad), CGEvent (⌘V), NSPasteboard y NSWindow.
 
 mod clipboard;
+mod locale;
 mod keyboard;
 mod permissions;
 mod window;
 
 pub use clipboard::clipboard_backend;
+pub use locale::system_language;
 pub use keyboard::{press_hotkey_for_test, send_paste_keystroke};
 pub use permissions::{
     open_permission_settings, permissions_status, request_accessibility_permission,

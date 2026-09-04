@@ -1,39 +1,73 @@
-// Interfaz de configuración. Toda la lógica vive en Rust; aquí solo se pinta y se invocan comandos.
+// Interfaz de configuración. Toda la lógica de la app vive en Rust; aquí solo se pinta
+// y se invocan comandos. Los textos salen de i18n.js.
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
 const ui = {
   settings: null,
   providers: [],
   appInfo: null,
+  lang: "es",
+  page: "general",
   capturing: false,
   deleteArmed: false,
 };
 
-const LANGUAGES = [
-  ["auto", "Automático"], ["es", "Español"], ["en", "Inglés"], ["pt", "Portugués"],
-  ["fr", "Francés"], ["de", "Alemán"], ["it", "Italiano"], ["ca", "Catalán"],
-  ["nl", "Neerlandés"], ["ja", "Japonés"], ["ko", "Coreano"], ["zh", "Chino"],
-  ["ru", "Ruso"], ["ar", "Árabe"], ["hi", "Hindi"], ["tr", "Turco"], ["pl", "Polaco"],
-  ["sv", "Sueco"], ["da", "Danés"], ["fi", "Finés"], ["no", "Noruego"], ["el", "Griego"],
-  ["he", "Hebreo"], ["uk", "Ucraniano"], ["cs", "Checo"], ["ro", "Rumano"], ["hu", "Húngaro"],
+/** Idiomas de dictado, en su nombre nativo (no se traducen). */
+const DICTATION_LANGUAGES = [
+  ["es", "Español"], ["en", "English"], ["pt", "Português"], ["fr", "Français"],
+  ["de", "Deutsch"], ["it", "Italiano"], ["ca", "Català"], ["nl", "Nederlands"],
+  ["ja", "日本語"], ["ko", "한국어"], ["zh", "中文"], ["ru", "Русский"],
+  ["ar", "العربية"], ["hi", "हिन्दी"], ["tr", "Türkçe"], ["pl", "Polski"],
+  ["sv", "Svenska"], ["da", "Dansk"], ["fi", "Suomi"], ["nb", "Norsk"],
+  ["el", "Ελληνικά"], ["he", "עברית"], ["uk", "Українська"], ["cs", "Čeština"],
+  ["ro", "Română"], ["hu", "Magyar"], ["id", "Bahasa Indonesia"], ["vi", "Tiếng Việt"],
 ];
+
+/** Color e inicial de cada proveedor para su distintivo. */
+const BRAND = {
+  groq: { bg: "#f55036", mark: "G" },
+  openai: { bg: "#10a37f", mark: "AI" },
+  gemini: { bg: "#3b7ff5", mark: "G" },
+  deepgram: { bg: "#13ef95", mark: "D" },
+  grok: { bg: "#111114", mark: "X" },
+  local: { bg: "#7a7a86", mark: "◍" },
+};
+
 const MODIFIER_CODES = new Set([
   "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight",
   "MetaLeft", "MetaRight", "CapsLock", "Fn", "FnLock",
 ]);
-const PERMISSION_LABELS = {
-  granted: "Concedido",
-  denied: "Denegado",
-  not_determined: "Sin decidir",
-  not_applicable: "No necesario",
+
+const PERMISSION_KEY = {
+  granted: "perm.granted", denied: "perm.denied",
+  not_determined: "perm.pending", not_applicable: "perm.na",
 };
+
+// ---------- i18n ----------
+
+function t(key, vars) {
+  const table = window.I18N[ui.lang] || window.I18N.en;
+  let text = table[key] ?? window.I18N.en[key] ?? key;
+  if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, v);
+  return text;
+}
+
+function applyStaticText() {
+  document.documentElement.lang = ui.lang;
+  for (const el of $$("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  $("#btn-change-hotkey").textContent = t(ui.capturing ? "general.cancel" : "general.change");
+  $("#api-key").placeholder = t("models.apikey.placeholder");
+}
 
 function isMac() {
   return (ui.appInfo?.platform || "macos") === "macos";
 }
 
+/** "Alt+Shift+Space" → "⌥⇧Space". */
 function prettyHotkey(hotkey) {
   const mac = isMac();
   const parts = String(hotkey || "").split("+").map((p) => p.trim()).filter(Boolean);
@@ -43,7 +77,7 @@ function prettyHotkey(hotkey) {
     if (["alt", "option"].includes(key)) return mac ? "⌥" : "Alt";
     if (["control", "ctrl"].includes(key)) return mac ? "⌃" : "Ctrl";
     if (key === "shift") return mac ? "⇧" : "Shift";
-    if (key === "space") return "Espacio";
+    if (key === "space") return "Space";
     if (key.startsWith("key") && key.length === 4) return key.slice(3).toUpperCase();
     if (key.startsWith("digit") && key.length === 6) return key.slice(5);
     if (key.startsWith("arrow")) return { up: "↑", down: "↓", left: "←", right: "→" }[key.slice(5)] || part;
@@ -67,130 +101,188 @@ function currentProvider() {
   return ui.providers.find((p) => p.id === ui.settings.provider) || ui.providers[0];
 }
 
+// ---------- Navegación ----------
+
+function showPage(page) {
+  ui.page = page;
+  for (const item of $$(".nav-item")) item.classList.toggle("active", item.dataset.page === page);
+  for (const section of $$(".page")) section.classList.toggle("active", section.dataset.page === page);
+  $("#page-title").textContent = t(`${page}.title`);
+  $("#page-sub").textContent = t(`${page}.subtitle`);
+  // El aviso de permisos solo estorba fuera de General; el detalle vive en «Acerca de».
+  updateBannerVisibility();
+  $("#content")?.scrollTo(0, 0);
+  document.querySelector(".content").scrollTop = 0;
+}
+
 // ---------- Render ----------
 
 function renderStatus(status) {
   const pill = $("#status-pill");
   pill.className = `pill ${status.state}`;
-  const labels = {
-    idle: "Listo",
-    recording: "Grabando…",
-    transcribing: "Transcribiendo…",
-    pasting: "Pegando…",
-  };
-  $("#status-text").textContent = labels[status.state] || status.message || status.state;
+  const known = ["idle", "recording", "transcribing", "pasting"];
+  $("#status-text").textContent = known.includes(status.state)
+    ? t(`status.${status.state}`)
+    : status.message || status.state;
 }
 
-function renderProviderOptions() {
-  const select = $("#provider");
-  select.innerHTML = "";
-  for (const p of ui.providers) {
-    const opt = document.createElement("option");
-    opt.value = p.id;
-    opt.textContent = p.verified ? p.name : `${p.name} (sin probar)`;
-    select.appendChild(opt);
-  }
-}
-
-function renderSettings() {
-  const s = ui.settings;
+function renderSidebar() {
   const provider = currentProvider();
-  $("#provider").value = s.provider;
-  $("#provider-note").textContent = provider?.verified
-    ? "Probado de extremo a extremo en esta versión."
-    : "Incluido para demostrar la interfaz de proveedores; no se ha probado.";
-
-  const model = $("#model");
-  model.innerHTML = "";
-  for (const m of provider?.models || []) {
-    const opt = document.createElement("option");
-    opt.value = m.id;
-    opt.textContent = m.name;
-    model.appendChild(opt);
-  }
-  model.value = s.model;
-  const modelInfo = provider?.models.find((m) => m.id === s.model);
-  $("#model-note").textContent = modelInfo?.description || "";
-
-  $("#language").value = s.language;
-  $("#hotkey-display").textContent = prettyHotkey(s.hotkey);
-  $("#hotkey-inline").textContent = prettyHotkey(s.hotkey);
-  $("#hotkey-raw").textContent = s.hotkey;
-  $("#auto-paste").checked = s.autoPaste;
-  $("#restore-clipboard").checked = s.restoreClipboard;
-  $("#restore-clipboard").disabled = !s.autoPaste;
-  $("#show-overlay").checked = s.showOverlay;
-  $("#input-device").value = s.inputDevice || "";
-  $("#max-secs").value = s.maxRecordingSecs;
-  $("#max-history").value = s.maxHistory;
+  const model = provider?.models.find((m) => m.id === ui.settings.model);
+  $("#foot-model").textContent = model ? model.name : ui.settings.model;
+  $("#foot-model").title = provider ? `${provider.name} · ${model?.name ?? ui.settings.model}` : "";
+  $("#foot-version").textContent = ui.appInfo.version;
 }
 
-function fillLanguages() {
-  const select = $("#language");
-  for (const [code, name] of LANGUAGES) {
+function renderGeneral() {
+  $("#hotkey-display").textContent = ui.capturing ? t("general.press") : prettyHotkey(ui.settings.hotkey);
+  $("#hotkey-display").classList.toggle("capturing", ui.capturing);
+  $("#auto-paste").checked = ui.settings.autoPaste;
+  fillSelect($("#language"), [["auto", t("common.auto")], ...DICTATION_LANGUAGES], ui.settings.language);
+}
+
+function fillSelect(select, entries, value) {
+  select.innerHTML = "";
+  for (const [code, name] of entries) {
     const opt = document.createElement("option");
     opt.value = code;
     opt.textContent = name;
     select.appendChild(opt);
   }
+  select.value = value ?? "";
 }
 
-async function loadDevices() {
-  try {
-    const devices = await invoke("list_input_devices");
-    const select = $("#input-device");
-    const current = ui.settings.inputDevice || "";
-    select.innerHTML = '<option value="">Predeterminado del sistema</option>';
-    for (const name of devices) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      select.appendChild(opt);
+function providerLogo(id, name) {
+  const brand = BRAND[id] || { bg: "var(--accent)", mark: name.charAt(0).toUpperCase() };
+  const span = document.createElement("span");
+  span.className = "logo";
+  span.style.background = brand.bg;
+  span.textContent = brand.mark;
+  return span;
+}
+
+function renderModels() {
+  const chips = $("#provider-chips");
+  chips.innerHTML = "";
+  for (const p of ui.providers) {
+    const chip = document.createElement("button");
+    chip.className = `chip${p.id === ui.settings.provider ? " active" : ""}`;
+    chip.dataset.provider = p.id;
+    chip.appendChild(providerLogo(p.id, p.name));
+    const name = document.createElement("span");
+    name.textContent = p.name;
+    chip.appendChild(name);
+    if (!p.verified) {
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = t("models.unverified");
+      chip.appendChild(tag);
     }
-    if (current && !devices.includes(current)) {
-      const opt = document.createElement("option");
-      opt.value = current;
-      opt.textContent = `${current} (no conectado)`;
-      select.appendChild(opt);
-    }
-    select.value = current;
-  } catch (err) {
-    console.error(err);
+    chips.appendChild(chip);
   }
+
+  const list = $("#model-list");
+  list.innerHTML = "";
+  for (const m of currentProvider()?.models || []) {
+    const card = document.createElement("button");
+    card.className = `model${m.id === ui.settings.model ? " active" : ""}`;
+    card.dataset.model = m.id;
+    const radio = document.createElement("span");
+    radio.className = "radio";
+    const info = document.createElement("span");
+    info.className = "info";
+    const strong = document.createElement("strong");
+    strong.textContent = m.name;
+    const desc = document.createElement("span");
+    desc.textContent = m.description;
+    info.append(strong, desc);
+    card.append(radio, info);
+    list.appendChild(card);
+  }
+}
+
+function permissionRow(kind, state) {
+  const row = document.createElement("div");
+  row.className = "row";
+  const label = document.createElement("div");
+  label.className = "label";
+  const strong = document.createElement("strong");
+  strong.textContent = t(`perm.${kind}`);
+  const desc = document.createElement("span");
+  desc.textContent = t(`perm.${kind}.desc`);
+  label.append(strong, desc);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const badge = document.createElement("span");
+  badge.className = `badge ${state}`;
+  badge.textContent = t(PERMISSION_KEY[state] || "perm.pending");
+  actions.appendChild(badge);
+
+  if (state === "not_determined" || (kind === "ax" && state === "denied")) {
+    const grant = document.createElement("button");
+    grant.className = "ghost small";
+    grant.dataset.grant = kind;
+    grant.textContent = t("perm.grant");
+    actions.appendChild(grant);
+  }
+  if (state === "denied") {
+    const open = document.createElement("button");
+    open.className = "ghost small";
+    open.dataset.openPerm = kind;
+    open.textContent = t("perm.open");
+    actions.appendChild(open);
+  }
+  row.append(label, actions);
+  return row;
+}
+
+/** El aviso solo se muestra en General, y solo si falta algún permiso. */
+function updateBannerVisibility() {
+  const banner = $("#perm-banner");
+  banner.hidden = ui.page !== "general" || !banner.dataset.missing;
+}
+
+function renderPermissions(perms) {
+  const entries = [["mic", perms.microphone], ["ax", perms.accessibility]];
+  const missing = entries.filter(([, s]) => s !== "granted" && s !== "not_applicable");
+
+  const banner = $("#perm-banner");
+  const rows = $("#perm-rows");
+  rows.innerHTML = "";
+  banner.dataset.missing = missing.length ? "1" : "";
+  for (const [kind, state] of missing) rows.appendChild(permissionRow(kind, state));
+  updateBannerVisibility();
+
+  const aboutRows = $("#about-perm-rows");
+  aboutRows.innerHTML = "";
+  for (const [kind, state] of entries) aboutRows.appendChild(permissionRow(kind, state));
 }
 
 async function refreshPermissions() {
   try {
-    const perms = await invoke("get_permissions");
-    renderPermission("mic", perms.microphone);
-    renderPermission("ax", perms.accessibility);
+    renderPermissions(await invoke("get_permissions"));
   } catch (err) {
     console.error(err);
   }
 }
 
-function renderPermission(prefix, state) {
-  const badge = $(`#perm-${prefix}`);
-  badge.className = `badge ${state}`;
-  badge.textContent = PERMISSION_LABELS[state] || state;
-  $(`#btn-${prefix}-request`).hidden = !(state === "not_determined" || (prefix === "ax" && state === "denied"));
-  $(`#btn-${prefix}-settings`).hidden = state !== "denied";
-}
-
 async function refreshKeyStatus() {
   const provider = currentProvider();
+  if (!provider) return;
   try {
     const status = await invoke("get_api_key_status", { provider: provider.id });
     $("#key-status").textContent = status.configured
-      ? `Guardada en el Llavero ${status.hint ? `(${status.hint})` : ""}`
-      : `No configurada. Necesitas una API key de ${provider.name}.`;
+      ? `${t("models.apikey.stored")}${status.hint ? ` (${status.hint})` : ""}`
+      : t("models.apikey.missing", { p: provider.name });
     $("#btn-delete-key").hidden = !status.configured;
-    $("#api-key").placeholder = status.configured ? "Pega una nueva API key para reemplazarla" : "Pega tu API key";
+    $("#api-key").placeholder = t(status.configured ? "models.apikey.replace" : "models.apikey.placeholder");
+    $("#foot-dot").style.background = status.configured ? "var(--ok)" : "var(--warn)";
   } catch (err) {
-    $("#key-status").textContent = `No se pudo consultar el Llavero: ${err}`;
+    $("#key-status").textContent = String(err);
   }
   ui.deleteArmed = false;
-  $("#btn-delete-key").textContent = "Eliminar";
+  $("#btn-delete-key").textContent = t("models.delete");
 }
 
 async function refreshHistory() {
@@ -203,20 +295,27 @@ async function refreshHistory() {
     for (const e of entries) {
       const li = document.createElement("li");
       li.className = "history-item";
-      const when = new Date(e.timestamp).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
-      const secs = (e.durationMs / 1000).toFixed(1);
-      li.innerHTML = `
-        <div class="text"></div>
-        <div class="actions">
-          <button class="small" data-copy="${e.id}">Copiar</button>
-          <button class="small danger" data-delete="${e.id}">Borrar</button>
-        </div>`;
-      const text = li.querySelector(".text");
+      const text = document.createElement("div");
+      text.className = "text";
       text.textContent = e.text;
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.textContent = `${when} · ${secs} s · ${e.model}${e.language ? ` · ${e.language}` : ""}${e.pasted ? " · pegado" : " · copiado"}`;
+      const when = new Date(e.timestamp).toLocaleString(ui.lang, { dateStyle: "short", timeStyle: "short" });
+      meta.textContent = `${when} · ${(e.durationMs / 1000).toFixed(1)}s · ${e.model} · ${t(e.pasted ? "history.pasted" : "history.copied")}`;
       text.appendChild(meta);
+
+      const tools = document.createElement("div");
+      tools.className = "tools";
+      const copy = document.createElement("button");
+      copy.className = "ghost small";
+      copy.dataset.copy = e.id;
+      copy.textContent = t("history.copy");
+      const del = document.createElement("button");
+      del.className = "ghost small danger";
+      del.dataset.delete = e.id;
+      del.textContent = t("history.delete");
+      tools.append(copy, del);
+      li.append(text, tools);
       list.appendChild(li);
     }
   } catch (err) {
@@ -224,12 +323,42 @@ async function refreshHistory() {
   }
 }
 
-async function refreshStatus() {
+async function refreshDevices() {
   try {
-    renderStatus(await invoke("get_status"));
+    const devices = await invoke("list_input_devices");
+    const current = ui.settings.inputDevice || "";
+    const entries = [["", t("advanced.device.default")], ...devices.map((d) => [d, d])];
+    if (current && !devices.includes(current)) entries.push([current, `${current} (${t("advanced.device.gone")})`]);
+    fillSelect($("#input-device"), entries, current);
   } catch (err) {
     console.error(err);
   }
+}
+
+function renderAdvanced() {
+  $("#restore-clipboard").checked = ui.settings.restoreClipboard;
+  $("#restore-clipboard").disabled = !ui.settings.autoPaste;
+  $("#show-overlay").checked = ui.settings.showOverlay;
+  $("#max-secs").value = ui.settings.maxRecordingSecs;
+  $("#max-history").value = ui.settings.maxHistory;
+}
+
+function renderAbout() {
+  const entries = [["auto", t("about.auto")], ...ui.appInfo.uiLanguages.map((c) => [c, window.UI_LANGUAGE_NAMES[c] || c])];
+  fillSelect($("#ui-language"), entries, ui.settings.uiLanguage);
+  $("#about-version").textContent = ui.appInfo.version;
+  $("#about-config").textContent = ui.appInfo.configDir;
+}
+
+/** Repinta todo tras cambiar ajustes o idioma. */
+function renderAll() {
+  applyStaticText();
+  showPage(ui.page);
+  renderSidebar();
+  renderGeneral();
+  renderModels();
+  renderAdvanced();
+  renderAbout();
 }
 
 // ---------- Acciones ----------
@@ -238,23 +367,40 @@ async function saveSettings(patch) {
   const next = { ...ui.settings, ...patch };
   try {
     ui.settings = await invoke("save_settings", { settings: next });
-    renderSettings();
-    toast("Guardado");
+    ui.lang = ui.settings.uiLanguage === "auto"
+      ? resolveAutoLanguage()
+      : ui.settings.uiLanguage;
+    renderAll();
+    await Promise.all([refreshHistory(), refreshDevices(), refreshPermissions(), refreshKeyStatus()]);
+    toast(t("toast.saved"));
   } catch (err) {
     toast(String(err), true);
-    renderSettings();
+    renderAll();
   }
+}
+
+function resolveAutoLanguage() {
+  const supported = ui.appInfo?.uiLanguages || ["en"];
+  for (const tag of navigator.languages || [navigator.language || "en"]) {
+    const short = String(tag).split("-")[0].toLowerCase();
+    if (supported.includes(short)) return short;
+  }
+  return ui.appInfo?.resolvedUiLanguage || "en";
+}
+
+function setHint(message, isError = false) {
+  const el = $("#hotkey-hint");
+  el.textContent = message;
+  el.classList.toggle("error", isError);
 }
 
 function beginCapture() {
   if (ui.capturing) return;
   ui.capturing = true;
   invoke("begin_hotkey_capture").catch(console.error);
-  const display = $("#hotkey-display");
-  display.classList.add("capturing");
-  display.textContent = "Presiona la combinación…";
-  $("#btn-change-hotkey").textContent = "Cancelar";
-  setHint("Usa al menos un modificador (⌘ ⌥ ⌃ ⇧) más una tecla, o una tecla F1–F24. Esc cancela.");
+  renderGeneral();
+  $("#btn-change-hotkey").textContent = t("general.cancel");
+  setHint(t("general.hint"));
   window.addEventListener("keydown", onCaptureKeydown, true);
 }
 
@@ -262,16 +408,9 @@ function endCapture() {
   if (!ui.capturing) return;
   ui.capturing = false;
   window.removeEventListener("keydown", onCaptureKeydown, true);
-  $("#hotkey-display").classList.remove("capturing");
-  $("#btn-change-hotkey").textContent = "Cambiar";
   invoke("end_hotkey_capture").catch(console.error);
-  renderSettings();
-}
-
-function setHint(message, isError = false) {
-  const el = $("#hotkey-hint");
-  el.textContent = message;
-  el.classList.toggle("error", isError);
+  renderGeneral();
+  $("#btn-change-hotkey").textContent = t("general.change");
 }
 
 async function onCaptureKeydown(e) {
@@ -289,35 +428,45 @@ async function onCaptureKeydown(e) {
   if (e.metaKey) mods.push("Super");
   const code = e.code;
   if (!code || MODIFIER_CODES.has(code)) {
-    $("#hotkey-display").textContent = mods.length ? prettyHotkey(mods.join("+")) + "…" : "Presiona la combinación…";
+    $("#hotkey-display").textContent = mods.length ? `${prettyHotkey(mods.join("+"))}…` : t("general.press");
     return;
   }
   const isFunctionKey = /^F([1-9]|1[0-9]|2[0-4])$/.test(code);
   if (mods.length === 0 && !isFunctionKey) {
-    setHint("Añade un modificador (⌘ ⌥ ⌃ ⇧) o usa una tecla F1–F24.", true);
+    setHint(t("general.hint.mod"), true);
     return;
   }
   const combo = [...mods, code].join("+");
   try {
     await invoke("validate_hotkey", { hotkey: combo });
-    // Guardamos con la captura aún suspendida; el atajo se registra en end_hotkey_capture.
-    const next = { ...ui.settings, hotkey: combo };
-    ui.settings = await invoke("save_settings", { settings: next });
-    setHint(`Atajo guardado: ${prettyHotkey(combo)}`);
+    ui.settings = await invoke("save_settings", { settings: { ...ui.settings, hotkey: combo } });
+    setHint("");
     endCapture();
-    toast("Atajo actualizado");
+    renderAll();
+    toast(t("toast.hotkey"));
   } catch (err) {
     setHint(String(err), true);
   }
 }
 
 function wireEvents() {
-  $("#provider").addEventListener("change", async (e) => {
-    const provider = ui.providers.find((p) => p.id === e.target.value);
+  $("#nav").addEventListener("click", (e) => {
+    const item = e.target.closest(".nav-item");
+    if (item) showPage(item.dataset.page);
+  });
+
+  $("#provider-chips").addEventListener("click", async (e) => {
+    const chip = e.target.closest("[data-provider]");
+    if (!chip) return;
+    const provider = ui.providers.find((p) => p.id === chip.dataset.provider);
     await saveSettings({ provider: provider.id, model: provider.defaultModel });
     await refreshKeyStatus();
   });
-  $("#model").addEventListener("change", (e) => saveSettings({ model: e.target.value }));
+  $("#model-list").addEventListener("click", (e) => {
+    const card = e.target.closest("[data-model]");
+    if (card) saveSettings({ model: card.dataset.model });
+  });
+
   $("#language").addEventListener("change", (e) => saveSettings({ language: e.target.value }));
   $("#auto-paste").addEventListener("change", (e) => saveSettings({ autoPaste: e.target.checked }));
   $("#restore-clipboard").addEventListener("change", (e) => saveSettings({ restoreClipboard: e.target.checked }));
@@ -325,15 +474,16 @@ function wireEvents() {
   $("#input-device").addEventListener("change", (e) => saveSettings({ inputDevice: e.target.value || null }));
   $("#max-secs").addEventListener("change", (e) => saveSettings({ maxRecordingSecs: Number(e.target.value) || 300 }));
   $("#max-history").addEventListener("change", (e) => saveSettings({ maxHistory: Number(e.target.value) || 50 }));
+  $("#ui-language").addEventListener("change", (e) => saveSettings({ uiLanguage: e.target.value }));
 
   $("#btn-save-key").addEventListener("click", async () => {
     const input = $("#api-key");
     const key = input.value.trim();
-    if (!key) return toast("Pega primero la API key", true);
+    if (!key) return;
     try {
       await invoke("set_api_key", { provider: ui.settings.provider, apiKey: key });
       input.value = "";
-      toast("API key guardada en el Llavero");
+      toast(t("toast.key_saved"));
       await refreshKeyStatus();
     } catch (err) {
       toast(String(err), true);
@@ -345,37 +495,51 @@ function wireEvents() {
   $("#btn-delete-key").addEventListener("click", async () => {
     if (!ui.deleteArmed) {
       ui.deleteArmed = true;
-      $("#btn-delete-key").textContent = "¿Seguro? Eliminar";
+      $("#btn-delete-key").textContent = t("models.confirm");
       setTimeout(() => {
         ui.deleteArmed = false;
-        $("#btn-delete-key").textContent = "Eliminar";
+        $("#btn-delete-key").textContent = t("models.delete");
       }, 4000);
       return;
     }
     try {
       await invoke("delete_api_key", { provider: ui.settings.provider });
-      toast("API key eliminada");
+      toast(t("toast.key_deleted"));
       await refreshKeyStatus();
     } catch (err) {
       toast(String(err), true);
     }
   });
-  $("#link-key").addEventListener("click", () => invoke("open_url", { url: currentProvider().keyUrl }).catch((e) => toast(String(e), true)));
+  $("#link-key").addEventListener("click", () =>
+    invoke("open_url", { url: currentProvider().keyUrl }).catch((e) => toast(String(e), true)));
 
-  $("#btn-change-hotkey").addEventListener("click", () => (ui.capturing ? (setHint(""), endCapture()) : beginCapture()));
+  $("#btn-change-hotkey").addEventListener("click", () => {
+    if (ui.capturing) {
+      setHint("");
+      endCapture();
+    } else {
+      beginCapture();
+    }
+  });
+  $("#hotkey-display").addEventListener("click", () => !ui.capturing && beginCapture());
   $("#btn-reset-hotkey").addEventListener("click", () => saveSettings({ hotkey: ui.appInfo.defaultHotkey }));
 
-  $("#btn-mic-request").addEventListener("click", async () => {
-    await invoke("request_microphone_permission");
-    setTimeout(refreshPermissions, 800);
+  document.addEventListener("click", async (e) => {
+    const grant = e.target.closest("[data-grant]");
+    const open = e.target.closest("[data-open-perm]");
+    if (grant) {
+      if (grant.dataset.grant === "mic") {
+        await invoke("request_microphone_permission");
+      } else {
+        const ok = await invoke("request_accessibility_permission");
+        if (!ok) toast(t("perm.ax.hint"));
+      }
+      setTimeout(refreshPermissions, 800);
+    } else if (open) {
+      const kind = open.dataset.openPerm === "mic" ? "microphone" : "accessibility";
+      invoke("open_permission_settings", { kind }).catch((err) => toast(String(err), true));
+    }
   });
-  $("#btn-mic-settings").addEventListener("click", () => invoke("open_permission_settings", { kind: "microphone" }));
-  $("#btn-ax-request").addEventListener("click", async () => {
-    const granted = await invoke("request_accessibility_permission");
-    if (!granted) toast("Activa «Dictado» en la lista de Accesibilidad de Ajustes del Sistema");
-    setTimeout(refreshPermissions, 800);
-  });
-  $("#btn-ax-settings").addEventListener("click", () => invoke("open_permission_settings", { kind: "accessibility" }));
 
   $("#history").addEventListener("click", async (e) => {
     const copy = e.target.closest("[data-copy]");
@@ -383,7 +547,7 @@ function wireEvents() {
     try {
       if (copy) {
         await invoke("copy_history_entry", { id: copy.dataset.copy });
-        toast("Copiado al portapapeles");
+        toast(t("toast.copied"));
       } else if (del) {
         await invoke("delete_history_entry", { id: del.dataset.delete });
       }
@@ -391,12 +555,14 @@ function wireEvents() {
       toast(String(err), true);
     }
   });
-  $("#btn-clear-history").addEventListener("click", () => invoke("clear_history").catch((e) => toast(String(e), true)));
-  $("#btn-logs").addEventListener("click", () => invoke("open_log_dir").catch((e) => toast(String(e), true)));
+  $("#btn-clear-history").addEventListener("click", () =>
+    invoke("clear_history").catch((e) => toast(String(e), true)));
+  $("#btn-logs").addEventListener("click", () =>
+    invoke("open_log_dir").catch((e) => toast(String(e), true)));
 
   window.addEventListener("focus", () => {
     refreshPermissions();
-    loadDevices();
+    refreshDevices();
   });
 }
 
@@ -404,24 +570,27 @@ async function init() {
   ui.appInfo = await invoke("get_app_info");
   ui.providers = await invoke("get_providers");
   ui.settings = await invoke("get_settings");
-  fillLanguages();
-  renderProviderOptions();
-  renderSettings();
-  $("#about").textContent = `Dictado ${ui.appInfo.version} · configuración en ${ui.appInfo.configDir}`;
+  ui.lang = ui.settings.uiLanguage === "auto" ? resolveAutoLanguage() : ui.settings.uiLanguage;
+
+  renderAll();
   wireEvents();
-  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshStatus(), loadDevices()]);
+  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices()]);
+  renderStatus(await invoke("get_status"));
+
   await listen("status", (e) => renderStatus(e.payload));
   await listen("history-changed", refreshHistory);
   await listen("permissions-changed", refreshPermissions);
   await listen("settings-changed", (e) => {
     ui.settings = e.payload;
-    renderSettings();
+    ui.lang = ui.settings.uiLanguage === "auto" ? resolveAutoLanguage() : ui.settings.uiLanguage;
+    renderAll();
+    refreshKeyStatus();
   });
-  setInterval(refreshPermissions, 2500);
+  setInterval(refreshPermissions, 3000);
   invoke("ui_ready").catch(() => {});
 }
 
 init().catch((err) => {
   console.error(err);
-  toast(`Error al iniciar la interfaz: ${err}`, true);
+  toast(String(err), true);
 });

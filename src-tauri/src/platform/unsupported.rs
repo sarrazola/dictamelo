@@ -36,3 +36,13 @@ pub fn hide_window(window: &WebviewWindow) -> Result<(), PlatformError> {
     window.hide().map_err(|e| PlatformError::Other(e.to_string()))
 }
 pub fn activate_app() {}
+
+/// Idioma preferido del sistema, leído de las variables de entorno.
+pub fn system_language() -> String {
+    std::env::var("LC_ALL")
+        .or_else(|_| std::env::var("LANG"))
+        .ok()
+        .and_then(|v| v.split('.').next().map(str::to_string))
+        .filter(|v| !v.is_empty() && v != "C" && v != "POSIX")
+        .unwrap_or_else(|| "en".to_string())
+}

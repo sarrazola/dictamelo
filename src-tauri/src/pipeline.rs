@@ -3,6 +3,7 @@
 
 use crate::audio::{self, wav, PreparedAudio};
 use crate::history::HistoryEntry;
+use crate::i18n::{t, tf};
 use crate::paste::{self, PasteError};
 use crate::platform::{self, PermissionState, PlatformError};
 use crate::settings::Settings;
@@ -39,7 +40,7 @@ pub fn set_status(app: &AppHandle, status: Status) -> u64 {
     *lock(&state.status) = status.clone();
     match &status {
         Status::Error { message } => log::warn!("Estado: error: {message}"),
-        other => log::info!("Estado: {}", other.label()),
+        other => log::info!("Estado: {}", other.label(&state.settings().ui_lang())),
     }
     let _ = app.emit("status", &status);
     tray::update(app, &status);
@@ -62,6 +63,11 @@ pub fn set_status(app: &AppHandle, status: Status) -> u64 {
     generation
 }
 
+/// Idioma actual de la interfaz, para los mensajes que ve el usuario.
+fn settings_lang(app: &AppHandle) -> String {
+    app.state::<AppState>().settings().ui_lang()
+}
+
 pub fn current_status(app: &AppHandle) -> Status {
     lock(&app.state::<AppState>().status).clone()
 }
@@ -78,14 +84,15 @@ async fn start_recording(app: &AppHandle) {
     {
         let status = lock(&state.status);
         if status.is_busy() {
-            log::debug!("Pulsación ignorada (estado: {})", status.label());
+            log::debug!("Pulsación ignorada (estado: {})", status.label(&settings_lang(app)));
             return;
         }
     }
     let settings = state.settings();
 
+    let lang = settings.ui_lang();
     let Some(provider) = state.providers.get(&settings.provider) else {
-        fail(app, format!("Proveedor desconocido: {}", settings.provider));
+        fail(app, tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]));
         return;
     };
     let info = provider.info();
@@ -93,12 +100,12 @@ async fn start_recording(app: &AppHandle) {
         match state.api_key_for(&info.id) {
             Ok(Some(key)) if !key.trim().is_empty() => {}
             Ok(_) => {
-                fail(app, format!("Configura tu API key de {} en Configuración", info.name));
+                fail(app, tf(&lang, "err.api_key_missing", &[("p", &info.name)]));
                 app_windows::show_settings(app);
                 return;
             }
             Err(e) => {
-                fail(app, format!("No se pudo leer la API key del llavero: {e}"));
+                fail(app, tf(&lang, "err.keychain", &[("e", &e.to_string())]));
                 return;
             }
         }
@@ -106,7 +113,7 @@ async fn start_recording(app: &AppHandle) {
 
     match platform::permissions_status().microphone {
         PermissionState::Denied => {
-            fail(app, "Sin acceso al micrófono. Actívalo en Ajustes del Sistema → Privacidad → Micrófono");
+            fail(app, t(&lang, "err.mic_denied"));
             app_windows::show_settings(app);
             return;
         }
@@ -116,7 +123,7 @@ async fn start_recording(app: &AppHandle) {
                 log::info!("Permiso de micrófono {}", if granted { "concedido" } else { "denegado" });
                 let _ = handle.emit("permissions-changed", granted);
             }));
-            fail(app, "Concede acceso al micrófono y vuelve a intentarlo");
+            fail(app, t(&lang, "err.mic_pending"));
             return;
         }
         _ => {}
@@ -128,7 +135,7 @@ async fn start_recording(app: &AppHandle) {
             spawn_level_monitor(app.clone(), generation);
             spawn_watchdog(app.clone(), generation, settings.max_recording_secs);
         }
-        Err(e) => fail(app, e.to_string()),
+        Err(e) => fail(app, e.localized(&lang)),
     }
 }
 
@@ -164,10 +171,11 @@ async fn stop_and_transcribe(app: &AppHandle) {
         state.recorder.cancel();
         return;
     }
+    let lang = state.settings().ui_lang();
     let raw = match state.recorder.stop().await {
         Ok(raw) => raw,
         Err(e) => {
-            fail(app, e.to_string());
+            fail(app, e.localized(&lang));
             return;
         }
     };
@@ -175,7 +183,7 @@ async fn stop_and_transcribe(app: &AppHandle) {
     let secs = prepared.duration_secs();
     log::info!("Grabación de {secs:.2}s ({} Hz, {} canal(es))", raw.sample_rate, raw.channels);
     if secs < MIN_RECORDING_SECS {
-        set_status(app, Status::Done { message: "Grabación demasiado corta".into() });
+        set_status(app, Status::Done { message: t(&lang, "msg.too_short").into() });
         return;
     }
     set_status(app, Status::Transcribing);
@@ -186,21 +194,22 @@ async fn stop_and_transcribe(app: &AppHandle) {
 pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio) -> Option<String> {
     let state = app.state::<AppState>();
     let settings = state.settings();
+    let lang = settings.ui_lang();
     let Some(provider) = state.providers.get(&settings.provider) else {
-        fail(app, format!("Proveedor desconocido: {}", settings.provider));
+        fail(app, tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]));
         return None;
     };
     let api_key = match state.api_key_for(&settings.provider) {
         Ok(key) => key,
         Err(e) => {
-            fail(app, format!("No se pudo leer la API key del llavero: {e}"));
+            fail(app, tf(&lang, "err.keychain", &[("e", &e.to_string())]));
             return None;
         }
     };
 
     let path = wav::new_temp_path(&state.temp_dir);
     if let Err(e) = wav::write_wav_mono_i16(&path, &audio.samples, audio.sample_rate) {
-        fail(app, format!("No se pudo escribir el audio temporal: {e}"));
+        fail(app, tf(&lang, "err.temp_write", &[("e", &e.to_string())]));
         return None;
     }
     let request = TranscriptionRequest {
@@ -229,7 +238,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             *lock(&state.last_failed) = None;
             tray::set_retry_enabled(app, false);
             if result.text.trim().is_empty() {
-                set_status(app, Status::Done { message: "No se detectó voz".into() });
+                set_status(app, Status::Done { message: t(&lang, "msg.no_speech").into() });
                 return Some(String::new());
             }
             let text = result.text.trim().to_string();
@@ -240,7 +249,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             let attempts = lock(&state.last_failed).as_ref().map(|p| p.attempts).unwrap_or(0) + 1;
             *lock(&state.last_failed) = Some(PendingTranscription { audio, attempts });
             tray::set_retry_enabled(app, true);
-            fail(app, format!("{e}. Puedes reintentar desde el menú de la barra."));
+            fail(app, tf(&lang, "err.retry_hint", &[("e", &e.localized(&lang))]));
             None
         }
     }
@@ -263,34 +272,35 @@ async fn transcribe_with_retry(
 
 async fn deliver(app: &AppHandle, result: TranscriptionResult, duration_secs: f32, settings: &Settings) {
     let text = result.text.trim().to_string();
+    let lang = settings.ui_lang();
     let mut pasted = false;
     if settings.auto_paste {
         set_status(app, Status::Pasting);
         match paste::paste_text(&text, settings.restore_clipboard).await {
             Ok(outcome) => {
                 pasted = true;
-                let message = if outcome.clipboard_restored || !settings.restore_clipboard {
-                    "Texto pegado"
+                let key = if outcome.clipboard_restored || !settings.restore_clipboard {
+                    "msg.pasted"
                 } else {
-                    "Texto pegado (el portapapeles cambió y no se restauró)"
+                    "msg.pasted_kept"
                 };
-                set_status(app, Status::Done { message: message.into() });
+                set_status(app, Status::Done { message: t(&lang, key).into() });
             }
             Err(PasteError::Keystroke(PlatformError::AccessibilityDenied)) => {
-                fail(app, "Sin permiso de Accesibilidad: el texto quedó copiado en el portapapeles");
+                fail(app, t(&lang, "err.ax_denied"));
                 app_windows::show_settings(app);
             }
             Err(e) => {
                 let _ = paste::copy_text(&text);
-                fail(app, format!("No se pudo pegar ({e}); el texto quedó en el portapapeles"));
+                fail(app, tf(&lang, "err.paste_failed", &[("e", &e.to_string())]));
             }
         }
     } else {
         match paste::copy_text(&text) {
             Ok(()) => {
-                set_status(app, Status::Done { message: "Texto copiado al portapapeles".into() });
+                set_status(app, Status::Done { message: t(&lang, "msg.copied").into() });
             }
-            Err(e) => fail(app, format!("No se pudo copiar al portapapeles: {e}")),
+            Err(e) => fail(app, tf(&lang, "err.copy_failed", &[("e", &e.to_string())])),
         }
     }
     record_history(app, text, result.language, duration_secs, settings, pasted);
@@ -330,7 +340,8 @@ pub async fn retry_last(app: &AppHandle) {
             let _ = transcribe_and_deliver(app, pending.audio).await;
         }
         None => {
-            set_status(app, Status::Done { message: "No hay nada que reintentar".into() });
+            let lang = state.settings().ui_lang();
+            set_status(app, Status::Done { message: t(&lang, "msg.nothing_retry").into() });
         }
     }
 }
