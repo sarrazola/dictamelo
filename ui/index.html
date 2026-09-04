@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dictado</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🎙</span>
+      <div>
+        <h1>Dictado</h1>
+        <p class="subtitle">Mantén <kbd id="hotkey-inline">…</kbd> en cualquier app, habla y suelta.</p>
+      </div>
+    </div>
+    <div id="status-pill" class="pill idle"><span class="dot"></span><span id="status-text">Listo</span></div>
+  </header>
+
+  <main>
+    <section class="card" id="card-permissions">
+      <h2>Permisos de macOS</h2>
+      <p class="lead">Dictado necesita dos permisos: el <strong>micrófono</strong> para grabar tu voz y <strong>Accesibilidad</strong> para pulsar ⌘V en la app donde estás escribiendo. Nada se graba hasta que mantienes el atajo.</p>
+      <div class="row">
+        <div class="label">
+          <strong>Micrófono</strong>
+          <span>Se pide la primera vez que grabas. Si lo negaste, actívalo en Ajustes del Sistema → Privacidad y seguridad → Micrófono.</span>
+        </div>
+        <div class="actions">
+          <span id="perm-mic" class="badge">…</span>
+          <button id="btn-mic-request" class="small" hidden>Solicitar acceso</button>
+          <button id="btn-mic-settings" class="small" hidden>Abrir Ajustes</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">
+          <strong>Accesibilidad</strong>
+          <span>Permite a Dictado enviar la pulsación ⌘V. En Ajustes del Sistema → Privacidad y seguridad → Accesibilidad, activa «Dictado».</span>
+        </div>
+        <div class="actions">
+          <span id="perm-ax" class="badge">…</span>
+          <button id="btn-ax-request" class="small" hidden>Solicitar acceso</button>
+          <button id="btn-ax-settings" class="small" hidden>Abrir Ajustes</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="card-provider">
+      <h2>Transcripción</h2>
+      <p class="lead">El audio se envía al proveedor elegido y se elimina del disco en cuanto termina. La API key se guarda en el Llavero de macOS, nunca en archivos.</p>
+      <div class="row">
+        <div class="label"><strong>Proveedor</strong><span id="provider-note"></span></div>
+        <div class="actions"><select id="provider"></select></div>
+      </div>
+      <div class="row stacked">
+        <div class="label"><strong>API key</strong><span id="key-status">…</span></div>
+        <div class="actions wide">
+          <input id="api-key" type="password" placeholder="Pega tu API key" autocomplete="off" spellcheck="false">
+          <button id="btn-save-key" class="primary">Guardar</button>
+          <button id="btn-delete-key" class="danger" hidden>Eliminar</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Modelo</strong><span id="model-note"></span></div>
+        <div class="actions"><select id="model"></select></div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Idioma</strong><span>«Automático» detecta el idioma; fijarlo mejora la precisión.</span></div>
+        <div class="actions"><select id="language"></select></div>
+      </div>
+      <p class="hint"><span class="link" id="link-key">Obtener una API key del proveedor ↗</span></p>
+    </section>
+
+    <section class="card" id="card-hotkey">
+      <h2>Atajo global</h2>
+      <p class="lead">Mantén presionado el atajo para grabar; al soltarlo se transcribe. Elige una combinación que ninguna otra app use.</p>
+      <div class="row">
+        <div class="label"><strong>Combinación</strong><span id="hotkey-raw"></span></div>
+        <div class="actions">
+          <kbd id="hotkey-display" class="hotkey-display">…</kbd>
+          <button id="btn-change-hotkey">Cambiar</button>
+          <button id="btn-reset-hotkey" class="small">Restablecer</button>
+        </div>
+      </div>
+      <p class="hint" id="hotkey-hint"></p>
+    </section>
+
+    <section class="card" id="card-behavior">
+      <h2>Comportamiento</h2>
+      <div class="row">
+        <div class="label"><strong>Pegado automático</strong><span>Escribe el texto donde estaba el cursor. Desactivado: solo se copia al portapapeles.</span></div>
+        <div class="actions"><label class="switch"><input type="checkbox" id="auto-paste"><span class="track"></span></label></div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Restaurar el portapapeles</strong><span>Tras pegar, recupera lo que tenías copiado (si no lo cambiaste mientras tanto).</span></div>
+        <div class="actions"><label class="switch"><input type="checkbox" id="restore-clipboard"><span class="track"></span></label></div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Indicador flotante</strong><span>Muestra «Grabando», «Transcribiendo»… sobre las demás ventanas.</span></div>
+        <div class="actions"><label class="switch"><input type="checkbox" id="show-overlay"><span class="track"></span></label></div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Micrófono</strong><span>Dispositivo de entrada que se graba.</span></div>
+        <div class="actions"><select id="input-device"><option value="">Predeterminado del sistema</option></select></div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Duración máxima</strong><span>Segundos por grabación (5–900). Al llegar al límite se transcribe automáticamente.</span></div>
+        <div class="actions"><input type="number" id="max-secs" min="5" max="900" step="5"></div>
+      </div>
+      <div class="row">
+        <div class="label"><strong>Historial</strong><span>Cantidad de transcripciones que se conservan localmente (1–500).</span></div>
+        <div class="actions"><input type="number" id="max-history" min="1" max="500" step="1"></div>
+      </div>
+    </section>
+
+    <section class="card" id="card-history">
+      <div class="row" style="border-top:0;padding-top:0">
+        <div class="label"><h2 style="margin:0">Historial</h2><span>Guardado solo en este equipo.</span></div>
+        <div class="actions"><button id="btn-clear-history" class="small danger">Vaciar</button></div>
+      </div>
+      <ul id="history" class="history-list"></ul>
+      <p id="history-empty" class="empty" hidden>Todavía no hay transcripciones.</p>
+    </section>
+  </main>
+
+  <footer>
+    <span id="about">Dictado</span>
+    <span><button id="btn-logs">Abrir registros</button></span>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="dev-mock.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

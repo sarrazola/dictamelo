@@ -1,0 +1,54 @@
+[package]
+name = "dictado"
+version = "0.1.0"
+description = "Dictado por voz: mantén presionado un atajo, habla y el texto aparece donde estaba el cursor."
+authors = ["Andrés Sarrazola"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+name = "dictado_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-global-shortcut = "2.3"
+tauri-plugin-opener = "2"
+tauri-plugin-log = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+thiserror = "2"
+anyhow = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }
+reqwest = { version = "0.13", default-features = false, features = ["multipart", "json", "rustls"] }
+cpal = "0.18"
+hound = "3.5"
+keyring = "4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSString", "NSEnumerator", "NSObject"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem", "NSWindow", "NSApplication", "NSResponder", "NSScreen"] }
+objc2-av-foundation = { version = "0.3", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
+block2 = "0.6"
+core-graphics = "0.25"
+core-foundation = "0.10"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+# Portapapeles genérico (Windows/Linux). En macOS se usa NSPasteboard directamente.
+arboard = { version = "3", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "unwind"
+strip = true

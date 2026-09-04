@@ -1,0 +1,11 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/schemas/
+dist/
+scripts/paste_target
+.DS_Store
+*.log
+.env
+.env.*
+*.key
+secrets*

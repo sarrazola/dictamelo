@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- La app vive en la barra de menú: sin ícono en el Dock. -->
+  <key>LSUIElement</key>
+  <true/>
+  <!-- Texto que macOS muestra al pedir permiso de micrófono. Sin esta clave el sistema cierra la app. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Dictado necesita el micrófono para grabar tu voz mientras mantienes presionado el atajo y transcribirla.</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>© 2026 Andrés Sarrazola</string>
+</dict>
+</plist>
