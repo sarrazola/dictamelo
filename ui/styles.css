@@ -299,16 +299,32 @@ button:disabled { opacity: .45; cursor: default; }
 }
 .toast.error { background: var(--err); }
 
-/* ---------- Indicador flotante (overlay.html) ---------- */
+/* ---------- Indicador flotante (overlay.html) ----------
+   La ventana mide exactamente lo que ocupa .hud; macOS pone detrás un material translúcido con
+   desenfoque (HUD) y una sombra del sistema. El fondo CSS es el respaldo si no hay material. */
 body.overlay { background: transparent; overflow: hidden; }
-.overlay-pill { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-.overlay-pill .pill {
-  padding: 9px 17px; font-size: 13px; color: #fff; gap: 9px; box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
-  background: rgba(28, 28, 30, .93); border: 1px solid rgba(255, 255, 255, .12);
+.hud {
+  position: absolute; top: 0; left: 0; height: 48px;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 0 18px 0 14px; border-radius: 14px;
+  background: rgba(30, 30, 34, .62);
+  color: #fff; font-size: 13.5px; font-weight: 600; letter-spacing: -.1px; white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
 }
-.overlay-pill .pill .dot { background: #8e8e93; width: 9px; height: 9px; }
-.overlay-pill .pill.error { background: rgba(224, 69, 59, .95); }
-.overlay-pill .pill.done { background: rgba(31, 157, 77, .95); }
-.bars { display: none; align-items: flex-end; gap: 3px; height: 15px; }
-.pill.recording .bars { display: inline-flex; }
-.bars i { display: block; width: 3px; height: 3px; border-radius: 2px; background: #fff; transition: height .08s; }
+.hud .glyph { width: 20px; height: 20px; flex: none; display: grid; place-items: center; }
+.hud .glyph svg { width: 18px; height: 18px; }
+.hud .label { max-width: 440px; overflow: hidden; text-overflow: ellipsis; }
+.hud .dot {
+  width: 11px; height: 11px; border-radius: 50%; background: #ff453a;
+  box-shadow: 0 0 0 3px rgba(255, 69, 58, .28); animation: hud-pulse 1.2s ease-in-out infinite;
+}
+.hud .spinner {
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .25); border-top-color: #fff;
+  animation: hud-spin .8s linear infinite;
+}
+.hud .bars { display: none; align-items: flex-end; gap: 3px; height: 14px; margin-left: 2px; }
+.hud.recording .bars { display: inline-flex; }
+.hud .bars i { display: block; width: 3px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .9); transition: height .08s; }
+@keyframes hud-pulse { 50% { opacity: .45; box-shadow: 0 0 0 5px rgba(255, 69, 58, .12); } }
+@keyframes hud-spin { to { transform: rotate(360deg); } }

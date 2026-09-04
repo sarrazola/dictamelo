@@ -15,4 +15,4 @@ pub use permissions::{
     open_permission_settings, permissions_status, request_accessibility_permission,
     request_microphone_permission,
 };
-pub use window::{activate_app, configure_overlay_window, hide_window, show_window_without_focus};
+pub use window::{activate_app, configure_overlay_window, hide_window, refresh_window_shadow, show_window_without_focus};

@@ -233,6 +233,12 @@ pub fn retry_last_transcription(app: AppHandle) {
     tauri::async_runtime::spawn(async move { pipeline::retry_last(&app).await });
 }
 
+/// El indicador flotante informa el tamaño de su contenido para ajustar la ventana.
+#[tauri::command]
+pub fn overlay_layout(app: AppHandle, width: f64, height: f64) {
+    app_windows::layout_overlay(&app, width, height);
+}
+
 /// La interfaz avisa cuando terminó de cargar (diagnóstico: confirma que el webview está vivo).
 #[tauri::command]
 pub fn ui_ready(window: tauri::WebviewWindow) {

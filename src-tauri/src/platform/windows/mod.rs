@@ -56,6 +56,8 @@ pub fn hide_window(window: &WebviewWindow) -> Result<(), PlatformError> {
 
 pub fn activate_app() {}
 
+pub fn refresh_window_shadow(_window: &WebviewWindow) {}
+
 /// Esc para cancelar: pendiente (en Windows, un hook de teclado de bajo nivel).
 pub fn install_cancel_key_monitor(_on_escape: std::sync::Arc<dyn Fn() + Send + Sync>) {}
 

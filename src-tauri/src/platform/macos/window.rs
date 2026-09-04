@@ -3,6 +3,10 @@
 
 use super::super::PlatformError;
 use objc2_app_kit::{NSApplication, NSStatusWindowLevel, NSWindow, NSWindowCollectionBehavior};
+use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+
+/// Radio de las esquinas del indicador flotante (coincide con `styles.css`).
+const OVERLAY_RADIUS: f64 = 14.0;
 use objc2_foundation::MainThreadMarker;
 use tauri::WebviewWindow;
 
@@ -28,8 +32,20 @@ pub fn configure_overlay_window(window: &WebviewWindow) -> Result<(), PlatformEr
     );
     ns.setIgnoresMouseEvents(true);
     ns.setHidesOnDeactivate(false);
-    ns.setHasShadow(false);
+    // Sombra del sistema: se dibuja fuera de la ventana, así nunca se corta.
+    ns.setHasShadow(true);
+    // Material translúcido con desenfoque, como los HUD de macOS. Si falla, queda el fondo CSS.
+    if let Err(e) = apply_vibrancy(window, NSVisualEffectMaterial::HudWindow, Some(NSVisualEffectState::Active), Some(OVERLAY_RADIUS)) {
+        log::warn!("Sin material translúcido para el indicador: {e}");
+    }
     Ok(())
+}
+
+/// Recalcula la sombra tras cambiar el tamaño o el contenido de la ventana.
+pub fn refresh_window_shadow(window: &WebviewWindow) {
+    if let Ok(ns) = ns_window(window) {
+        ns.invalidateShadow();
+    }
 }
 
 /// Muestra la ventana sin convertirla en ventana clave ni activar la app

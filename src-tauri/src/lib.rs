@@ -90,6 +90,7 @@ pub fn run() {
             commands::retry_last_transcription,
             commands::open_url,
             commands::ui_ready,
+            commands::overlay_layout,
         ])
         .setup(|app| {
             // App de barra de menú: sin ícono en el Dock ni menú de aplicación.

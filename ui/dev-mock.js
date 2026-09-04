@@ -60,6 +60,7 @@ if (!window.__TAURI__) {
     retry_last_transcription: () => null,
     open_url: () => null,
     ui_ready: () => null,
+    overlay_layout: () => null,
   };
   window.__TAURI__ = {
     core: {
