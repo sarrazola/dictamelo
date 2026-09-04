@@ -20,6 +20,13 @@ interfaz que permite cambiarlo sin tocar el resto de la app.
   alguno; el resto del tiempo no estorba.
 - **Interfaz en 6 idiomas** (español, inglés, portugués, francés, alemán, italiano), incluidos el menú
   de la barra y los mensajes de error. Por defecto sigue el idioma del sistema.
+- **Iniciar con el sistema** (LaunchAgent), **sonidos sutiles** del sistema al empezar y terminar de
+  grabar, y **Esc cancela** una grabación sin transcribir ni gastar API.
+- **Vocabulario propio**: nombres y términos que Whisper suele confundir se envían como contexto.
+- **Limpieza con IA opcional** (apagada por defecto): un modelo de lenguaje quita muletillas, arregla
+  la puntuación y aplica tus autocorrecciones («no, mejor el viernes»). Usa GPT-OSS en Groq con la
+  misma API key; viene con unas instrucciones predeterminadas que puedes editar o restablecer. Si la
+  limpieza falla, se pega el texto original y se avisa.
 - Historial local pequeño (JSON) con copiar/borrar/vaciar.
 - Los WAV temporales se borran justo después de usarse y también al arrancar (por si hubo un cierre
   abrupto). Si una transcripción falla, el audio se conserva **en memoria** para «Reintentar última
@@ -44,6 +51,8 @@ src-tauri/
     pipeline.rs          Máquina de estados grabar → transcribir → pegar + recuperación de errores
     audio/               cpal (hilo dedicado), mezcla a mono, remuestreo FIR a 16 kHz, WAV
     transcription/       Trait TranscriptionProvider, registro, cliente OpenAI-compatible, Groq, OpenAI
+    cleanup/             Trait TextCleaner, instrucciones predeterminadas, cliente de chat, Groq (GPT-OSS)
+    autostart.rs         Inicio con el sistema
     clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
     platform/            TODO lo dependiente del SO: macos/ (completo) y windows/ (esqueleto)
     i18n.rs              Textos del menú de la barra, estados y errores (mismos 6 idiomas)
@@ -65,6 +74,12 @@ assets/make_icons.py     Genera el ícono de la app y los de la barra de menú
 
 La UI, la configuración, el Llavero (una key por proveedor), el historial y el pipeline no cambian.
 `openai.rs` está incluido como ejemplo de esta extensibilidad, marcado como «sin probar».
+
+### Cómo cambiar el modelo de limpieza
+
+Misma idea que la transcripción: implementa `TextCleaner` (o reutiliza `OpenAiCompatibleChatClient`
+si la API es compatible con OpenAI) y regístralo en `CleanerRegistry::with_defaults`. Las
+instrucciones predeterminadas están en `cleanup/mod.rs` (`DEFAULT_PROMPT`).
 
 ### Cómo añadir un idioma
 

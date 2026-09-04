@@ -42,6 +42,7 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
         "status.recording" => pick(lang, ["Grabando…", "Recording…", "Gravando…", "Enregistrement…", "Aufnahme…", "Registrazione…"]),
         "status.transcribing" => pick(lang, ["Transcribiendo…", "Transcribing…", "Transcrevendo…", "Transcription…", "Transkription…", "Trascrizione…"]),
         "status.pasting" => pick(lang, ["Pegando…", "Pasting…", "Colando…", "Collage…", "Einfügen…", "Incollaggio…"]),
+        "status.cleaning" => pick(lang, ["Limpiando…", "Cleaning up…", "Limpando…", "Nettoyage…", "Bereinigung…", "Pulizia…"]),
         "status.error" => pick(lang, ["Error", "Error", "Erro", "Erreur", "Fehler", "Errore"]),
         "status.done" => pick(lang, ["Hecho", "Done", "Pronto", "Terminé", "Fertig", "Fatto"]),
 
@@ -86,6 +87,15 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
         ]),
         "msg.too_short" => pick(lang, ["Grabación demasiado corta", "Recording too short", "Gravação muito curta", "Enregistrement trop court", "Aufnahme zu kurz", "Registrazione troppo breve"]),
         "msg.no_speech" => pick(lang, ["No se detectó voz", "No speech detected", "Nenhuma fala detectada", "Aucune voix détectée", "Keine Sprache erkannt", "Nessuna voce rilevata"]),
+        "msg.cancelled" => pick(lang, ["Grabación cancelada", "Recording cancelled", "Gravação cancelada", "Enregistrement annulé", "Aufnahme abgebrochen", "Registrazione annullata"]),
+        "msg.pasted_uncleaned" => pick(lang, [
+            "Texto pegado sin limpiar (la limpieza con IA falló)",
+            "Text pasted without cleanup (AI cleanup failed)",
+            "Texto colado sem limpeza (a limpeza com IA falhou)",
+            "Texte collé sans nettoyage (le nettoyage par IA a échoué)",
+            "Text ohne Bereinigung eingefügt (KI-Bereinigung fehlgeschlagen)",
+            "Testo incollato senza pulizia (la pulizia con IA è fallita)",
+        ]),
         "msg.nothing_retry" => pick(lang, ["No hay nada que reintentar", "Nothing to retry", "Nada para tentar novamente", "Rien à réessayer", "Nichts zu wiederholen", "Niente da riprovare"]),
 
         // --- Errores del flujo ---

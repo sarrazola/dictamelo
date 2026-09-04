@@ -131,7 +131,7 @@ fn icon_for(status: &Status) -> Image<'static> {
     let bytes: &'static [u8] = match status {
         Status::Idle | Status::Done { .. } => include_bytes!("../icons/tray/idle.png"),
         Status::Recording => include_bytes!("../icons/tray/recording.png"),
-        Status::Transcribing => include_bytes!("../icons/tray/transcribing.png"),
+        Status::Transcribing | Status::Cleaning => include_bytes!("../icons/tray/transcribing.png"),
         Status::Pasting => include_bytes!("../icons/tray/pasting.png"),
         Status::Error { .. } => include_bytes!("../icons/tray/error.png"),
     };
@@ -144,6 +144,7 @@ fn title_for(status: &Status, lang: &str) -> Option<String> {
         Status::Idle => None,
         Status::Recording => Some(t(lang, "status.recording").into()),
         Status::Transcribing => Some(t(lang, "status.transcribing").into()),
+        Status::Cleaning => Some(t(lang, "status.cleaning").into()),
         Status::Pasting => Some(t(lang, "status.pasting").into()),
         Status::Done { .. } => Some("✓".into()),
         Status::Error { .. } => Some(t(lang, "status.error").into()),

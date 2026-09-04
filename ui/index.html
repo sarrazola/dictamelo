@@ -110,6 +110,17 @@
           <div class="actions"><select id="language"></select></div>
         </div>
       </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="general.launch"></strong><span data-i18n="general.launch.desc"></span></div>
+          <div class="actions"><label class="switch"><input type="checkbox" id="launch-at-login"><span class="track"></span></label></div>
+        </div>
+        <div class="row">
+          <div class="label"><strong data-i18n="general.sounds"></strong><span data-i18n="general.sounds.desc"></span></div>
+          <div class="actions"><label class="switch"><input type="checkbox" id="play-sounds"><span class="track"></span></label></div>
+        </div>
+      </div>
     </section>
 
     <!-- Modelos -->
@@ -131,6 +142,35 @@
       <div class="card">
         <div class="card-title" data-i18n="models.model"></div>
         <div id="model-list" class="model-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" data-i18n="models.vocab"></div>
+        <p class="desc" data-i18n="models.vocab.desc"></p>
+        <textarea id="vocabulary" rows="2" spellcheck="false"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="label"><strong data-i18n="models.cleanup"></strong><span data-i18n="models.cleanup.desc"></span></div>
+          <div class="actions"><label class="switch"><input type="checkbox" id="cleanup-enabled"><span class="track"></span></label></div>
+        </div>
+        <div id="cleanup-options">
+          <div class="row">
+            <div class="label"><strong data-i18n="models.cleanup.model"></strong><span id="cleanup-model-desc"></span></div>
+            <div class="actions"><select id="cleanup-model"></select></div>
+          </div>
+          <div class="row">
+            <div class="label"><strong data-i18n="models.cleanup.prompt"></strong><span data-i18n="models.cleanup.prompt.desc"></span></div>
+            <div class="actions">
+              <button id="btn-toggle-prompt" class="ghost small"></button>
+              <button id="btn-reset-prompt" class="ghost small" data-i18n="models.cleanup.reset"></button>
+            </div>
+          </div>
+          <div id="prompt-editor" class="editor" hidden>
+            <textarea id="cleanup-prompt" class="mono" rows="16" spellcheck="false"></textarea>
+          </div>
+        </div>
       </div>
 
       <p class="footnote" data-i18n="models.privacy"></p>

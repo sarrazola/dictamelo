@@ -44,6 +44,14 @@ pub enum PermissionKind {
     Accessibility,
 }
 
+/// Sonidos cortos de aviso.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SoundKind {
+    Start,
+    Stop,
+    Error,
+}
+
 #[derive(Debug, Clone, thiserror::Error)]
 #[allow(dead_code)] // Algunas variantes solo se construyen en ciertas plataformas.
 pub enum PlatformError {

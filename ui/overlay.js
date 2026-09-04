@@ -23,7 +23,7 @@ function resolveLang(settings, supported) {
 function render(status) {
   const pill = document.getElementById("pill");
   pill.className = `pill ${status.state}`;
-  const known = ["idle", "recording", "transcribing", "pasting"];
+  const known = ["idle", "recording", "transcribing", "cleaning", "pasting"];
   document.getElementById("label").textContent = known.includes(status.state)
     ? t(`status.${status.state}`)
     : status.message || status.state;

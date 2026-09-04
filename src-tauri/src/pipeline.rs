@@ -5,7 +5,7 @@ use crate::audio::{self, wav, PreparedAudio};
 use crate::history::HistoryEntry;
 use crate::i18n::{t, tf};
 use crate::paste::{self, PasteError};
-use crate::platform::{self, PermissionState, PlatformError};
+use crate::platform::{self, PermissionState, PlatformError, SoundKind};
 use crate::settings::Settings;
 use crate::state::{AppState, PendingTranscription};
 use crate::status::Status;
@@ -74,6 +74,31 @@ pub fn current_status(app: &AppHandle) -> Status {
 
 fn fail(app: &AppHandle, message: impl Into<String>) {
     set_status(app, Status::Error { message: message.into() });
+    sound(app, SoundKind::Error);
+}
+
+/// Sonido de aviso, si el usuario los tiene activados.
+fn sound(app: &AppHandle, kind: SoundKind) {
+    if app.state::<AppState>().settings().play_sounds {
+        platform::play_sound(app, kind);
+    }
+}
+
+/// Esc durante la grabación: descarta el audio sin transcribir.
+pub fn cancel_recording(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        if !matches!(*lock(&state.status), Status::Recording) {
+            return;
+        }
+        let lang = state.settings().ui_lang();
+        log::info!("Grabación cancelada con Esc");
+        // Primero el estado, para que al soltar el atajo no se intente transcribir.
+        set_status(&app, Status::Done { message: t(&lang, "msg.cancelled").into() });
+        state.recorder.cancel();
+        sound(&app, SoundKind::Stop);
+    });
 }
 
 async fn start_recording(app: &AppHandle) {
@@ -132,6 +157,7 @@ async fn start_recording(app: &AppHandle) {
     match state.recorder.start(settings.input_device.clone()).await {
         Ok(()) => {
             let generation = set_status(app, Status::Recording);
+            sound(app, SoundKind::Start);
             spawn_level_monitor(app.clone(), generation);
             spawn_watchdog(app.clone(), generation, settings.max_recording_secs);
         }
@@ -179,6 +205,7 @@ async fn stop_and_transcribe(app: &AppHandle) {
             return;
         }
     };
+    sound(app, SoundKind::Stop);
     let prepared = audio::prepare(&raw);
     let secs = prepared.duration_secs();
     log::info!("Grabación de {secs:.2}s ({} Hz, {} canal(es))", raw.sample_rate, raw.channels);
@@ -216,7 +243,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
         audio_path: path.clone(),
         model: settings.model.clone(),
         language: settings.language_code(),
-        prompt: None,
+        prompt: settings.vocabulary_prompt(),
     };
     let started = Instant::now();
     let result = transcribe_with_retry(provider.as_ref(), api_key.as_deref(), &request).await;
@@ -241,8 +268,25 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
                 set_status(app, Status::Done { message: t(&lang, "msg.no_speech").into() });
                 return Some(String::new());
             }
-            let text = result.text.trim().to_string();
-            deliver(app, result, audio.duration_secs(), &settings).await;
+            let mut text = result.text.trim().to_string();
+            let mut cleanup_failed = false;
+            if settings.cleanup_enabled {
+                set_status(app, Status::Cleaning);
+                let started = Instant::now();
+                match clean_text(&state, &settings, &text).await {
+                    Ok(cleaned) if !cleaned.trim().is_empty() => {
+                        log::info!("Texto limpio en {:.1}s ({} → {} caracteres)", started.elapsed().as_secs_f32(), text.chars().count(), cleaned.chars().count());
+                        text = cleaned.trim().to_string();
+                    }
+                    Ok(_) => log::info!("La limpieza devolvió vacío; se conserva el texto original"),
+                    Err(e) => {
+                        // La limpieza es un extra: si falla, se pega el texto tal cual y se avisa.
+                        log::warn!("Limpieza con IA fallida: {e}");
+                        cleanup_failed = true;
+                    }
+                }
+            }
+            deliver(app, text.clone(), result.language, audio.duration_secs(), &settings, cleanup_failed).await;
             Some(text)
         }
         Err(e) => {
@@ -253,6 +297,21 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             None
         }
     }
+}
+
+/// Pasa el texto por el modelo de limpieza configurado.
+async fn clean_text(state: &AppState, settings: &Settings, text: &str) -> Result<String, TranscriptionError> {
+    let cleaner = state
+        .cleaners
+        .get(&settings.cleanup_provider)
+        .ok_or_else(|| TranscriptionError::Rejected(format!("limpiador desconocido: {}", settings.cleanup_provider)))?;
+    let key_provider = cleaner.info().key_provider;
+    let api_key = state
+        .api_key_for(&key_provider)
+        .map_err(|e| TranscriptionError::Rejected(e.to_string()))?;
+    cleaner
+        .clean(api_key.as_deref(), &settings.cleanup_model, &settings.cleanup_system_prompt(), text)
+        .await
 }
 
 async fn transcribe_with_retry(
@@ -270,8 +329,14 @@ async fn transcribe_with_retry(
     }
 }
 
-async fn deliver(app: &AppHandle, result: TranscriptionResult, duration_secs: f32, settings: &Settings) {
-    let text = result.text.trim().to_string();
+async fn deliver(
+    app: &AppHandle,
+    text: String,
+    language: Option<String>,
+    duration_secs: f32,
+    settings: &Settings,
+    cleanup_failed: bool,
+) {
     let lang = settings.ui_lang();
     let mut pasted = false;
     if settings.auto_paste {
@@ -279,7 +344,9 @@ async fn deliver(app: &AppHandle, result: TranscriptionResult, duration_secs: f3
         match paste::paste_text(&text, settings.restore_clipboard).await {
             Ok(outcome) => {
                 pasted = true;
-                let key = if outcome.clipboard_restored || !settings.restore_clipboard {
+                let key = if cleanup_failed {
+                    "msg.pasted_uncleaned"
+                } else if outcome.clipboard_restored || !settings.restore_clipboard {
                     "msg.pasted"
                 } else {
                     "msg.pasted_kept"
@@ -303,7 +370,7 @@ async fn deliver(app: &AppHandle, result: TranscriptionResult, duration_secs: f3
             Err(e) => fail(app, tf(&lang, "err.copy_failed", &[("e", &e.to_string())])),
         }
     }
-    record_history(app, text, result.language, duration_secs, settings, pasted);
+    record_history(app, text, language, duration_secs, settings, pasted);
 }
 
 fn record_history(app: &AppHandle, text: String, language: Option<String>, duration_secs: f32, settings: &Settings, pasted: bool) {

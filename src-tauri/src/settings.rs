@@ -32,6 +32,20 @@ pub struct Settings {
     pub max_history: usize,
     /// Duración máxima de una grabación, en segundos.
     pub max_recording_secs: u32,
+    /// Abrir Dictado al iniciar sesión.
+    pub launch_at_login: bool,
+    /// Sonido sutil al empezar y terminar de grabar.
+    pub play_sounds: bool,
+    /// Nombres y términos que el modelo suele confundir; se pasan como contexto a Whisper.
+    pub vocabulary: String,
+    /// Limpiar el texto con un modelo de lenguaje (muletillas, puntuación, autocorrecciones).
+    pub cleanup_enabled: bool,
+    /// Proveedor del modelo de limpieza (por ahora solo "groq").
+    pub cleanup_provider: String,
+    /// Modelo de limpieza dentro del proveedor.
+    pub cleanup_model: String,
+    /// Instrucciones de limpieza personalizadas; vacío = las predeterminadas.
+    pub cleanup_prompt: String,
 }
 
 impl Default for Settings {
@@ -48,6 +62,13 @@ impl Default for Settings {
             input_device: None,
             max_history: 50,
             max_recording_secs: 300,
+            launch_at_login: false,
+            play_sounds: true,
+            vocabulary: String::new(),
+            cleanup_enabled: false,
+            cleanup_provider: "groq".to_string(),
+            cleanup_model: "openai/gpt-oss-120b".to_string(),
+            cleanup_prompt: String::new(),
         }
     }
 }
@@ -73,6 +94,17 @@ impl Settings {
         }
         let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
         std::fs::write(path, json)
+    }
+
+    /// Vocabulario listo para enviar como contexto (`None` si está vacío).
+    pub fn vocabulary_prompt(&self) -> Option<String> {
+        let v = self.vocabulary.trim();
+        (!v.is_empty()).then(|| v.to_string())
+    }
+
+    /// Instrucciones de limpieza en uso (las del usuario o las predeterminadas), más el vocabulario.
+    pub fn cleanup_system_prompt(&self) -> String {
+        crate::cleanup::build_system_prompt(&self.cleanup_prompt, &self.vocabulary)
     }
 
     /// Idioma resuelto de la interfaz (nunca "auto").
@@ -111,6 +143,12 @@ impl Settings {
         }
         if matches!(self.input_device.as_deref(), Some("")) {
             self.input_device = None;
+        }
+        if self.cleanup_provider.trim().is_empty() {
+            self.cleanup_provider = "groq".to_string();
+        }
+        if self.cleanup_model.trim().is_empty() {
+            self.cleanup_model = "openai/gpt-oss-120b".to_string();
         }
         self
     }

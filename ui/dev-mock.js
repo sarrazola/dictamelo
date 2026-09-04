@@ -5,6 +5,8 @@ if (!window.__TAURI__) {
     hotkey: "Alt+Shift+Space", provider: "groq", model: "whisper-large-v3-turbo", language: "auto",
     uiLanguage: "auto", autoPaste: true, restoreClipboard: true, showOverlay: true,
     inputDevice: null, maxHistory: 50, maxRecordingSecs: 300,
+    launchAtLogin: false, playSounds: true, vocabulary: "",
+    cleanupEnabled: false, cleanupProvider: "groq", cleanupModel: "openai/gpt-oss-120b", cleanupPrompt: "",
   };
   const history = [
     { id: "1", timestamp: new Date().toISOString(), text: "Hola, esto es una prueba de dictado por voz. El texto debería aparecer donde estaba el cursor.", durationMs: 6300, provider: "groq", model: "whisper-large-v3-turbo", language: "Spanish", pasted: true },
@@ -14,11 +16,11 @@ if (!window.__TAURI__) {
   const providers = [
     { id: "groq", name: "Groq", requiresApiKey: true, keyUrl: "https://console.groq.com/keys", defaultModel: "whisper-large-v3-turbo", verified: true,
       models: [
-        { id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo", description: "Rápido y multilingüe (recomendado)" },
-        { id: "whisper-large-v3", name: "Whisper Large v3", description: "Máxima precisión, algo más lento" },
+        { id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo", description: "model.desc.whisper_turbo" },
+        { id: "whisper-large-v3", name: "Whisper Large v3", description: "model.desc.whisper_v3" },
       ] },
     { id: "openai", name: "OpenAI", requiresApiKey: true, keyUrl: "https://platform.openai.com/api-keys", defaultModel: "gpt-4o-mini-transcribe", verified: false,
-      models: [{ id: "gpt-4o-mini-transcribe", name: "GPT-4o mini Transcribe", description: "Rápido y económico" }] },
+      models: [{ id: "gpt-4o-mini-transcribe", name: "GPT-4o mini Transcribe", description: "model.desc.gpt4o_mini" }] },
   ];
   let keyConfigured = true;
   const commands = {
@@ -27,7 +29,13 @@ if (!window.__TAURI__) {
       logDir: "~/Library/Logs/com.sarrazola.dictado",
       configDir: "~/Library/Application Support/com.sarrazola.dictado",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",
+      defaultCleanupPrompt: "You are the cleanup step of a dictation app. (Vista previa: el texto real vive en src-tauri/src/cleanup/mod.rs.)",
     }),
+    get_cleaners: () => [{ id: "groq", name: "Groq", keyProvider: "groq", defaultModel: "openai/gpt-oss-120b",
+      models: [
+        { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B", description: "model.desc.oss120" },
+        { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", description: "model.desc.oss20" },
+      ] }],
     get_providers: () => providers,
     get_settings: () => settings,
     save_settings: ({ settings: s }) => Object.assign(settings, s),

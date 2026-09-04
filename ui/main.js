@@ -9,6 +9,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const ui = {
   settings: null,
   providers: [],
+  cleaners: [],
   appInfo: null,
   lang: "es",
   page: "general",
@@ -61,6 +62,8 @@ function applyStaticText() {
   for (const el of $$("[data-i18n]")) el.textContent = t(el.dataset.i18n);
   $("#btn-change-hotkey").textContent = t(ui.capturing ? "general.cancel" : "general.change");
   $("#api-key").placeholder = t("models.apikey.placeholder");
+  $("#vocabulary").placeholder = t("models.vocab.placeholder");
+  $("#btn-toggle-prompt").textContent = t($("#prompt-editor").hidden ? "models.cleanup.edit" : "models.cleanup.hide");
 }
 
 function isMac() {
@@ -118,9 +121,10 @@ function showPage(page) {
 // ---------- Render ----------
 
 function renderStatus(status) {
+  ui.lastStatus = status;
   const pill = $("#status-pill");
   pill.className = `pill ${status.state}`;
-  const known = ["idle", "recording", "transcribing", "pasting"];
+  const known = ["idle", "recording", "transcribing", "cleaning", "pasting"];
   $("#status-text").textContent = known.includes(status.state)
     ? t(`status.${status.state}`)
     : status.message || status.state;
@@ -139,6 +143,34 @@ function renderGeneral() {
   $("#hotkey-display").classList.toggle("capturing", ui.capturing);
   $("#auto-paste").checked = ui.settings.autoPaste;
   fillSelect($("#language"), [["auto", t("common.auto")], ...DICTATION_LANGUAGES], ui.settings.language);
+  $("#launch-at-login").checked = ui.settings.launchAtLogin;
+  $("#play-sounds").checked = ui.settings.playSounds;
+}
+
+function currentCleaner() {
+  return ui.cleaners.find((c) => c.id === ui.settings.cleanupProvider) || ui.cleaners[0];
+}
+
+/** Las descripciones de modelo llegan como claves i18n; si no existe la clave se muestra tal cual. */
+function modelDescription(model) {
+  return t(model.description);
+}
+
+function renderCleanup() {
+  const enabled = ui.settings.cleanupEnabled;
+  $("#cleanup-enabled").checked = enabled;
+  $("#cleanup-options").hidden = !enabled;
+  const cleaner = currentCleaner();
+  if (!cleaner) return;
+  fillSelect($("#cleanup-model"), cleaner.models.map((mm) => [mm.id, mm.name]), ui.settings.cleanupModel);
+  const model = cleaner.models.find((mm) => mm.id === ui.settings.cleanupModel);
+  $("#cleanup-model-desc").textContent = model ? modelDescription(model) : "";
+  const prompt = $("#cleanup-prompt");
+  if (document.activeElement !== prompt) {
+    prompt.value = ui.settings.cleanupPrompt || ui.appInfo.defaultCleanupPrompt;
+  }
+  $("#btn-reset-prompt").disabled = !ui.settings.cleanupPrompt;
+  $("#btn-toggle-prompt").textContent = t($("#prompt-editor").hidden ? "models.cleanup.edit" : "models.cleanup.hide");
 }
 
 function fillSelect(select, entries, value) {
@@ -194,11 +226,15 @@ function renderModels() {
     const strong = document.createElement("strong");
     strong.textContent = m.name;
     const desc = document.createElement("span");
-    desc.textContent = m.description;
+    desc.textContent = modelDescription(m);
     info.append(strong, desc);
     card.append(radio, info);
     list.appendChild(card);
   }
+
+  const vocabulary = $("#vocabulary");
+  if (document.activeElement !== vocabulary) vocabulary.value = ui.settings.vocabulary || "";
+  renderCleanup();
 }
 
 function permissionRow(kind, state) {
@@ -354,6 +390,7 @@ function renderAbout() {
 function renderAll() {
   applyStaticText();
   showPage(ui.page);
+  if (ui.lastStatus) renderStatus(ui.lastStatus);
   renderSidebar();
   renderGeneral();
   renderModels();
@@ -475,6 +512,23 @@ function wireEvents() {
   $("#max-secs").addEventListener("change", (e) => saveSettings({ maxRecordingSecs: Number(e.target.value) || 300 }));
   $("#max-history").addEventListener("change", (e) => saveSettings({ maxHistory: Number(e.target.value) || 50 }));
   $("#ui-language").addEventListener("change", (e) => saveSettings({ uiLanguage: e.target.value }));
+  $("#launch-at-login").addEventListener("change", (e) => saveSettings({ launchAtLogin: e.target.checked }));
+  $("#play-sounds").addEventListener("change", (e) => saveSettings({ playSounds: e.target.checked }));
+  $("#vocabulary").addEventListener("change", (e) => saveSettings({ vocabulary: e.target.value.trim() }));
+  $("#cleanup-enabled").addEventListener("change", (e) => saveSettings({ cleanupEnabled: e.target.checked }));
+  $("#cleanup-model").addEventListener("change", (e) => saveSettings({ cleanupModel: e.target.value }));
+  $("#cleanup-prompt").addEventListener("change", (e) => {
+    const value = e.target.value.trim();
+    // Si el usuario deja el texto predeterminado, se guarda vacío para seguir las actualizaciones.
+    saveSettings({ cleanupPrompt: value === ui.appInfo.defaultCleanupPrompt.trim() ? "" : value });
+  });
+  $("#btn-toggle-prompt").addEventListener("click", () => {
+    const editor = $("#prompt-editor");
+    editor.hidden = !editor.hidden;
+    $("#btn-toggle-prompt").textContent = t(editor.hidden ? "models.cleanup.edit" : "models.cleanup.hide");
+    if (!editor.hidden) $("#cleanup-prompt").focus();
+  });
+  $("#btn-reset-prompt").addEventListener("click", () => saveSettings({ cleanupPrompt: "" }));
 
   $("#btn-save-key").addEventListener("click", async () => {
     const input = $("#api-key");
@@ -569,6 +623,7 @@ function wireEvents() {
 async function init() {
   ui.appInfo = await invoke("get_app_info");
   ui.providers = await invoke("get_providers");
+  ui.cleaners = await invoke("get_cleaners");
   ui.settings = await invoke("get_settings");
   ui.lang = ui.settings.uiLanguage === "auto" ? resolveAutoLanguage() : ui.settings.uiLanguage;
 

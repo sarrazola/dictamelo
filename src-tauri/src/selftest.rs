@@ -64,6 +64,16 @@ async fn run_with_hotkey(app: &AppHandle, hold_secs: f64) -> Result<String, Stri
         let result = crate::platform::press_hotkey_for_test(&hk, Duration::from_secs_f64(hold_secs)).map_err(|e| e.to_string());
         *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(result);
     });
+    // Opcional: pulsar Esc a mitad de la grabación para probar la cancelación.
+    if let Some(ms) = std::env::var("DICTADO_SELFTEST_ESC_AFTER_MS").ok().and_then(|v| v.parse::<u64>().ok()) {
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(ms));
+            log::info!("Selftest: pulsando Esc");
+            if let Err(e) = crate::platform::press_hotkey_for_test("Escape", Duration::from_millis(40)) {
+                log::warn!("Selftest: no se pudo pulsar Esc: {e}");
+            }
+        });
+    }
 
     let deadline = Instant::now() + Duration::from_secs(90);
     let mut started = false;
@@ -73,7 +83,7 @@ async fn run_with_hotkey(app: &AppHandle, hold_secs: f64) -> Result<String, Stri
         }
         let status = pipeline::current_status(app);
         match &status {
-            Status::Recording | Status::Transcribing | Status::Pasting => started = true,
+            Status::Recording | Status::Transcribing | Status::Cleaning | Status::Pasting => started = true,
             Status::Done { message } if started => {
                 let text = lock(&app.state::<AppState>().history).entries().first().map(|e| e.text.clone()).unwrap_or_default();
                 log::info!("Selftest terminado: {message}");

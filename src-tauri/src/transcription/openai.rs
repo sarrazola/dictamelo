@@ -33,17 +33,17 @@ impl TranscriptionProvider for OpenAiProvider {
                 ModelInfo {
                     id: "gpt-4o-mini-transcribe".into(),
                     name: "GPT-4o mini Transcribe".into(),
-                    description: "Rápido y económico".into(),
+                    description: "model.desc.gpt4o_mini".into(),
                 },
                 ModelInfo {
                     id: "gpt-4o-transcribe".into(),
                     name: "GPT-4o Transcribe".into(),
-                    description: "Mayor precisión".into(),
+                    description: "model.desc.gpt4o".into(),
                 },
                 ModelInfo {
                     id: "whisper-1".into(),
                     name: "Whisper".into(),
-                    description: "Modelo clásico".into(),
+                    description: "model.desc.whisper1".into(),
                 },
             ],
         }

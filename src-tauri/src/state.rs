@@ -1,11 +1,12 @@
 //! Estado global de la aplicación (compartido entre comandos, atajo, bandeja y pipeline).
 
 use crate::audio::{self, PreparedAudio, Recorder};
+use crate::cleanup::CleanerRegistry;
 use crate::history::History;
 use crate::secrets::{KeyringSecretStore, SecretError, SecretStore};
 use crate::settings::Settings;
 use crate::status::Status;
-use crate::transcription::ProviderRegistry;
+use crate::transcription::{shared_http_client, ProviderRegistry};
 use crate::util::read;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -27,6 +28,7 @@ pub struct AppState {
     pub history: Mutex<History>,
     pub secrets: Arc<dyn SecretStore>,
     pub providers: ProviderRegistry,
+    pub cleaners: CleanerRegistry,
     pub recorder: Recorder,
     pub status: Mutex<Status>,
     /// Se incrementa en cada cambio de estado; permite descartar temporizadores obsoletos.
@@ -66,6 +68,7 @@ impl AppState {
             history: Mutex::new(history),
             secrets: Arc::new(KeyringSecretStore::new(KEYCHAIN_SERVICE)),
             providers: ProviderRegistry::with_defaults(),
+            cleaners: CleanerRegistry::with_defaults(shared_http_client()),
             recorder: Recorder::spawn(),
             status: Mutex::new(Status::Idle),
             status_generation: AtomicU64::new(0),

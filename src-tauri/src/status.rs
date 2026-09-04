@@ -9,6 +9,8 @@ pub enum Status {
     Idle,
     Recording,
     Transcribing,
+    /// Limpieza opcional del texto con un modelo de lenguaje.
+    Cleaning,
     Pasting,
     /// Resultado exitoso transitorio (vuelve a `Idle` solo).
     Done { message: String },
@@ -19,7 +21,7 @@ pub enum Status {
 impl Status {
     /// `true` mientras hay una operación en curso (no se aceptan nuevas pulsaciones).
     pub fn is_busy(&self) -> bool {
-        matches!(self, Status::Recording | Status::Transcribing | Status::Pasting)
+        matches!(self, Status::Recording | Status::Transcribing | Status::Cleaning | Status::Pasting)
     }
 
     /// Texto corto del estado en el idioma indicado. Los mensajes de `Done`/`Error`
@@ -29,6 +31,7 @@ impl Status {
             Status::Idle => t(lang, "status.idle").into(),
             Status::Recording => t(lang, "status.recording").into(),
             Status::Transcribing => t(lang, "status.transcribing").into(),
+            Status::Cleaning => t(lang, "status.cleaning").into(),
             Status::Pasting => t(lang, "status.pasting").into(),
             Status::Done { message } => message.clone(),
             Status::Error { message } => format!("{}: {message}", t(lang, "status.error")),

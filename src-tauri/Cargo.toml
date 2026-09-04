@@ -32,11 +32,12 @@ hound = "3.5"
 keyring = "4"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+tauri-plugin-autostart = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSString", "NSEnumerator", "NSObject", "NSLocale"] }
-objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem", "NSWindow", "NSApplication", "NSResponder", "NSScreen"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem", "NSWindow", "NSApplication", "NSResponder", "NSScreen", "NSSound", "NSEvent", "block2"] }
 objc2-av-foundation = { version = "0.3", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
 block2 = "0.6"
 core-graphics = "0.25"

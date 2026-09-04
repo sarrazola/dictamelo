@@ -35,6 +35,32 @@ pub fn send_paste_keystroke() -> Result<(), PlatformError> {
     Ok(())
 }
 
+const KEY_ESCAPE: u16 = 53;
+
+/// Observa la tecla Esc en todo el sistema (sin consumirla) y avisa cada vez que se pulsa.
+/// Se instala una sola vez; el pipeline decide si hay una grabación que cancelar. Requiere
+/// Accesibilidad, que la app ya necesita para pegar. Sin ese permiso, simplemente no avisa.
+pub fn install_cancel_key_monitor(on_escape: std::sync::Arc<dyn Fn() + Send + Sync>) {
+    use objc2_app_kit::{NSEvent, NSEventMask};
+    use std::ptr::NonNull;
+
+    let block = block2::RcBlock::new(move |event: NonNull<NSEvent>| {
+        // SAFETY: AppKit garantiza un NSEvent válido durante la llamada.
+        if unsafe { event.as_ref() }.keyCode() == KEY_ESCAPE {
+            on_escape();
+        }
+    });
+    let monitor = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &block);
+    match monitor {
+        // El monitor y el bloque deben vivir tanto como la app.
+        Some(token) => {
+            std::mem::forget(token);
+            std::mem::forget(block);
+        }
+        None => log::warn!("No se pudo instalar el monitor de Esc (¿falta Accesibilidad?)"),
+    }
+}
+
 /// Solo para el autodiagnóstico: mantiene pulsado el atajo `hotkey` (formato del plugin, p. ej.
 /// "Alt+Shift+Space") durante `hold` usando eventos sintéticos, como lo haría una persona.
 pub fn press_hotkey_for_test(hotkey: &str, hold: Duration) -> Result<(), PlatformError> {

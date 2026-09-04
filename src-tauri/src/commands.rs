@@ -30,7 +30,18 @@ pub fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Setti
         return Err(format!("El modelo «{}» no existe en {}", new.model, info.name));
     }
 
+    if let Some(cleaner) = state.cleaners.get(&new.cleanup_provider) {
+        if !cleaner.info().models.iter().any(|m| m.id == new.cleanup_model) {
+            return Err(format!("El modelo de limpieza «{}» no existe", new.cleanup_model));
+        }
+    } else {
+        return Err(format!("Limpiador desconocido: {}", new.cleanup_provider));
+    }
+
     let old = state.settings();
+    if old.launch_at_login != new.launch_at_login {
+        crate::autostart::set_enabled(&app, new.launch_at_login)?;
+    }
     new.save(&state.settings_path).map_err(|e| format!("No se pudo guardar la configuración: {e}"))?;
     *write(&state.settings) = new.clone();
 
@@ -59,6 +70,11 @@ pub fn get_status(app: AppHandle) -> Status {
 #[tauri::command]
 pub fn get_providers(state: State<'_, AppState>) -> Vec<ProviderInfo> {
     state.providers.list()
+}
+
+#[tauri::command]
+pub fn get_cleaners(state: State<'_, AppState>) -> Vec<crate::cleanup::CleanerInfo> {
+    state.cleaners.list()
 }
 
 #[derive(Serialize)]
@@ -189,6 +205,8 @@ pub struct AppInfo {
     pub ui_languages: Vec<String>,
     /// Idioma realmente en uso, ya resuelto si la preferencia es "auto".
     pub resolved_ui_language: String,
+    /// Instrucciones de limpieza predeterminadas, para mostrarlas y poder restablecerlas.
+    pub default_cleanup_prompt: String,
 }
 
 #[tauri::command]
@@ -201,6 +219,7 @@ pub fn get_app_info(state: State<'_, AppState>) -> AppInfo {
         config_dir: state.config_dir.display().to_string(),
         ui_languages: crate::i18n::LANGS.iter().map(|s| s.to_string()).collect(),
         resolved_ui_language: state.settings().ui_lang(),
+        default_cleanup_prompt: crate::cleanup::DEFAULT_PROMPT.to_string(),
     }
 }
 

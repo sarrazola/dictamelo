@@ -98,7 +98,7 @@ impl OpenAiCompatibleClient {
     }
 }
 
-fn map_reqwest(e: reqwest::Error) -> TranscriptionError {
+pub(crate) fn map_reqwest(e: reqwest::Error) -> TranscriptionError {
     if e.is_timeout() {
         TranscriptionError::Timeout
     } else if e.is_connect() {
@@ -109,7 +109,7 @@ fn map_reqwest(e: reqwest::Error) -> TranscriptionError {
     }
 }
 
-fn map_status(status: StatusCode, body: &str) -> TranscriptionError {
+pub(crate) fn map_status(status: StatusCode, body: &str) -> TranscriptionError {
     let message = extract_error_message(body);
     match status.as_u16() {
         401 | 403 => TranscriptionError::Unauthorized,

@@ -32,12 +32,12 @@ impl TranscriptionProvider for GroqProvider {
                 ModelInfo {
                     id: "whisper-large-v3-turbo".into(),
                     name: "Whisper Large v3 Turbo".into(),
-                    description: "Rápido y multilingüe (recomendado)".into(),
+                    description: "model.desc.whisper_turbo".into(),
                 },
                 ModelInfo {
                     id: "whisper-large-v3".into(),
                     name: "Whisper Large v3".into(),
-                    description: "Máxima precisión, algo más lento".into(),
+                    description: "model.desc.whisper_v3".into(),
                 },
             ],
         }

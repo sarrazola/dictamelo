@@ -13,6 +13,8 @@
 
 mod app_windows;
 mod audio;
+mod autostart;
+mod cleanup;
 mod clipboard;
 mod commands;
 mod history;
@@ -56,12 +58,18 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .macos_launcher(tauri_plugin_autostart::MacosLauncher::LaunchAgent)
+                .build(),
+        )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::save_settings,
             commands::get_status,
             commands::get_providers,
+            commands::get_cleaners,
             commands::get_api_key_status,
             commands::set_api_key,
             commands::delete_api_key,
@@ -95,6 +103,9 @@ pub fn run() {
             app_windows::create_windows(&handle)?;
             tray::create(&handle)?;
             hotkey::apply_from_settings(&handle);
+            autostart::sync_with_settings(&handle);
+            let esc_handle = handle.clone();
+            platform::install_cancel_key_monitor(std::sync::Arc::new(move || pipeline::cancel_recording(&esc_handle)));
             if selftest::enabled() {
                 selftest::maybe_run(&handle);
             } else {

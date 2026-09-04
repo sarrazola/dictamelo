@@ -56,6 +56,12 @@ pub fn hide_window(window: &WebviewWindow) -> Result<(), PlatformError> {
 
 pub fn activate_app() {}
 
+/// Esc para cancelar: pendiente (en Windows, un hook de teclado de bajo nivel).
+pub fn install_cancel_key_monitor(_on_escape: std::sync::Arc<dyn Fn() + Send + Sync>) {}
+
+/// Sonidos de aviso: pendiente (en Windows, `PlaySound` con los sonidos del sistema).
+pub fn play_sound(_app: &tauri::AppHandle, _kind: super::SoundKind) {}
+
 /// Idioma preferido del sistema, leído de las variables de entorno.
 pub fn system_language() -> String {
     std::env::var("LC_ALL")

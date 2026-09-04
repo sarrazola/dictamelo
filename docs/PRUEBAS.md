@@ -25,6 +25,17 @@
 | Vista previa de la interfaz en navegador (`ui/dev-mock.js`) | Todas las secciones renderizan; sin errores de consola |
 | Bundle de release | Firmado con «Developer ID Application» + Hardened Runtime, entitlements `audio-input` y `network.client`, `LSUIElement`, `NSMicrophoneUsageDescription`; `codesign --verify --deep --strict` correcto |
 
+## Limpieza con IA, vocabulario, sonidos, Esc e inicio con el sistema (añadidos después)
+
+| Prueba | Resultado |
+| --- | --- |
+| `cleans_spanish_dictation` (real, GPT-OSS 120B y 20B en Groq) | «eh bueno entonces o sea mándale el correo a sarrasola el jueves no espera el viernes punto y dile que que la reunión es a las tres» → «Entonces, mándale el correo a Sarrazola el viernes y dile que la reunión es a las tres.» en ~1 s. Una pregunta se limpia sin responderla. |
+| Autodiagnóstico en la app instalada con limpieza activada | Audio TTS con muletillas → transcrito en 1,0 s → limpiado en 0,8 s (125 → 71 caracteres) → copiado: «Mándale el correo a Andrés el viernes y dile que la reunión es a las 3.» |
+| `prompt_uses_default_when_custom_is_blank`, `wraps_transcript`, `tidy_strips_wrappers` | Instrucciones por defecto + vocabulario, envoltorio `<transcript>`, limpieza de comillas/etiquetas en la respuesta |
+| Inicio con el sistema | Con el ajuste activado la app crea el LaunchAgent; al restaurar los valores por defecto lo elimina |
+| Esc cancela (real) | Atajo sintético mantenido 6 s y Esc pulsado a los 2 s: «Grabación cancelada con Esc», sin transcribir. Hallazgo: registrar Esc como atajo global de Carbon mientras el atajo principal está pulsado provoca una liberación falsa (la grabación se cortaba a 0,5 s); por eso Esc se detecta con un monitor global de AppKit (`NSEvent.addGlobalMonitorForEvents`), que no interfiere. Verificado: con el monitor, 3 s pulsados = 2,94 s grabados. |
+| Sonidos | Sonidos del sistema (Pop, Tink, Basso) vía `NSSound`, sin avisos en el registro; que suenen no se puede comprobar de forma automática |
+
 ## Flujo real con el atajo (app instalada y firmada, permisos concedidos)
 
 Ejecutado con el modo `DICTADO_SELFTEST_HOTKEY_SECS`, que hace que la app pulse su propio atajo con
