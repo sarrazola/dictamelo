@@ -1,9 +1,14 @@
+<p align="center"><img src="assets/logo-original.png" width="128" alt="Dictámelo"></p>
+
 # Dictámelo
 
-App de barra de menú para macOS (Rust + Tauri 2) que convierte voz en texto **donde esté el cursor**:
-mantén presionado un atajo global en cualquier aplicación, habla, suelta y la transcripción se pega
-automáticamente. La transcripción la hace un proveedor remoto (Groq en esta versión) detrás de una
-interfaz que permite cambiarlo sin tocar el resto de la app.
+Dicta en cualquier app de tu Mac: mantén presionado un atajo, habla, suelta, y el texto aparece donde
+está el cursor. App de barra de menú hecha en Rust + Tauri 2. La transcripción la hace un proveedor
+remoto (Groq en esta versión) detrás de una interfaz que permite cambiarlo sin tocar el resto de la app.
+
+**Descarga:** [última versión para macOS (Apple Silicon)](https://github.com/sarrazola/dictamelo/releases/latest).
+Como todavía no está notarizada, la primera vez ábrela con clic derecho → Abrir.
+Más información en [dictamelo.com](https://dictamelo.com).
 
 ## Qué hace
 
