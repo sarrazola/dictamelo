@@ -716,6 +716,8 @@ function wireEvents() {
       toast(String(err), true);
     }
   });
+  $("#btn-website").addEventListener("click", () =>
+    invoke("open_url", { url: "https://dictamelo.com" }).catch((e) => toast(String(e), true)));
   $("#btn-logs").addEventListener("click", () =>
     invoke("open_log_dir").catch((e) => toast(String(e), true)));
 

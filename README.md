@@ -1,4 +1,4 @@
-# Dictado
+# Dictámelo
 
 App de barra de menú para macOS (Rust + Tauri 2) que convierte voz en texto **donde esté el cursor**:
 mantén presionado un atajo global en cualquier aplicación, habla, suelta y la transcripción se pega
@@ -120,17 +120,17 @@ Pruebas opcionales que tocan recursos reales:
 
 ```bash
 cd src-tauri
-DICTADO_LIVE_TESTS=1 cargo test live_tests -- --nocapture   # llama a la API de Groq con audio TTS
-DICTADO_CLIPBOARD_TESTS=1 cargo test snapshot_and_restore   # usa el portapapeles real (lo restaura)
-DICTADO_SELFTEST_WAV=/ruta/audio.wav ./target/debug/dictado  # flujo completo sin micrófono ni atajo
+DICTAMELO_LIVE_TESTS=1 cargo test live_tests -- --nocapture   # llama a la API de Groq con audio TTS
+DICTAMELO_CLIPBOARD_TESTS=1 cargo test snapshot_and_restore   # usa el portapapeles real (lo restaura)
+DICTAMELO_SELFTEST_WAV=/ruta/audio.wav ./target/debug/dictamelo  # flujo completo sin micrófono ni atajo
 ```
 
 ## Permisos de macOS
 
 - **Micrófono**: macOS lo pide la primera vez que grabas. Si lo negaste: Ajustes del Sistema →
-  Privacidad y seguridad → Micrófono → activa Dictado.
+  Privacidad y seguridad → Micrófono → activa Dictámelo.
 - **Accesibilidad**: necesario para enviar ⌘V. Ajustes del Sistema → Privacidad y seguridad →
-  Accesibilidad → activa Dictado. Sin él, el texto se copia al portapapeles y la app te avisa.
+  Accesibilidad → activa Dictámelo. Sin él, el texto se copia al portapapeles y la app te avisa.
 
 La ventana de configuración muestra el estado de ambos permisos y tiene botones para solicitarlos o
 abrir el panel correcto. La app está firmada con Developer ID para que macOS mantenga los permisos
@@ -140,10 +140,10 @@ entre versiones.
 
 | Qué | Dónde |
 | --- | --- |
-| API keys | Llavero de macOS, servicio `com.sarrazola.dictado`, cuenta = id del proveedor |
-| Configuración | `~/Library/Application Support/com.sarrazola.dictado/settings.json` |
-| Historial | `~/Library/Application Support/com.sarrazola.dictado/history.json` |
-| Audio temporal | `~/Library/Caches/com.sarrazola.dictado/audio/` (se borra tras cada uso) |
-| Registros | `~/Library/Logs/com.sarrazola.dictado/dictado.log` |
+| API keys | Llavero de macOS, servicio `com.dictamelo.desktop`, cuenta = id del proveedor |
+| Configuración | `~/Library/Application Support/com.dictamelo.desktop/settings.json` |
+| Historial | `~/Library/Application Support/com.dictamelo.desktop/history.json` |
+| Audio temporal | `~/Library/Caches/com.dictamelo.desktop/audio/` (se borra tras cada uso) |
+| Registros | `~/Library/Logs/com.dictamelo.desktop/dictado.log` |
 
 Las API keys nunca se escriben en archivos, en el repositorio ni en los registros.

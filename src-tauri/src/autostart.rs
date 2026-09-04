@@ -1,4 +1,4 @@
-//! Abrir Dictado al iniciar sesión (LaunchAgent en macOS, registro en Windows).
+//! Abrir Dictámelo al iniciar sesión (LaunchAgent en macOS, registro en Windows).
 
 use crate::state::AppState;
 use tauri::{AppHandle, Manager};

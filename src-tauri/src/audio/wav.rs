@@ -22,7 +22,7 @@ pub fn write_wav_mono_i16(path: &Path, samples: &[i16], sample_rate: u32) -> Res
 
 /// Ruta única para un WAV temporal dentro de `dir`.
 pub fn new_temp_path(dir: &Path) -> PathBuf {
-    dir.join(format!("dictado-{}.wav", uuid::Uuid::new_v4()))
+    dir.join(format!("dictamelo-{}.wav", uuid::Uuid::new_v4()))
 }
 
 #[cfg(test)]

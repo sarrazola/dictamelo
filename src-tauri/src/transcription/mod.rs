@@ -148,7 +148,7 @@ impl ProviderRegistry {
 /// Cliente HTTP compartido (rustls, sin OpenSSL) con tiempos de espera razonables.
 pub fn shared_http_client() -> reqwest::Client {
     reqwest::Client::builder()
-        .user_agent(concat!("Dictado/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Dictamelo/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(180))
         .build()

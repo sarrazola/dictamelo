@@ -1,98 +1,74 @@
 #!/usr/bin/env python3
-"""Genera el ícono de la app (1024x1024) y los íconos de la barra de menú.
+"""Genera todos los íconos a partir del logo original (assets/logo-original.png).
 
-Uso:  python3 assets/make_icons.py
-Luego: npx tauri icon assets/app-icon-1024.png
+- Ícono de app (1024×1024) al estilo macOS: cuadrado redondeado con márgenes.
+- Íconos de la barra de menú: el mismo dibujo (perfil + líneas de sonido) en monocromo
+  (plantilla, se adapta al modo claro/oscuro) y tintado por estado.
+- ui/icon.png para la barra lateral y «Acerca de».
+
+Uso:  python3 assets/make_icons.py && npx tauri icon assets/app-icon-1024.png
 """
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
+import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
+LOGO = ROOT / "assets" / "logo-original.png"
 TRAY_DIR = ROOT / "src-tauri" / "icons" / "tray"
 TRAY_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def mic_glyph(draw: ImageDraw.ImageDraw, cx: float, cy: float, size: float, fill):
-    """Dibuja un micrófono centrado en (cx, cy); `size` es la altura total."""
-    w = size * 0.34
-    body_h = size * 0.52
-    top = cy - size * 0.48
-    # Cápsula del micrófono
-    draw.rounded_rectangle(
-        [cx - w / 2, top, cx + w / 2, top + body_h], radius=w / 2, fill=fill
-    )
-    # Arco de soporte
-    arc_w = size * 0.62
-    arc_top = top + body_h * 0.42
-    arc_bottom = top + body_h + size * 0.16
-    thick = max(1, int(size * 0.075))
-    draw.arc(
-        [cx - arc_w / 2, arc_top, cx + arc_w / 2, arc_bottom],
-        start=0, end=180, fill=fill, width=thick,
-    )
-    # Mástil y base
-    stem_top = arc_bottom - size * 0.02
-    stem_bottom = cy + size * 0.42
-    draw.rectangle([cx - thick / 2, stem_top, cx + thick / 2, stem_bottom], fill=fill)
-    base_w = size * 0.36
-    draw.rounded_rectangle(
-        [cx - base_w / 2, stem_bottom - thick / 2, cx + base_w / 2, stem_bottom + thick / 2],
-        radius=thick / 2, fill=fill,
-    )
-
-
 def app_icon(path: Path, px: int = 1024):
+    """Cuadrado redondeado (la forma que usa macOS) con el logo a sangre y margen del 10 %."""
+    logo = Image.open(LOGO).convert("RGB")
+    canvas = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+    margin = round(px * 0.098)          # cuadrícula de Apple: 824 px de 1024
+    size = px - 2 * margin
+    radius = round(size * 0.2237)       # radio de esquina de los íconos de macOS
+    content = logo.resize((size, size), Image.LANCZOS)
+    # Máscara con antialiasing: se dibuja a 4× y se reduce.
     scale = 4
-    big = px * scale
-    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    margin = big * 0.06
-    radius = big * 0.22
-    # Fondo con degradado vertical (azul-violeta)
-    grad = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(grad)
-    top_c = (78, 88, 255)
-    bot_c = (140, 60, 220)
-    for y in range(big):
-        t = y / (big - 1)
-        c = tuple(int(top_c[i] * (1 - t) + bot_c[i] * t) for i in range(3)) + (255,)
-        gd.line([(0, y), (big, y)], fill=c)
-    mask = Image.new("L", (big, big), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [margin, margin, big - margin, big - margin], radius=radius, fill=255
-    )
-    img.paste(grad, (0, 0), mask)
-    # Micrófono blanco
-    mic_glyph(d, big / 2, big / 2 + big * 0.02, big * 0.52, (255, 255, 255, 255))
-    img = img.resize((px, px), Image.LANCZOS)
-    img.save(path)
+    mask = Image.new("L", (size * scale, size * scale), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, size * scale - 1, size * scale - 1], radius=radius * scale, fill=255)
+    mask = mask.resize((size, size), Image.LANCZOS)
+    canvas.paste(content, (margin, margin), mask)
+    canvas.save(path)
 
 
-def tray_icon(name: str, px: int, fg, badge=None, template=True):
-    """Ícono de barra de menú. `px` es el tamaño en píxeles (usar 2x para retina)."""
-    scale = 4
-    big = px * scale
-    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    if badge is not None:
-        # Disco de color con micrófono blanco encima (íconos de estado, no template)
-        d.ellipse([0, 0, big - 1, big - 1], fill=badge)
-        mic_glyph(d, big / 2, big / 2, big * 0.62, (255, 255, 255, 255))
-    else:
-        mic_glyph(d, big / 2, big / 2, big * 0.92, fg)
-    img = img.resize((px, px), Image.LANCZOS)
-    img.save(TRAY_DIR / f"{name}.png")
+def glyph_alpha() -> Image.Image:
+    """Máscara (canal alfa) del trazo negro del logo: perfil + líneas, recortado a la parte central."""
+    im = Image.open(LOGO).convert("RGB")
+    lum = np.asarray(im).astype(np.float32).mean(axis=2)
+    # Transición suave alrededor del umbral para conservar el antialiasing del trazo.
+    alpha = np.clip((120.0 - lum) / 60.0, 0.0, 1.0) * 255.0
+    mask = Image.fromarray(alpha.astype(np.uint8), "L")
+    # Recorte: de la punta de la nariz hasta el final de las líneas de sonido.
+    crop = mask.crop((270, 290, 1170, 1070))
+    return crop
+
+
+def tray_icon(name: str, color, height_px: int = 36):
+    """PNG con el dibujo en `color` y el alfa del trazo, de `height_px` de alto (18 pt @2x)."""
+    alpha = glyph_alpha()
+    w, h = alpha.size
+    width_px = round(height_px * w / h)
+    alpha = alpha.resize((width_px, height_px), Image.LANCZOS)
+    rgba = Image.new("RGBA", (width_px, height_px), color + (0,))
+    rgba.putalpha(alpha)
+    rgba.save(TRAY_DIR / f"{name}.png")
+    return width_px
 
 
 if __name__ == "__main__":
     out = ROOT / "assets" / "app-icon-1024.png"
     app_icon(out)
     print("app icon ->", out)
-    black = (0, 0, 0, 255)
-    # 36 px = 18 pt @2x (tray-icon escala a 18 pt de alto en macOS)
-    tray_icon("idle", 36, black)
-    tray_icon("recording", 36, black, badge=(228, 52, 52, 255))
-    tray_icon("transcribing", 36, black, badge=(56, 120, 250, 255))
-    tray_icon("pasting", 36, black, badge=(40, 170, 90, 255))
-    tray_icon("error", 36, black, badge=(240, 140, 20, 255))
-    print("tray icons ->", TRAY_DIR)
+    (ROOT / "ui").mkdir(exist_ok=True)
+    Image.open(out).resize((256, 256), Image.LANCZOS).save(ROOT / "ui" / "icon.png")
+    print("ui/icon.png listo")
+    w = tray_icon("idle", (0, 0, 0))               # plantilla: macOS la tiñe según el modo
+    tray_icon("recording", (228, 52, 52))
+    tray_icon("transcribing", (56, 120, 250))
+    tray_icon("pasting", (40, 170, 90))
+    tray_icon("error", (240, 140, 20))
+    print(f"tray icons -> {TRAY_DIR} ({w}×36 px)")

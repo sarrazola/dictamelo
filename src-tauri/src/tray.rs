@@ -55,7 +55,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let tray = TrayIconBuilder::with_id("main")
         .icon(icon_for(&Status::Idle))
         .icon_as_template(true)
-        .tooltip("Dictado")
+        .tooltip("Dictámelo")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| handle_menu(app, event.id().as_ref()))

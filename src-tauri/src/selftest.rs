@@ -1,4 +1,4 @@
-//! Autodiagnóstico sin micrófono ni atajo: con `DICTADO_SELFTEST_WAV=/ruta/audio.wav` la app
+//! Autodiagnóstico sin micrófono ni atajo: con `DICTAMELO_SELFTEST_WAV=/ruta/audio.wav` la app
 //! transcribe ese archivo con la configuración actual, lo pega/copia como en el flujo normal,
 //! imprime el resultado y termina (código 0 si todo fue bien). Útil para probar la integración
 //! con el proveedor, el portapapeles y el historial de forma automatizada.
@@ -11,15 +11,15 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 pub fn enabled() -> bool {
-    std::env::var_os("DICTADO_SELFTEST_WAV").is_some()
-        || std::env::var_os("DICTADO_SELFTEST_HOTKEY_SECS").is_some()
-        || std::env::var_os("DICTADO_SELFTEST_FILE").is_some()
+    std::env::var_os("DICTAMELO_SELFTEST_WAV").is_some()
+        || std::env::var_os("DICTAMELO_SELFTEST_HOTKEY_SECS").is_some()
+        || std::env::var_os("DICTAMELO_SELFTEST_FILE").is_some()
 }
 
 pub fn maybe_run(app: &AppHandle) {
-    let wav = std::env::var("DICTADO_SELFTEST_WAV").ok();
-    let hotkey_secs = std::env::var("DICTADO_SELFTEST_HOTKEY_SECS").ok().and_then(|s| s.parse::<f64>().ok());
-    let file = std::env::var("DICTADO_SELFTEST_FILE").ok();
+    let wav = std::env::var("DICTAMELO_SELFTEST_WAV").ok();
+    let hotkey_secs = std::env::var("DICTAMELO_SELFTEST_HOTKEY_SECS").ok().and_then(|s| s.parse::<f64>().ok());
+    let file = std::env::var("DICTAMELO_SELFTEST_FILE").ok();
     if wav.is_none() && hotkey_secs.is_none() && file.is_none() {
         return;
     }
@@ -69,7 +69,7 @@ async fn run_with_hotkey(app: &AppHandle, hold_secs: f64) -> Result<String, Stri
         *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(result);
     });
     // Opcional: pulsar Esc a mitad de la grabación para probar la cancelación.
-    if let Some(ms) = std::env::var("DICTADO_SELFTEST_ESC_AFTER_MS").ok().and_then(|v| v.parse::<u64>().ok()) {
+    if let Some(ms) = std::env::var("DICTAMELO_SELFTEST_ESC_AFTER_MS").ok().and_then(|v| v.parse::<u64>().ok()) {
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(ms));
             log::info!("Selftest: pulsando Esc");

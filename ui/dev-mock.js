@@ -26,8 +26,8 @@ if (!window.__TAURI__) {
   const commands = {
     get_app_info: () => ({
       version: "0.1.0", platform: "macos", defaultHotkey: "Alt+Shift+Space",
-      logDir: "~/Library/Logs/com.sarrazola.dictado",
-      configDir: "~/Library/Application Support/com.sarrazola.dictado",
+      logDir: "~/Library/Logs/com.dictamelo.desktop",
+      configDir: "~/Library/Application Support/com.dictamelo.desktop",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",
       defaultCleanupPrompt: "You are the cleanup step of a dictation app. (Vista previa: el texto real vive en src-tauri/src/cleanup/mod.rs.)",
     }),

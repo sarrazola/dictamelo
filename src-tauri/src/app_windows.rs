@@ -19,7 +19,7 @@ const OVERLAY_FALLBACK: Duration = Duration::from_millis(300);
 
 pub fn create_windows(app: &AppHandle) -> tauri::Result<()> {
     WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
-        .title("Dictado")
+        .title("Dictámelo")
         .inner_size(660.0, 780.0)
         .min_inner_size(560.0, 520.0)
         .visible(false)

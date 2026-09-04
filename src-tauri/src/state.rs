@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use tauri::{AppHandle, Manager};
 
 /// Nombre del servicio bajo el que se guardan las API keys en el llavero.
-pub const KEYCHAIN_SERVICE: &str = "com.sarrazola.dictado";
+pub const KEYCHAIN_SERVICE: &str = "com.dictamelo.desktop";
 
 /// Audio de una transcripción fallida, conservado en memoria para poder reintentar.
 pub struct PendingTranscription {

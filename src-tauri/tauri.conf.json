@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Dictado",
+  "productName": "Dictámelo",
   "version": "0.1.0",
-  "identifier": "com.sarrazola.dictado",
+  "identifier": "com.dictamelo.desktop",
   "build": {
     "frontendDist": "../ui"
   },
@@ -18,7 +18,7 @@
     "active": true,
     "targets": ["app", "dmg"],
     "category": "Productivity",
-    "shortDescription": "Dictado por voz para cualquier aplicación",
+    "shortDescription": "Dictámelo: dictado por voz para cualquier aplicación",
     "longDescription": "Mantén presionado un atajo global, habla y suelta: la transcripción se pega donde estaba el cursor.",
     "icon": [
       "icons/32x32.png",

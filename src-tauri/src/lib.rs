@@ -1,4 +1,4 @@
-//! Dictado: app de barra de menú para dictar por voz en cualquier aplicación.
+//! Dictámelo: app de barra de menú para dictar por voz en cualquier aplicación.
 //!
 //! Toda la lógica vive en Rust; el frontend (carpeta `ui/`) solo pinta la interfaz.
 //!
@@ -53,7 +53,7 @@ pub fn run() {
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some("dictado".into()),
+                        file_name: Some("dictamelo".into()),
                     }),
                 ])
                 .build(),
@@ -121,7 +121,7 @@ pub fn run() {
             } else {
                 pipeline::startup_checks(&handle);
             }
-            log::info!("Dictado {} iniciado", env!("CARGO_PKG_VERSION"));
+            log::info!("Dictámelo {} iniciado", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -134,7 +134,7 @@ pub fn run() {
             }
         })
         .build(tauri::generate_context!())
-        .expect("error al iniciar Dictado")
+        .expect("error al iniciar Dictámelo")
         .run(|_app, event| {
             // Sin ventanas visibles la app debe seguir viva (vive en la barra de menú).
             if let tauri::RunEvent::ExitRequested { api, code, .. } = event {

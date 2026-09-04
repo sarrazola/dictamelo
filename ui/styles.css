@@ -1,4 +1,4 @@
-/* Dictado — interfaz de configuración. Estilo nativo de macOS: barra lateral + panel. */
+/* Dictámelo — interfaz de configuración. Estilo nativo de macOS: barra lateral + panel. */
 
 :root {
   color-scheme: light dark;
@@ -68,13 +68,7 @@ body {
   gap: 14px;
 }
 .brand { display: flex; align-items: center; gap: 9px; padding: 4px 6px 0; }
-.brand-mark {
-  width: 26px; height: 26px; border-radius: 7px; flex: none;
-  display: grid; place-items: center; color: #fff;
-  background: linear-gradient(160deg, #6366ff, #9b46e0);
-  box-shadow: 0 1px 3px rgba(90, 60, 200, .35);
-}
-.brand-mark svg { width: 15px; height: 15px; }
+.brand-mark { width: 32px; height: 32px; flex: none; margin: -3px -2px -3px -3px; }
 .brand-name { font-size: 14px; font-weight: 650; letter-spacing: -.2px; }
 
 nav { display: flex; flex-direction: column; gap: 1px; flex: 1; }
@@ -109,6 +103,12 @@ nav { display: flex; flex-direction: column; gap: 1px; flex: 1; }
 
 .page { display: none; flex-direction: column; gap: 14px; max-width: 620px; }
 .page.active { display: flex; }
+
+.about-hero { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.about-icon { width: 64px; height: 64px; margin: -6px; }
+.about-text { display: flex; flex-direction: column; flex: 1; }
+.about-text strong { font-size: 16px; font-weight: 680; letter-spacing: -.2px; }
+.about-text span { color: var(--muted); font-size: 12px; }
 
 /* ---------- Tarjetas y filas ---------- */
 .card {

@@ -32,7 +32,7 @@ pub struct Settings {
     pub max_history: usize,
     /// Duración máxima de una grabación, en segundos.
     pub max_recording_secs: u32,
-    /// Abrir Dictado al iniciar sesión.
+    /// Abrir Dictámelo al iniciar sesión.
     pub launch_at_login: bool,
     /// Sonido sutil al empezar y terminar de grabar.
     pub play_sounds: bool,

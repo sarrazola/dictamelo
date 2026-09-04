@@ -1012,7 +1012,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dictado"
+name = "dictamelo"
 version = "0.1.0"
 dependencies = [
  "anyhow",

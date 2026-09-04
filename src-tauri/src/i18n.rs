@@ -65,7 +65,7 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Riprova l'ultima trascrizione",
         ]),
         "tray.autopaste" => pick(lang, ["Pegado automático", "Auto-paste", "Colagem automática", "Collage automatique", "Automatisch einfügen", "Incolla automatico"]),
-        "tray.quit" => pick(lang, ["Salir de Dictado", "Quit Dictado", "Sair do Dictado", "Quitter Dictado", "Dictado beenden", "Esci da Dictado"]),
+        "tray.quit" => pick(lang, ["Salir de Dictámelo", "Quit Dictámelo", "Sair do Dictámelo", "Quitter Dictámelo", "Dictámelo beenden", "Esci da Dictámelo"]),
 
         // --- Mensajes de resultado ---
         "msg.pasted" => pick(lang, ["Texto pegado", "Text pasted", "Texto colado", "Texte collé", "Text eingefügt", "Testo incollato"]),

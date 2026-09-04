@@ -17,10 +17,10 @@
 
 | Prueba | Resultado |
 | --- | --- |
-| `DICTADO_LIVE_TESTS=1 cargo test live_tests` — frase en español sintetizada con `say`, enviada a Groq con `whisper-large-v3-turbo` (idioma fijo) y `whisper-large-v3` (detección automática) | Transcripción correcta en ~1,5 s cada una («Hola, esto es una prueba de dictado por voz con Groq» → «…por vos con grog», error propio de la voz sintética) |
+| `DICTAMELO_LIVE_TESTS=1 cargo test live_tests` — frase en español sintetizada con `say`, enviada a Groq con `whisper-large-v3-turbo` (idioma fijo) y `whisper-large-v3` (detección automática) | Transcripción correcta en ~1,5 s cada una («Hola, esto es una prueba de dictado por voz con Groq» → «…por vos con grog», error propio de la voz sintética) |
 | `invalid_key_is_reported_as_unauthorized` — key inválida, sin key y modelo inexistente | `Unauthorized`, `MissingApiKey` y `Unauthorized/Rejected` respectivamente |
-| `DICTADO_CLIPBOARD_TESTS=1 cargo test snapshot_and_restore` — portapapeles real | La instantánea conserva `public.utf8-plain-text`, el contador de cambios sube al escribir y la restauración recupera el contenido previo |
-| `DICTADO_SELFTEST_WAV=… ./target/debug/dictado` (dos veces, con dos frases distintas) | Arranque de la app completa (bandeja, ventanas, atajo registrado), lectura de la API key desde el Llavero, transcripción vía Groq en 0,5 s, borrado del WAV temporal, intento de pegado → sin permiso de Accesibilidad → texto copiado al portapapeles y entrada añadida al historial; código de salida 0 |
+| `DICTAMELO_CLIPBOARD_TESTS=1 cargo test snapshot_and_restore` — portapapeles real | La instantánea conserva `public.utf8-plain-text`, el contador de cambios sube al escribir y la restauración recupera el contenido previo |
+| `DICTAMELO_SELFTEST_WAV=… ./target/debug/dictamelo` (dos veces, con dos frases distintas) | Arranque de la app completa (bandeja, ventanas, atajo registrado), lectura de la API key desde el Llavero, transcripción vía Groq en 0,5 s, borrado del WAV temporal, intento de pegado → sin permiso de Accesibilidad → texto copiado al portapapeles y entrada añadida al historial; código de salida 0 |
 | Arranque normal del binario de desarrollo | Ambas vistas web informan «Interfaz lista»; estado inicial registrado (`api_key=true`, micrófono `NotDetermined`, accesibilidad `Denied`), ventana de configuración abierta automáticamente |
 | Vista previa de la interfaz en navegador (`ui/dev-mock.js`) | Todas las secciones renderizan; sin errores de consola |
 | Bundle de release | Firmado con «Developer ID Application» + Hardened Runtime, entitlements `audio-input` y `network.client`, `LSUIElement`, `NSMicrophoneUsageDescription`; `codesign --verify --deep --strict` correcto |
@@ -36,7 +36,14 @@
 | Esc cancela (real) | Atajo sintético mantenido 6 s y Esc pulsado a los 2 s: «Grabación cancelada con Esc», sin transcribir. Hallazgo: registrar Esc como atajo global de Carbon mientras el atajo principal está pulsado provoca una liberación falsa (la grabación se cortaba a 0,5 s); por eso Esc se detecta con un monitor global de AppKit (`NSEvent.addGlobalMonitorForEvents`), que no interfiere. Verificado: con el monitor, 3 s pulsados = 2,94 s grabados. |
 | Sonidos | Sonidos del sistema (Pop, Tink, Basso) vía `NSSound`, sin avisos en el registro; que suenen no se puede comprobar de forma automática |
 
-## Transcripción de archivos (app instalada, modo `DICTADO_SELFTEST_FILE`)
+## Cambio de nombre a Dictámelo (2026-09-04)
+
+Identificador `com.dictamelo.desktop`, bundle `Dictámelo.app`, binario `dictamelo`. Verificado: el bundle se
+firma y se instala con el nombre acentuado, la API key migrada al nuevo servicio del Llavero se lee sin
+diálogos (`api_key=true`), el historial se copió al nuevo directorio y, como cambia la identidad de la app,
+macOS vuelve a pedir Micrófono y Accesibilidad una sola vez.
+
+## Transcripción de archivos (app instalada, modo `DICTAMELO_SELFTEST_FILE`)
 
 | Archivo | Ruta seguida | Resultado |
 | --- | --- | --- |
@@ -44,13 +51,13 @@
 | AIFF de 162 KB | No nativo → `afconvert` a WAV 16 kHz mono | 66 caracteres correctos en ~1 s |
 | WAV de 26 min / 50 MB (frase repetida con pausas) | Supera 24 MB → conversión + 3 tramos cortados en silencios | 13.564 caracteres, 1563 s de audio, 59 s en total |
 
-Tras las tres pruebas no quedó ningún temporal en `~/Library/Caches/com.sarrazola.dictado/audio/`.
+Tras las tres pruebas no quedó ningún temporal en `~/Library/Caches/com.dictamelo.desktop/audio/`.
 Pruebas unitarias del troceado: un audio corto queda en un tramo; uno largo se corta dentro del
 silencio más cercano a la frontera, los tramos son contiguos, cubren todo y ninguno supera el máximo.
 
 ## Flujo real con el atajo (app instalada y firmada, permisos concedidos)
 
-Ejecutado con el modo `DICTADO_SELFTEST_HOTKEY_SECS`, que hace que la app pulse su propio atajo con
+Ejecutado con el modo `DICTAMELO_SELFTEST_HOTKEY_SECS`, que hace que la app pulse su propio atajo con
 eventos sintéticos y mantenga la grabación. Registro de la app:
 
 ```

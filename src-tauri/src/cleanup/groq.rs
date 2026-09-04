@@ -54,7 +54,7 @@ impl TextCleaner for GroqCleaner {
     }
 }
 
-/// Prueba real contra Groq (`DICTADO_LIVE_TESTS=1`, API key en el Llavero).
+/// Prueba real contra Groq (`DICTAMELO_LIVE_TESTS=1`, API key en el Llavero).
 #[cfg(all(test, target_os = "macos"))]
 mod live_tests {
     use super::*;
@@ -72,7 +72,7 @@ mod live_tests {
 
     #[tokio::test]
     async fn cleans_spanish_dictation() {
-        if std::env::var("DICTADO_LIVE_TESTS").is_err() {
+        if std::env::var("DICTAMELO_LIVE_TESTS").is_err() {
             return;
         }
         let key = keychain_key().expect("API key de Groq en el Llavero");

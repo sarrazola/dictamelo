@@ -24,7 +24,7 @@ app.mainMenu = mainMenu
 
 let window = NSWindow(contentRect: NSRect(x: 260, y: 300, width: 680, height: 220),
                       styleMask: [.titled, .closable], backing: .buffered, defer: false)
-window.title = "Dictado — destino de pegado (prueba automática)"
+window.title = "Dictámelo — destino de pegado (prueba automática)"
 let scroll = NSScrollView(frame: window.contentView!.bounds)
 scroll.autoresizingMask = [.width, .height]
 let textView = NSTextView(frame: scroll.bounds)

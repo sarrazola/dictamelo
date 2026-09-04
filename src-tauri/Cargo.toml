@@ -1,14 +1,14 @@
 [package]
-name = "dictado"
+name = "dictamelo"
 version = "0.1.0"
-description = "Dictado por voz: mantén presionado un atajo, habla y el texto aparece donde estaba el cursor."
+description = "Dictámelo: dictado por voz. Mantén presionado un atajo, habla y el texto aparece donde estaba el cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"
 edition = "2021"
 rust-version = "1.80"
 
 [lib]
-name = "dictado_lib"
+name = "dictamelo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

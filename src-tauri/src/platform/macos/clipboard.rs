@@ -81,11 +81,11 @@ mod tests {
     use super::*;
 
     /// Modifica el portapapeles real del usuario (lo deja como estaba). Se ejecuta solo
-    /// con `DICTADO_CLIPBOARD_TESTS=1`.
+    /// con `DICTAMELO_CLIPBOARD_TESTS=1`.
     #[test]
     fn snapshot_and_restore_roundtrip() {
-        if std::env::var("DICTADO_CLIPBOARD_TESTS").is_err() {
-            eprintln!("omitido: define DICTADO_CLIPBOARD_TESTS=1");
+        if std::env::var("DICTAMELO_CLIPBOARD_TESTS").is_err() {
+            eprintln!("omitido: define DICTAMELO_CLIPBOARD_TESTS=1");
             return;
         }
         let cb = MacClipboard;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dictado</title>
+  <title>Dictámelo</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,13 +11,8 @@
 
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <rect x="9" y="2.5" width="6" height="10.5" rx="3" fill="currentColor" stroke="none"/>
-          <path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/><path d="M8.5 21h7"/>
-        </svg>
-      </span>
-      <span class="brand-name">Dictado</span>
+      <img class="brand-mark" src="icon.png" alt="">
+      <span class="brand-name">Dictámelo</span>
     </div>
 
     <nav id="nav">
@@ -245,6 +240,14 @@
 
     <!-- Acerca de -->
     <section class="page" data-page="about">
+      <div class="card about-hero">
+        <img class="about-icon" src="icon.png" alt="">
+        <div class="about-text">
+          <strong>Dictámelo</strong>
+          <span id="about-version"></span>
+        </div>
+        <button id="btn-website" class="ghost">dictamelo.com</button>
+      </div>
       <div class="card">
         <div class="row">
           <div class="label"><strong data-i18n="about.uilang"></strong><span data-i18n="about.uilang.desc"></span></div>
@@ -256,10 +259,6 @@
         <div id="about-perm-rows"></div>
       </div>
       <div class="card">
-        <div class="row">
-          <div class="label"><strong data-i18n="about.version"></strong><span id="about-version"></span></div>
-          <div class="actions"></div>
-        </div>
         <div class="row">
           <div class="label"><strong data-i18n="about.logs"></strong><span data-i18n="about.logs.desc"></span></div>
           <div class="actions"><button id="btn-logs" class="ghost" data-i18n="about.openlogs"></button></div>
