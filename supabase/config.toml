@@ -24,8 +24,8 @@ content_path = "./supabase/templates/sign-in.html"
 subject = "Your Dictámelo sign-in code"
 content_path = "./supabase/templates/sign-in.html"
 
-# Estas funciones no usan sesiones de Supabase: la credencial es la clave de licencia, que
-# se comprueba dentro de cada función contra Lemon Squeezy.
+# Gateway JWT checks are disabled for legacy Pro license headers. Free-account requests
+# validate their JWT against Supabase Auth inside the function before accessing quota.
 [functions.transcribe]
 verify_jwt = false
 

@@ -31,6 +31,9 @@ if ! gh release view "$TAG" >/dev/null 2>&1; then
   gh release create "$TAG" --draft --verify-tag --title "Dictámelo $VERSION" --notes-file "$NOTES"
 fi
 # Draft assets can be refreshed while verification is in progress. Public assets are immutable.
+[[ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" == true ]] || {
+  echo 'Refusing to replace assets without a confirmed draft release.' >&2; exit 1;
+}
 gh release upload "$TAG" "$STAGE"/* --clobber
 gh release edit "$TAG" --title "Dictámelo $VERSION" --notes-file "$NOTES" --draft=false --latest
 DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --nocapture
