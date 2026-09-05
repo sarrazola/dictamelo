@@ -13,6 +13,18 @@ use tauri_plugin_updater::UpdaterExt;
 /// Evita dos descargas a la vez si el usuario pulsa el botón mientras ya se está instalando.
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 
+// Forks must explicitly opt in after choosing their own updater endpoint and public key.
+// A clean open-source build must never replace itself with an official hosted edition.
+fn enabled() -> bool {
+    option_env!("DICTAMELO_UPDATES_ENABLED") == Some("true")
+}
+
+fn ensure_enabled() -> Result<(), String> {
+    if enabled() { Ok(()) } else {
+        Err("Automatic updates are disabled in this build. Get a newer version from its publisher.".into())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateInfo {
@@ -33,6 +45,7 @@ struct DownloadProgress {
 
 /// Consulta si hay una versión nueva. Un fallo de red devuelve error para poder avisarlo.
 pub async fn check(app: &AppHandle) -> Result<UpdateInfo, String> {
+    ensure_enabled()?;
     let current = app.package_info().version.to_string();
     let updater = app.updater().map_err(|e| e.to_string())?;
     match updater.check().await {
@@ -51,6 +64,7 @@ pub async fn check(app: &AppHandle) -> Result<UpdateInfo, String> {
 /// Descarga e instala la actualización, informando el avance por el evento `update-progress`.
 /// En macOS reemplaza el paquete y hay que reiniciar; en Windows corre el instalador.
 pub async fn install(app: &AppHandle) -> Result<(), String> {
+    ensure_enabled()?;
     if INSTALLING.swap(true, Ordering::SeqCst) {
         return Err("Ya se está instalando una actualización".into());
     }
@@ -119,6 +133,7 @@ const CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(6 * 60 *
 /// Comprueba en segundo plano poco después de arrancar y luego cada pocas horas, avisando a la
 /// interfaz si hay novedad. Nunca interrumpe: sin red o sin releases solo queda en el registro.
 pub fn check_on_startup(app: &AppHandle) {
+    if !enabled() { return; }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         // Un respiro para no competir con el arranque ni con la comprobación de licencia.

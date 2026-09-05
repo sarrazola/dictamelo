@@ -16,7 +16,10 @@ const ui = {
   capturing: false,
   license: { active: false },
   account: { signedIn: false, limitWords: 2000 },
-  signInEmail: null,
+  authMode: "signup",
+  accountNotice: null,
+  googlePending: false,
+  onboarding: { step: 1, mode: "free", keyConfigured: false },
   accountBusy: false,
   update: { available: false, installed: false, busy: false },
   deleteArmed: false,
@@ -60,6 +63,7 @@ function t(key, vars) {
   // Fuera de macOS, una clave con variante «.win» (Administrador de credenciales, nombres de
   // teclas, formatos…) tiene prioridad; si no existe, se usa el texto común.
   const platformKey = !isMac() && `${key}.win` in table ? `${key}.win` : key;
+  vars = { hours: window.PLAN_LIMITS.proHours, ...vars };
   let text = table[platformKey] ?? window.I18N.en[platformKey] ?? table[key] ?? window.I18N.en[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, v);
   return text;
@@ -73,6 +77,8 @@ function applyStaticText() {
   $("#vocabulary").placeholder = t("models.vocab.placeholder");
   $("#btn-toggle-prompt").textContent = t($("#prompt-editor").hidden ? "models.cleanup.edit" : "models.cleanup.hide");
 }
+
+function cloudAvailable() { return ui.appInfo?.cloudAvailable !== false; }
 
 function isMac() {
   return (ui.appInfo?.platform || "macos") === "macos";
@@ -119,7 +125,7 @@ function showPage(page) {
   for (const item of $$(".nav-item")) item.classList.toggle("active", item.dataset.page === page);
   for (const section of $$(".page")) section.classList.toggle("active", section.dataset.page === page);
   $("#page-title").textContent = t(`${page}.title`);
-  $("#page-sub").textContent = t(`${page}.subtitle`);
+  $("#page-sub").textContent = t(page === "plan" && !cloudAvailable() ? "plan.standalone.subtitle" : `${page}.subtitle`);
   // El aviso de permisos solo estorba fuera de General; el detalle vive en «Acerca de».
   updateBannerVisibility();
   $("#content")?.scrollTo(0, 0);
@@ -141,8 +147,8 @@ function renderStatus(status) {
 function renderSidebar() {
   const provider = currentProvider();
   const model = provider?.models.find((m) => m.id === ui.settings.model);
-  $("#foot-model").textContent = model ? model.name : ui.settings.model;
-  $("#foot-model").title = provider ? `${provider.name} · ${model?.name ?? ui.settings.model}` : "";
+  $("#foot-model").textContent = isHostedMode() ? "Whisper Large v3 Turbo" : model ? model.name : ui.settings.model;
+  $("#foot-model").title = isHostedMode() ? "Dictámelo · Whisper Large v3 Turbo" : provider ? `${provider.name} · ${model?.name ?? ui.settings.model}` : "";
   $("#foot-version").textContent = ui.appInfo.version;
 }
 
@@ -164,15 +170,22 @@ function modelDescription(model) {
   return t(model.description);
 }
 
+function isHostedMode() { return cloudAvailable() && !ui.settings.useOwnKey && (ui.license.active || ui.account.signedIn); }
+
 function renderCleanup() {
-  const enabled = ui.settings.cleanupEnabled;
+  const hosted = isHostedMode();
+  const freeCloud = hosted && !ui.license.active;
+  const enabled = ui.settings.cleanupEnabled && !freeCloud;
+  $("#cleanup-enabled").disabled = freeCloud;
   $("#cleanup-enabled").checked = enabled;
   $("#cleanup-options").hidden = !enabled;
   const cleaner = currentCleaner();
   if (!cleaner) return;
   fillSelect($("#cleanup-model"), cleaner.models.map((mm) => [mm.id, mm.name]), ui.settings.cleanupModel);
   const model = cleaner.models.find((mm) => mm.id === ui.settings.cleanupModel);
-  $("#cleanup-model-desc").textContent = model ? modelDescription(model) : "";
+  $("#cleanup-model").disabled = hosted;
+  if (hosted) fillSelect($("#cleanup-model"), [["hosted", "GPT-OSS 20B"]], "hosted");
+  $("#cleanup-model-desc").textContent = hosted ? t("models.cloud.cleanup") : model ? modelDescription(model) : "";
   const prompt = $("#cleanup-prompt");
   if (document.activeElement !== prompt) {
     prompt.value = ui.settings.cleanupPrompt || ui.appInfo.defaultCleanupPrompt;
@@ -202,6 +215,10 @@ function providerLogo(id, name) {
 }
 
 function renderModels() {
+  const hosted = isHostedMode();
+  $("#models-cloud-notice").hidden = !hosted;
+  $("#models-cloud-desc").textContent = t(ui.license.active ? "models.cloud.pro" : "models.cloud.free");
+  $$(".byok-models").forEach(el => el.hidden = hosted);
   const chips = $("#provider-chips");
   chips.innerHTML = "";
   for (const p of ui.providers) {
@@ -288,6 +305,7 @@ function updateBannerVisibility() {
 }
 
 function renderPermissions(perms) {
+  ui.permissions = perms;
   const entries = [["mic", perms.microphone], ["ax", perms.accessibility]];
   const missing = entries.filter(([, s]) => s !== "granted" && s !== "not_applicable");
 
@@ -301,6 +319,8 @@ function renderPermissions(perms) {
   const aboutRows = $("#about-perm-rows");
   aboutRows.innerHTML = "";
   for (const [kind, state] of entries) aboutRows.appendChild(permissionRow(kind, state));
+  const wizardRows = $("#onboarding-permissions");
+  wizardRows.replaceChildren(...entries.map(([kind, state]) => permissionRow(kind, state)));
 }
 
 async function refreshPermissions() {
@@ -321,7 +341,7 @@ async function refreshKeyStatus() {
       : t("models.apikey.missing", { p: provider.name });
     $("#btn-delete-key").hidden = !status.configured;
     $("#api-key").placeholder = t(status.configured ? "models.apikey.replace" : "models.apikey.placeholder");
-    $("#foot-dot").style.background = status.configured ? "var(--ok)" : "var(--warn)";
+    $("#foot-dot").style.background = status.configured || isHostedMode() ? "var(--ok)" : "var(--warn)";
   } catch (err) {
     $("#key-status").textContent = String(err);
   }
@@ -384,12 +404,23 @@ async function checkForUpdates(manual) {
 
 function renderPlan() {
   renderAccount();
+  renderSidebar();
+  renderModels();
+  const available = cloudAvailable();
+  $("#plan-free").hidden = !available;
+  $("#plan-pro").hidden = !available;
+  $("#account-home").hidden = !available;
+  $("#license-home").hidden = !available;
+  $(".plans").classList.toggle("standalone", !available);
+  $(".plans + .footnote").hidden = !available;
   const active = ui.license.active;
-  $("#plan-free").querySelector(".plan-badge").hidden = active;
-  $("#plan-pro").querySelector(".plan-badge").hidden = !active;
-  $("#plan-free").classList.toggle("featured", !active);
-  $("#plan-pro").classList.toggle("featured", active);
-  $("#btn-get-pro").hidden = active;
+  const mode = !available || ui.settings.useOwnKey || (!active && !ui.account.signedIn) ? "own" : active ? "pro" : "free";
+  for (const id of ["own", "free", "pro"]) {
+    $(`#plan-${id}`).querySelector(".plan-badge").hidden = id !== mode;
+    $(`#plan-${id}`).classList.toggle("featured", id === mode);
+  }
+  $("#btn-use-cloud").textContent = t(active ? "account.manage" : ui.account.signedIn ? "plan.free.choose" : "account.create");
+  $("#btn-get-pro").textContent = t(active ? "plan.pro.choose" : "plan.get");
   $("#btn-deactivate-license").hidden = !active;
   $("#license-key").placeholder = t("plan.license.placeholder");
   const status = $("#license-status");
@@ -405,34 +436,156 @@ function renderPlan() {
 
 function renderAccount() {
   const a = ui.account;
-  $("#account-signin").hidden = a.signedIn;
-  $("#account-verify").hidden = a.signedIn || !ui.signInEmail;
+  const mode = ui.authMode;
+  const verification = mode === "confirm" || mode === "reset";
+  $("#account-auth").hidden = a.signedIn;
   $("#account-usage").hidden = !a.signedIn;
-  $("#use-own-key").checked = !!ui.settings?.useOwnKey;
+  $("#account-pro-note").hidden = !ui.license.active;
   $("#account-email").placeholder = t("account.email");
+  $("#account-password").placeholder = t("account.password");
   $("#account-code").placeholder = t("account.code");
-  $("#account-status").textContent = a.error || (a.signedIn ? a.email : t(ui.signInEmail ? "account.sent" : "account.desc"));
+  $("#account-password-field").hidden = mode === "confirm";
+  $("#account-code-field").hidden = !verification;
+  $("#account-password").required = mode !== "confirm";
+  $("#account-code").required = verification;
+  $("#account-password").minLength = mode === "signin" ? 1 : 8;
+  $("#account-password").autocomplete = mode === "signin" ? "current-password" : "new-password";
+  $("#account-password-hint").hidden = mode !== "signup" && mode !== "reset";
+  $("#btn-forgot-password").hidden = mode !== "signin";
+  $("#btn-resend-confirmation").hidden = mode !== "confirm" && mode !== "signin";
+  $("#btn-google-auth").hidden = verification;
+  $(".auth-divider").hidden = verification;
+  $("#btn-cancel-google").hidden = !ui.googlePending;
+  $("#btn-auth-create").setAttribute("aria-selected", String(mode === "signup" || mode === "confirm"));
+  $("#btn-auth-signin").setAttribute("aria-selected", String(mode === "signin" || mode === "reset"));
+  $("#btn-account-submit").textContent = t({ signup: "account.create", signin: "account.signin", confirm: "account.confirm", reset: "account.reset" }[mode]);
+  $("#account-status").textContent = a.error || ui.accountNotice || (a.signedIn ? a.email : t("account.desc"));
+  $("#account-status").classList.toggle("error", !!a.error);
   const used = a.usedWords;
-  $("#usage-label").textContent = used == null ? t("account.unavailable") : t("account.usage", { used: used.toLocaleString(ui.lang), limit: a.limitWords.toLocaleString(ui.lang), remaining: Math.max(0, a.limitWords - used).toLocaleString(ui.lang) });
+  const limit = a.limitWords || 2000;
+  $("#usage-label").textContent = used == null ? t("account.unavailable") : t("account.usage", { used: used.toLocaleString(ui.lang), limit: limit.toLocaleString(ui.lang), remaining: Math.max(0, limit - used).toLocaleString(ui.lang) });
   $("#usage-progress").hidden = used == null;
-  $("#usage-progress").max = a.limitWords;
-  $("#usage-progress").value = Math.min(a.limitWords, used || 0);
+  $("#usage-progress").max = limit;
+  $("#usage-progress").value = Math.min(limit, used || 0);
   $("#usage-renews").textContent = a.resetsAt ? t("account.renews", { date: new Date(a.resetsAt).toLocaleString(ui.lang) }) : "";
+  renderOnboardingNext();
 }
 
 async function refreshAccount() {
   try { ui.account = await invoke("get_account_status"); }
   catch (err) { ui.account = { ...ui.account, usedWords: null, error: String(err) }; }
-  renderAccount();
+  renderPlan();
+  renderModels();
 }
 
 async function accountAction(action) {
   if (ui.accountBusy) return;
   ui.accountBusy = true;
-  for (const button of $$("#account-card button")) button.disabled = true;
+  ui.account.error = null;
+  for (const button of $$("#account-card button:not(#btn-cancel-google)")) button.disabled = true;
   try { await action(); }
-  catch (err) { toast(String(err), true); $("#account-status").textContent = String(err); }
-  finally { ui.accountBusy = false; for (const button of $$("#account-card button")) button.disabled = false; }
+  catch (err) { ui.account.error = String(err); renderAccount(); }
+  finally {
+    ui.accountBusy = false;
+    ui.googlePending = false;
+    for (const button of $$("#account-card button")) button.disabled = false;
+    renderAccount();
+  }
+}
+
+function setAuthMode(mode) {
+  ui.authMode = mode;
+  ui.accountNotice = null;
+  ui.account.error = null;
+  $("#account-password").value = "";
+  $("#account-code").value = "";
+  renderAccount();
+}
+
+async function finishAccountSignIn(status) {
+  ui.account = status;
+  ui.accountNotice = null;
+  $("#account-password").value = "";
+  $("#account-code").value = "";
+  if (status.signedIn) await saveSettings({ useOwnKey: false });
+  renderPlan();
+}
+
+// ---------- Onboarding (manual launch while the new flow is being tested) ----------
+
+function restoreOnboardingCards() {
+  $("#account-home").appendChild($("#account-card"));
+  $("#license-home").appendChild($("#license-card"));
+  $("#btn-wizard-checkout").hidden = true;
+}
+
+function openOnboarding(mode) {
+  ui.onboarding = { step: 1, mode: cloudAvailable() ? mode || "free" : "own", keyConfigured: false };
+  $("#onboarding-dialog").showModal();
+  renderOnboarding();
+}
+
+function closeOnboarding() {
+  if (ui.googlePending) invoke("cancel_google_sign_in").catch(console.error);
+  restoreOnboardingCards();
+  $("#onboarding-api-key").value = "";
+  $("#account-password").value = "";
+  $("#onboarding-dialog").close();
+  $("#btn-onboarding").focus();
+}
+
+function renderOnboardingNext() {
+  const { step, mode, keyConfigured } = ui.onboarding;
+  const ready = mode === "own" ? keyConfigured : mode === "free" ? ui.account.signedIn : ui.license.active;
+  $("#btn-onboarding-next").disabled = step === 2 && !ready;
+  $("#btn-onboarding-next").textContent = t(step === 3 ? "onboarding.done" : "onboarding.next");
+}
+
+function renderOnboarding() {
+  if (!$("#onboarding-dialog").open) return;
+  const { step, mode } = ui.onboarding;
+  restoreOnboardingCards();
+  $("#onboarding-title").textContent = t(`onboarding.step${step}.title`);
+  $("#onboarding-desc").textContent = t(step === 2 ? `onboarding.setup.${mode}` : `onboarding.step${step}.desc`);
+  $("#onboarding-step").textContent = t("onboarding.step", { step });
+  $$(".wizard-progress i").forEach((el, index) => el.classList.toggle("active", index < step));
+  $("#onboarding-choose").hidden = step !== 1;
+  $("#onboarding-choose").classList.toggle("standalone", !cloudAvailable());
+  $$("[data-onboarding-mode]").forEach(el => el.hidden = !cloudAvailable() && el.dataset.onboardingMode !== "own");
+  $("#onboarding-setup").hidden = step !== 2;
+  $("#onboarding-ready").hidden = step !== 3;
+  $("#btn-onboarding-back").hidden = step === 1;
+  $("#btn-onboarding-later").hidden = step === 3;
+  $$("[data-onboarding-mode]").forEach(el => { el.classList.toggle("selected", el.dataset.onboardingMode === mode); el.setAttribute("aria-pressed", String(el.dataset.onboardingMode === mode)); });
+  $("#onboarding-key-form").hidden = mode !== "own";
+  if (step === 2 && mode === "free") $("#onboarding-account").appendChild($("#account-card"));
+  if (step === 2 && mode === "pro") {
+    $("#onboarding-license").appendChild($("#license-card"));
+    $("#btn-wizard-checkout").hidden = ui.license.active;
+  }
+  if (step === 2 && mode === "own") {
+    fillSelect($("#onboarding-provider"), ui.providers.map(p => [p.id, p.verified ? p.name : `${p.name} (${t("models.unverified")})`]), ui.settings.provider);
+    fillSelect($("#onboarding-model"), currentProvider().models.map(m => [m.id, m.name]), ui.settings.model);
+    refreshOnboardingKey();
+  }
+  $("#onboarding-hotkey").textContent = prettyHotkey(ui.settings.hotkey);
+  fillSelect($("#onboarding-language"), [["auto", t("common.auto")], ...DICTATION_LANGUAGES], ui.settings.language);
+  $("#btn-close-onboarding").ariaLabel = t("onboarding.close");
+  renderOnboardingNext();
+}
+
+async function refreshOnboardingKey() {
+  try {
+    const provider = ui.settings.provider;
+    const status = await invoke("get_api_key_status", { provider });
+    if (provider !== ui.settings.provider) return;
+    ui.onboarding.keyConfigured = status.configured;
+    $("#onboarding-key-status").textContent = status.configured ? t("models.apikey.stored") : t("models.apikey.missing", { p: currentProvider().name });
+  } catch (err) {
+    ui.onboarding.keyConfigured = false;
+    $("#onboarding-key-status").textContent = String(err);
+  }
+  renderOnboardingNext();
 }
 
 async function refreshLicense() {
@@ -444,6 +597,7 @@ async function refreshLicense() {
   }
   renderPlan();
   renderUpdate();
+  renderOnboardingNext();
 }
 
 // ---------- Archivos ----------
@@ -607,6 +761,7 @@ function renderAll() {
   renderAbout();
   renderPlan();
   renderUpdate();
+  renderOnboarding();
 }
 
 // ---------- Acciones ----------
@@ -621,9 +776,11 @@ async function saveSettings(patch) {
     renderAll();
     await Promise.all([refreshHistory(), refreshDevices(), refreshPermissions(), refreshKeyStatus()]);
     toast(t("toast.saved"));
+    return true;
   } catch (err) {
     toast(String(err), true);
     renderAll();
+    return false;
   }
 }
 
@@ -839,44 +996,115 @@ function wireEvents() {
   });
   $("#btn-restart").addEventListener("click", () => invoke("restart_app").catch((e) => toast(String(e), true)));
 
-  $("#btn-get-pro").addEventListener("click", () =>
-    invoke("open_checkout").catch((e) => toast(String(e), true)));
-  $("#account-signin").addEventListener("submit", (e) => {
+  $("#btn-onboarding").addEventListener("click", () => openOnboarding());
+  $("#btn-close-onboarding").addEventListener("click", closeOnboarding);
+  $("#btn-onboarding-later").addEventListener("click", closeOnboarding);
+  $("#onboarding-dialog").addEventListener("cancel", e => { e.preventDefault(); closeOnboarding(); });
+  $("#onboarding-choose").addEventListener("click", e => {
+    const option = e.target.closest("[data-onboarding-mode]");
+    if (option) { ui.onboarding.mode = option.dataset.onboardingMode; renderOnboarding(); }
+  });
+  $("#btn-onboarding-back").addEventListener("click", () => { if (ui.googlePending) invoke("cancel_google_sign_in").catch(console.error); ui.onboarding.step--; renderOnboarding(); });
+  $("#btn-onboarding-next").addEventListener("click", async () => {
+    if (ui.onboarding.step === 3) { closeOnboarding(); showPage("general"); return; }
+    if (ui.onboarding.step === 1 && !(await saveSettings({ useOwnKey: ui.onboarding.mode === "own" }))) return;
+    ui.onboarding.step++;
+    renderOnboarding();
+    refreshPermissions();
+  });
+  $("#onboarding-provider").addEventListener("change", async e => {
+    const provider = ui.providers.find(p => p.id === e.target.value);
+    $("#onboarding-api-key").value = "";
+    ui.onboarding.keyConfigured = false;
+    await saveSettings({ provider: provider.id, model: provider.defaultModel });
+  });
+  $("#onboarding-language").addEventListener("change", e => saveSettings({ language: e.target.value }));
+  $("#onboarding-model").addEventListener("change", e => saveSettings({ model: e.target.value }));
+  $("#onboarding-key-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const input = $("#onboarding-api-key");
+    if (!input.value.trim()) return;
+    try {
+      await invoke("set_api_key", { provider: ui.settings.provider, apiKey: input.value.trim() });
+      input.value = "";
+      await Promise.all([refreshOnboardingKey(), refreshKeyStatus()]);
+      toast(t("toast.key_saved"));
+    } catch (err) { toast(String(err), true); }
+  });
+  $("#onboarding-get-key").addEventListener("click", () => invoke("open_url", { url: currentProvider().keyUrl }).catch(e => toast(String(e), true)));
+  $("#btn-models-own").addEventListener("click", () => saveSettings({ useOwnKey: true }));
+  $("#btn-use-own").addEventListener("click", async () => { if (await saveSettings({ useOwnKey: true })) showPage("models"); });
+  $("#btn-use-cloud").addEventListener("click", async () => {
+    if (!(await saveSettings({ useOwnKey: false }))) return;
+    if (!ui.account.signedIn) setAuthMode("signup");
+    $("#account-card").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!ui.account.signedIn) $("#account-email").focus({ preventScroll: true });
+  });
+  const checkout = () => invoke("open_checkout").catch(e => toast(String(e), true));
+  $("#btn-get-pro").addEventListener("click", () => ui.license.active ? saveSettings({ useOwnKey: false }) : checkout());
+  $("#btn-wizard-checkout").addEventListener("click", checkout);
+  $("#btn-auth-create").addEventListener("click", () => setAuthMode("signup"));
+  $("#btn-auth-signin").addEventListener("click", () => setAuthMode("signin"));
+  $("#account-signin").addEventListener("submit", e => {
     e.preventDefault();
     accountAction(async () => {
       const email = $("#account-email").value.trim();
-      await invoke("send_sign_in_code", { email });
-      ui.signInEmail = email;
-      ui.account.error = null;
+      const password = $("#account-password").value;
+      const code = $("#account-code").value.trim();
+      if (ui.authMode === "signup") {
+        const result = await invoke("sign_up_account", { email, password });
+        $("#account-password").value = "";
+        if (result.confirmationRequired) {
+          ui.account = result.status;
+          ui.authMode = "confirm";
+          ui.accountNotice = t("account.confirm.sent");
+          renderAccount();
+          $("#account-code").focus();
+        } else await finishAccountSignIn(result.status);
+      } else {
+        const command = { signin: "sign_in_account", confirm: "confirm_account_email", reset: "reset_account_password" }[ui.authMode];
+        await finishAccountSignIn(await invoke(command, { email, password, code }));
+      }
+    });
+  });
+  $("#btn-google-auth").addEventListener("click", () => accountAction(async () => {
+    ui.googlePending = true;
+    ui.accountNotice = t("account.google.waiting");
+    renderAccount();
+    await finishAccountSignIn(await invoke("sign_in_with_google"));
+  }));
+  $("#btn-cancel-google").addEventListener("click", () => invoke("cancel_google_sign_in").catch(e => toast(String(e), true)));
+  $("#btn-resend-confirmation").addEventListener("click", () => {
+    if (!$("#account-email").reportValidity()) return;
+    accountAction(async () => {
+      await invoke("resend_account_confirmation", { email: $("#account-email").value.trim() });
+      setAuthMode("confirm");
+      ui.accountNotice = t("account.confirm.sent");
       renderAccount();
       $("#account-code").focus();
     });
   });
-  $("#account-verify").addEventListener("submit", (e) => {
-    e.preventDefault();
+  $("#btn-forgot-password").addEventListener("click", () => {
+    if (!$("#account-email").reportValidity()) return;
     accountAction(async () => {
-      ui.account = await invoke("verify_sign_in_code", { email: ui.signInEmail, code: $("#account-code").value.trim() });
-      $("#account-code").value = "";
-      ui.signInEmail = null;
+      await invoke("request_password_reset", { email: $("#account-email").value.trim() });
+      setAuthMode("reset");
+      ui.accountNotice = t("account.reset.sent");
       renderAccount();
+      $("#account-code").focus();
     });
   });
   $("#btn-signout").addEventListener("click", () => accountAction(async () => {
-    await invoke("sign_out_account"); ui.signInEmail = null; await refreshAccount();
+    await invoke("sign_out_account"); setAuthMode("signin"); await refreshAccount();
   }));
   $("#btn-refresh-usage").addEventListener("click", () => accountAction(refreshAccount));
-  $("#use-own-key").addEventListener("change", async (e) => {
-    const previous = ui.settings.useOwnKey;
-    ui.settings.useOwnKey = e.target.checked;
-    try { await invoke("save_settings", { settings: ui.settings }); }
-    catch (err) { ui.settings.useOwnKey = previous; renderAccount(); toast(String(err), true); }
-  });
   $("#btn-activate-license").addEventListener("click", async () => {
     const input = $("#license-key");
     const key = input.value.trim();
     if (!key) return;
     try {
       ui.license = await invoke("activate_license", { key });
+      await saveSettings({ useOwnKey: false });
       input.value = "";
       renderPlan();
       toast(t("toast.license_on"));

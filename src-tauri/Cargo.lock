@@ -1043,11 +1043,12 @@ dependencies = [
 
 [[package]]
 name = "dictamelo"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "arboard",
  "async-trait",
+ "base64 0.22.1",
  "block2",
  "chrono",
  "core-foundation 0.10.1",
@@ -1064,6 +1065,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",

@@ -14,12 +14,9 @@ use async_trait::async_trait;
 use reqwest::multipart::{Form, Part};
 use serde::Deserialize;
 
-/// Funciones de borde del proyecto de Supabase.
-pub const BACKEND_URL: &str = "https://iburiyhhfodndqgmsaot.supabase.co/functions/v1";
-
 pub struct DictameloProvider {
     http: reqwest::Client,
-    endpoint: String,
+    endpoint: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -39,7 +36,7 @@ impl DictameloProvider {
     pub const ID: &'static str = "dictamelo";
 
     pub fn new(http: reqwest::Client) -> Self {
-        Self { http, endpoint: format!("{BACKEND_URL}/transcribe") }
+        Self { http, endpoint: crate::cloud_config::backend_url().ok().map(|base| format!("{base}/transcribe")) }
     }
 }
 
@@ -48,7 +45,7 @@ impl TranscriptionProvider for DictameloProvider {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             id: Self::ID.into(),
-            name: "Dictámelo Pro".into(),
+            name: "Dictámelo Cloud".into(),
             requires_api_key: false,
             key_url: "https://dictamelo.com".into(),
             default_model: "whisper-large-v3-turbo".into(),
@@ -67,6 +64,7 @@ impl TranscriptionProvider for DictameloProvider {
         api_key: Option<&str>,
         request: &TranscriptionRequest,
     ) -> Result<TranscriptionResult, TranscriptionError> {
+        let endpoint = self.endpoint.as_deref().ok_or_else(|| TranscriptionError::Rejected("Cloud services are not configured in this build. Use your own API key.".into()))?;
         let license = api_key.map(str::trim).filter(|k| !k.is_empty()).ok_or(TranscriptionError::MissingApiKey)?;
         let bytes = tokio::fs::read(&request.audio_path).await?;
         let file_name = request
@@ -87,7 +85,7 @@ impl TranscriptionProvider for DictameloProvider {
             form = form.text("prompt", prompt.clone());
         }
 
-        let builder = self.http.post(&self.endpoint);
+        let builder = self.http.post(endpoint);
         let builder = if let Some(token) = license.strip_prefix("Bearer ") { builder.bearer_auth(token) } else { builder.header("x-license-key", license) };
         let response = builder
             .multipart(form)

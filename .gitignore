@@ -23,6 +23,9 @@ supabase/.branches/
 *.mobileprovision
 # Keep example configuration without real credentials.
 !.env.example
+# Official build metadata stays local; the tracked template has public placeholders only.
+.env.cloud-build
+!.env.cloud-build.example
 
 # Python helper bytecode
 __pycache__/

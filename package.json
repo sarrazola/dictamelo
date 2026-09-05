@@ -1,11 +1,11 @@
 {
   "name": "dictamelo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Voice dictation for macOS and Windows",
   "scripts": {
     "dev": "tauri dev",
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "test:backend": "deno test supabase/functions/_shared/free_test.ts",
+    "test:backend": "deno test supabase/functions/_shared/free_test.ts supabase/functions/_shared/pro_test.ts",
     "check": "node --check ui/main.js && node --check ui/i18n.js && cargo check --manifest-path src-tauri/Cargo.toml"
   },
   "keywords": [],

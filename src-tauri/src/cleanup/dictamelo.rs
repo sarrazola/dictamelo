@@ -2,7 +2,6 @@
 //! la credencial es la licencia y la clave del proveedor vive solo en el servidor.
 
 use super::{wrap_transcript, CleanerInfo, TextCleaner};
-use crate::transcription::dictamelo::BACKEND_URL;
 use crate::transcription::openai_compatible::{map_reqwest, map_status};
 use crate::transcription::{ModelInfo, TranscriptionError};
 use crate::util::truncate;
@@ -12,7 +11,7 @@ use std::time::Duration;
 
 pub struct DictameloCleaner {
     http: reqwest::Client,
-    endpoint: String,
+    endpoint: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -45,7 +44,7 @@ impl DictameloCleaner {
     pub const ID: &'static str = "dictamelo";
 
     pub fn new(http: reqwest::Client) -> Self {
-        Self { http, endpoint: format!("{BACKEND_URL}/cleanup") }
+        Self { http, endpoint: crate::cloud_config::backend_url().ok().map(|base| format!("{base}/cleanup")) }
     }
 }
 
@@ -56,11 +55,11 @@ impl TextCleaner for DictameloCleaner {
             id: Self::ID.into(),
             name: "Dictámelo Pro".into(),
             key_provider: Self::ID.into(),
-            default_model: "openai/gpt-oss-120b".into(),
+            default_model: "openai/gpt-oss-20b".into(),
             models: vec![ModelInfo {
-                id: "openai/gpt-oss-120b".into(),
-                name: "GPT-OSS 120B".into(),
-                description: "model.desc.oss120".into(),
+                id: "openai/gpt-oss-20b".into(),
+                name: "GPT-OSS 20B".into(),
+                description: "model.desc.oss20".into(),
             }],
         }
     }
@@ -73,10 +72,11 @@ impl TextCleaner for DictameloCleaner {
         system_prompt: &str,
         text: &str,
     ) -> Result<String, TranscriptionError> {
+        let endpoint = self.endpoint.as_deref().ok_or_else(|| TranscriptionError::Rejected("Cloud services are not configured in this build. Use your own API key.".into()))?;
         let license = api_key.map(str::trim).filter(|k| !k.is_empty()).ok_or(TranscriptionError::MissingApiKey)?;
         let response = self
             .http
-            .post(&self.endpoint)
+            .post(endpoint)
             .header("x-license-key", license)
             .timeout(Duration::from_secs(45))
             .json(&CleanupRequest { system: system_prompt, text: wrap_transcript(text), model })
@@ -88,11 +88,7 @@ impl TextCleaner for DictameloCleaner {
         if !status.is_success() {
             if let Ok(parsed) = serde_json::from_str::<CleanupResponse>(&body) {
                 if let Some(message) = parsed.error {
-                    return Err(match status.as_u16() {
-                        401 | 403 => TranscriptionError::Unauthorized,
-                        429 => TranscriptionError::RateLimited,
-                        _ => TranscriptionError::Rejected(message),
-                    });
+                    return Err(TranscriptionError::Rejected(message));
                 }
             }
             return Err(map_status(status, &body));

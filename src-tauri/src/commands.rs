@@ -201,6 +201,9 @@ pub struct AppInfo {
     pub default_hotkey: String,
     pub log_dir: String,
     pub config_dir: String,
+    /// Public build metadata; no account credentials are exposed to the frontend.
+    pub cloud_available: bool,
+    pub pro_trial_available: bool,
     /// Idiomas de interfaz disponibles (códigos ISO-639-1).
     pub ui_languages: Vec<String>,
     /// Idioma realmente en uso, ya resuelto si la preferencia es "auto".
@@ -217,6 +220,9 @@ pub fn get_app_info(state: State<'_, AppState>) -> AppInfo {
         default_hotkey: DEFAULT_HOTKEY.into(),
         log_dir: state.log_dir.display().to_string(),
         config_dir: state.config_dir.display().to_string(),
+        cloud_available: crate::cloud_config::configured(),
+        pro_trial_available: crate::cloud_config::configured()
+            && option_env!("DICTAMELO_PRO_TRIAL_AVAILABLE") == Some("true"),
         ui_languages: crate::i18n::LANGS.iter().map(|s| s.to_string()).collect(),
         resolved_ui_language: state.settings().ui_lang(),
         default_cleanup_prompt: crate::cleanup::DEFAULT_PROMPT.to_string(),
@@ -283,7 +289,8 @@ pub async fn deactivate_license(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_checkout() -> Result<(), String> {
-    tauri_plugin_opener::open_url(crate::license::CHECKOUT_URL, None::<&str>).map_err(|e| e.to_string())
+    tauri_plugin_opener::open_url(crate::license::checkout_url()?, None::<&str>)
+        .map_err(|_| "Could not open the Pro checkout in your browser.".to_string())
 }
 
 /// Nombre legible de este equipo, para distinguir activaciones en el panel de licencias.
@@ -390,6 +397,49 @@ pub fn open_url(url: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn get_account_status(app: AppHandle) -> crate::account::AccountStatus {
     app.state::<AppState>().account.status().await
+}
+#[tauri::command]
+pub async fn sign_up_account(app: AppHandle, email: String, password: String) -> Result<crate::account::SignUpResult, String> {
+    let state = app.state::<AppState>();
+    let confirmation_required = state.account.sign_up(&email, &password).await?;
+    Ok(crate::account::SignUpResult { status: state.account.status().await, confirmation_required })
+}
+#[tauri::command]
+pub async fn sign_in_account(app: AppHandle, email: String, password: String) -> Result<crate::account::AccountStatus, String> {
+    let state = app.state::<AppState>();
+    state.account.sign_in(&email, &password).await?;
+    Ok(state.account.status().await)
+}
+#[tauri::command]
+pub async fn confirm_account_email(app: AppHandle, email: String, code: String) -> Result<crate::account::AccountStatus, String> {
+    let state = app.state::<AppState>();
+    state.account.confirm_email(&email, &code).await?;
+    Ok(state.account.status().await)
+}
+#[tauri::command]
+pub async fn request_password_reset(app: AppHandle, email: String) -> Result<(), String> {
+    app.state::<AppState>().account.request_password_reset(&email).await
+}
+#[tauri::command]
+pub async fn resend_account_confirmation(app: AppHandle, email: String) -> Result<(), String> {
+    app.state::<AppState>().account.resend_confirmation(&email).await
+}
+#[tauri::command]
+pub async fn reset_account_password(app: AppHandle, email: String, code: String, password: String) -> Result<crate::account::AccountStatus, String> {
+    let state = app.state::<AppState>();
+    state.account.reset_password(&email, &code, &password).await?;
+    Ok(state.account.status().await)
+}
+#[tauri::command]
+pub async fn sign_in_with_google(app: AppHandle) -> Result<crate::account::AccountStatus, String> {
+    let state = app.state::<AppState>();
+    state.account.sign_in_google().await?;
+    app_windows::show_settings(&app);
+    Ok(state.account.status().await)
+}
+#[tauri::command]
+pub fn cancel_google_sign_in(app: AppHandle) {
+    app.state::<AppState>().account.cancel_google();
 }
 #[tauri::command]
 pub async fn send_sign_in_code(app: AppHandle, email: String) -> Result<(), String> {

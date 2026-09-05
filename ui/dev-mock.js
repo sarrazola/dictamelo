@@ -5,7 +5,7 @@ if (!window.__TAURI__) {
     hotkey: "Alt+Shift+Space", provider: "groq", model: "whisper-large-v3-turbo", language: "auto",
     uiLanguage: "auto", autoPaste: true, restoreClipboard: true, showOverlay: true,
     inputDevice: null, maxHistory: 50, maxRecordingSecs: 300,
-    launchAtLogin: false, playSounds: true, vocabulary: "",
+    useOwnKey: true, launchAtLogin: false, playSounds: true, vocabulary: "",
     cleanupEnabled: false, cleanupProvider: "groq", cleanupModel: "openai/gpt-oss-120b", cleanupPrompt: "",
   };
   const history = [
@@ -22,11 +22,13 @@ if (!window.__TAURI__) {
     { id: "openai", name: "OpenAI", requiresApiKey: true, keyUrl: "https://platform.openai.com/api-keys", defaultModel: "gpt-4o-mini-transcribe", verified: false,
       models: [{ id: "gpt-4o-mini-transcribe", name: "GPT-4o mini Transcribe", description: "model.desc.gpt4o_mini" }] },
   ];
-  let keyConfigured = true;
+  const configuredKeys = new Set(["groq"]);
+  let activeLicense = false;
+  let accountEmail = "demo@example.com";
   let signedIn = false;
   const commands = {
     get_app_info: () => ({
-      version: "0.2.0", platform: "macos", defaultHotkey: "Alt+Shift+Space",
+      version: "0.3.0", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
       logDir: "~/Library/Logs/com.dictamelo.desktop",
       configDir: "~/Library/Application Support/com.dictamelo.desktop",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",
@@ -42,9 +44,9 @@ if (!window.__TAURI__) {
     save_settings: ({ settings: s }) => Object.assign(settings, s),
     ui_ready: () => null,
     get_status: () => ({ state: "idle" }),
-    get_api_key_status: () => ({ configured: keyConfigured, hint: keyConfigured ? "…abcd" : null }),
-    set_api_key: () => { keyConfigured = true; },
-    delete_api_key: () => { keyConfigured = false; },
+    get_api_key_status: ({provider}) => ({ configured: configuredKeys.has(provider), hint: configuredKeys.has(provider) ? "…abcd" : null }),
+    set_api_key: ({provider}) => { configuredKeys.add(provider); },
+    delete_api_key: ({provider}) => { configuredKeys.delete(provider); },
     get_permissions: () => ({ microphone: "not_determined", accessibility: "denied" }),
     request_microphone_permission: () => null,
     request_accessibility_permission: () => false,
@@ -62,13 +64,19 @@ if (!window.__TAURI__) {
     open_url: () => null,
     ui_ready: () => null,
     overlay_layout: () => null,
-    get_account_status: () => ({ signedIn, email: signedIn ? "demo@example.com" : null, usedWords: signedIn ? 742 : null, limitWords: 2000, resetsAt: "2026-09-07T00:00:00Z" }),
-    send_sign_in_code: () => null,
-    verify_sign_in_code: () => { signedIn = true; return commands.get_account_status(); },
+    get_account_status: () => ({ signedIn, email: signedIn ? accountEmail : null, usedWords: signedIn ? 742 : null, limitWords: 2000, resetsAt: "2026-09-07T00:00:00Z" }),
+    sign_up_account: ({email}) => { accountEmail = email; return { status: commands.get_account_status(), confirmationRequired: true }; },
+    sign_in_account: ({email,password}) => { if (password === "wrongpassword") throw new Error("Incorrect email or password."); accountEmail = email; signedIn = true; return commands.get_account_status(); },
+    confirm_account_email: ({code}) => { if (code !== "12345678") throw new Error("Invalid verification code. Preview code: 12345678."); signedIn = true; return commands.get_account_status(); },
+    resend_account_confirmation: () => null,
+    request_password_reset: () => null,
+    reset_account_password: ({code}) => { if (code !== "12345678") throw new Error("Invalid recovery code. Preview code: 12345678."); signedIn = true; return commands.get_account_status(); },
+    sign_in_with_google: () => { throw new Error("Google sign-in requires the installed app. Browser preview does not authenticate."); },
+    cancel_google_sign_in: () => null,
     sign_out_account: () => { signedIn = false; },
-    get_license_status: () => ({ active: false, keyHint: null, status: null, message: null }),
-    activate_license: () => ({ active: true, keyHint: "…MNOP", status: "active", message: null }),
-    deactivate_license: () => null, open_checkout: () => null,
+    get_license_status: () => ({ active: activeLicense, keyHint: null, status: null, message: null }),
+    activate_license: () => { activeLicense = true; return { active: true, keyHint: "…MNOP", status: "active", message: null }; },
+    deactivate_license: () => { activeLicense = false; }, open_checkout: () => null,
     check_for_updates: () => ({ available: true, version: "0.1.1", currentVersion: "0.1.0",
       notes: "Sistema de actualizaciones automáticas.\nCorrecciones menores.", date: null }),
     install_update: () => null, restart_app: () => null,
@@ -95,6 +103,6 @@ if (!window.__TAURI__) {
   const emit = (name, payload) => (listeners[name] || []).forEach((cb) => cb({ payload }));
   const cycle = [{ state: "recording" }, { state: "transcribing" }, { state: "pasting" }, { state: "done", message: "Text pasted" }, { state: "idle" }, { state: "error", message: "No connection to the service" }];
   let i = 0;
-  setInterval(() => emit("status", cycle[i++ % cycle.length]), 2500);
+  if (new URLSearchParams(location.search).has("animate")) setInterval(() => emit("status", cycle[i++ % cycle.length]), 2500);
   setInterval(() => emit("audio-level", Math.random() * 0.15), 100);
 }

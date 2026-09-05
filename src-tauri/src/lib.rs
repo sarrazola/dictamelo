@@ -21,6 +21,7 @@ mod commands;
 mod history;
 mod license;
 mod account;
+mod cloud_config;
 mod i18n;
 mod hotkey;
 mod paste;
@@ -79,6 +80,14 @@ pub fn run() {
             commands::get_providers,
             commands::get_cleaners,
             commands::get_account_status,
+            commands::sign_up_account,
+            commands::sign_in_account,
+            commands::confirm_account_email,
+            commands::request_password_reset,
+            commands::resend_account_confirmation,
+            commands::reset_account_password,
+            commands::sign_in_with_google,
+            commands::cancel_google_sign_in,
             commands::send_sign_in_code,
             commands::verify_sign_in_code,
             commands::sign_out_account,
@@ -166,6 +175,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error al iniciar Dictámelo")
         .run(|_app, event| {
+            // Finder/open should bring the existing menu-bar application's settings back.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                app_windows::show_settings(_app);
+            }
             // Sin ventanas visibles la app debe seguir viva (vive en la barra de menú).
             if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
                 if code.is_none() {

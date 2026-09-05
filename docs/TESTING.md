@@ -1,6 +1,30 @@
 # Verification record
 
-## Version 0.2.0 — September 5, 2026
+## Version 0.3.0 — Mac preview, September 5, 2026
+
+Built and installed on an Apple M4 Max Mac running macOS 26.5.2. The verified DMG supplied `/Applications/Dictámelo.app`; the app was left open on Plan after testing. This iteration changes the Mac preview only. Public 0.1.2 and draft 0.2.0 installers and manifests remain unchanged. No Windows build, VM or hardware results are claimed for 0.3.0.
+
+- Account implementation: email/password signup and login, confirmation, recovery and browser-based Google PKCE are present in source. Session storage uses the operating system credential store. Default source builds disable hosted services and automatic updates; official public metadata and the explicit updater flag are injected into the same source.
+- Backend helpers: six Deno tests passed across `free_test.ts` and `pro_test.ts`. New coverage includes paid PCM duration/structure, UTF-8 cleanup reservation bounds, input/instruction/output limits and fail-closed product ownership configuration.
+- Backend type checks: `transcribe`, `cleanup` and `usage` passed `deno check`.
+- Database: all migrations plus `free_quota.sql` and `pro_quota.sql` passed on an isolated local PostgreSQL 14 database. Pro assertions covered reservation accounting, a single active request, immediate transcription-to-cleanup, settlement, duplicate completion, uncertain/rejected requests, rolling expiry, audio/token/request limits, legacy usage and service-only access. Two concurrent database connections produced exactly one accepted reservation. The isolated test server was stopped afterward. These were local database checks, not a production migration or live paid-provider test.
+- Live deployment: migration `20260905020000_pro_quota` was applied and the updated `transcribe`/`cleanup` functions deployed to `iburiyhhfodndqgmsaot`. Independently rerunning `supabase/tests/pro_quota.sql` through the Management API passed inside its rollback transaction; matching temporary license rows were zero before and after.
+- Live access control: all seven quota/usage RPCs deny execution to `anon` and `authenticated` and allow `service_role`. All four license/usage tables have RLS enabled with no client policies. The free/Pro quota tables also deny client table grants; the older `licenses`/`usage_events` tables retain table grants but their RLS denies rows. A separate rolled-back test switched to both client roles and proved they could neither see a temporary private license, insert a license nor call the Pro quota RPC.
+- Live rejection checks: missing authentication on transcription/usage and missing license on cleanup returned HTTP 401; an invalid bearer token returned 401; a deliberately invalid license returned 403 on both Pro endpoints. The fake license created no cache/quota records. No valid license or audio was submitted, so this is not a new live paid-transcription test.
+- Billing metadata: the public checkout record identified store `447162`, product `1340872`, variant `2094776`, $4.99/month and `has_free_trial=false`. Those verified IDs were configured for server ownership checks. The product-editor URL supplied for investigation was not used as an assumed product ID.
+- Live Auth configuration: email confirmations remain enabled; confirmation and recovery templates include `{{ .Token }}`; the desktop loopback redirect allowlist is present. The Google provider remains disabled pending completion of Google Cloud setup/terms, SMTP has no host configured, and trial availability remains false. Configuration readback does not replace real inbox or Google return-to-app tests.
+- Clean-source check: a fresh export of the staged source compiled with `cargo check --locked`, without the ignored official configuration. The credential-store implementation remained included.
+- Rust/build checks: 48 Rust tests passed both with default configuration and with official public configuration. Strict Clippy passed. A final rerun initially hit a full disk; only the project's regenerable debug incremental cache was removed, then Clippy and the Python suite passed again. Seven Python build-configuration tests passed. Three opt-in live Groq tests passed; these do not establish a new paid-license cloud billing test.
+- Browser UI: mock-backed checks covered all six interface languages at 960 × 680 with no overflow. They exercised the three plan choices and onboarding presentation; these are browser mock results, not real account/provider verification.
+- Native UI: dragging the installed window could not shrink it below 960 × 680. All three plans displayed the expected limits, including Pro's 60 hours. The three-step wizard detected the saved personal Groq key and displayed Microphone and Accessibility as granted. A real file-picker upload of a synthesized Spanish WAV transcribed successfully with the existing personal Groq key; the temporary job was removed. Finder reopening was also verified after closing the settings window. This verifies file transcription, not new physical-microphone speech capture or an end-to-end cursor paste.
+- Live Auth API contract: an isolated synthetic account passed confirmation-token redemption, replay rejection, password login, token refresh, recovery, logout and initial usage of 0/2,000 words. Cleanup of that account was independently confirmed by HTTP 404. Tokens were generated for testing, so this did not test inbox delivery or the native Google browser callback.
+- Signing and notarization: Apple accepted the app submission `0ce5d0cb-d4bb-4a36-96ae-7d4522de7759` and DMG submission `dd72a942-be65-4ead-a2eb-ddcc8351d7bf`. Both were stapled. Strict signature and Gatekeeper checks reported `Notarized Developer ID`, including the app mounted from the read-only DMG and the installed copy.
+- Preview artifacts: the DMG, signed Mac updater archive, detached signature and `SHA256SUMS.txt` are staged in `dist/v0.3.0-macos-preview/`. The 4,922,506-byte updater archive independently passed `verify_artifact` against the embedded public key. This verifies one signed preview archive without generating or publishing an updater manifest. No 0.3.0 public release or Windows artifact was created.
+- External onboarding: real Google sign-in returning to the installed app, SMTP delivery/confirmation/recovery and a seven-day trial's checkout/entitlement lifecycle remain pending. Trial availability stays false until verified.
+
+Remaining checks: actual confirmation/recovery inbox delivery; Google setup, cancellation and return to the installed app; the proposed trial's checkout/access/expiry lifecycle; a fresh live paid-license transcription/cleanup flow; and physical spoken dictation through cursor paste on this Mac. Keep these distinct from the successful API, mock, file-transcription and packaging checks above.
+
+## Version 0.2.0 — historical draft checks, September 5, 2026
 
 - Rust: 35 macOS tests passed; `cargo clippy --all-targets -- -D warnings` passed after correcting existing lint warnings. A separate real Keychain read/write/delete round trip passed.
 - Free backend helpers: 3 Deno tests passed, including multilingual word segmentation, punctuation, actual PCM duration, malformed/truncated WAV, forged byte rate, and the two-minute boundary.
@@ -47,7 +71,10 @@ npm run test:backend
 npm run check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 supabase db query --linked --file supabase/tests/free_quota.sql
+supabase db query --linked --file supabase/tests/pro_quota.sql
 ```
+
+For checks that require the hosted edition's compiled public configuration, prefix the command with `python3 scripts/with-cloud-config.py --config .env.cloud-build --`. Also test a clean default build to verify that personal keys work without official cloud configuration.
 
 Optional tests that touch real resources must be run deliberately:
 
@@ -59,10 +86,10 @@ DICTAMELO_KEYRING_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml roundt
 
 Record exact versions, architectures, and results for future releases. Do not treat a configured workflow, successful compile, UI mock, or valid signature as proof of a real installation or end-to-end user flow.
 
-### Live free-account backend verification
+### Historical 0.2.0 live free-account backend verification
 
 A temporary account redeemed an email OTP generated through the Auth admin test API (no email sent), fetched zero initial usage, transcribed synthesized speech through the real hosted free endpoint, and recorded 11 words. After exhausting only that test account's allowance, another request returned HTTP 429. Missing/invalid authentication and direct client quota access were rejected. Refresh-token rotation succeeded. The temporary account and its usage were removed. Actual SMTP inbox delivery is a separate check.
 
-### Clean checkout and final macOS updater archive
+### Historical 0.2.0 clean checkout and final macOS updater archive
 
 A fresh archive of tracked source at `28160ef` passed `npm ci` and `cargo check --locked`. The final macOS updater archive was extracted into a fresh temporary directory; the extracted app passed strict code-signature, stapler, and Gatekeeper verification. All new account labels are present in all six interface languages.

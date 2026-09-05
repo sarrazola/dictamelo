@@ -7,6 +7,7 @@
 use crate::audio::{self, wav, RawRecording, TARGET_SAMPLE_RATE};
 use crate::i18n::{t, tf};
 use crate::platform::{self, PlatformError};
+use crate::pipeline::TranscriptionRoute;
 use crate::settings::Settings;
 use crate::state::AppState;
 use crate::transcription::TranscriptionRequest;
@@ -19,6 +20,7 @@ use tauri::{AppHandle, Emitter, Manager};
 const MAX_JOBS: usize = 20;
 /// Por debajo de este tamaño, y en formato nativo del proveedor, el archivo se sube sin tocar.
 const DIRECT_UPLOAD_MAX_BYTES: u64 = 24 * 1024 * 1024;
+const FREE_UPLOAD_MAX_BYTES: u64 = 4 * 1024 * 1024;
 /// Formatos que la API de Groq/OpenAI decodifica por sí misma.
 const NATIVE_FORMATS: [&str; 10] = ["mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "oga", "wav", "webm", "flac"];
 /// Duración máxima de cada tramo (10 min de WAV 16 kHz mono ≈ 19 MB, bajo el límite de 25 MB).
@@ -150,34 +152,21 @@ async fn process(app: &AppHandle, id: &str) {
 
 async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Result<(String, f32), String> {
     let lang = settings.ui_lang();
-    let (provider, api_key, temp_dir) = {
+    let (source, temp_dir) = {
         let state = app.state::<AppState>();
-        // Con Pro el audio va por nuestro servidor y la credencial es la licencia.
-        let (provider, api_key) = if state.uses_cloud() {
-            (state.backend_provider.clone(), state.cloud_credential().await?)
-        } else {
-            let provider = state
-                .providers
-                .get(&settings.provider)
-                .ok_or_else(|| tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]))?;
-            let key = state
-                .api_key_for(&settings.provider)
-                .map_err(|e| tf(&lang, "err.keychain", &[("e", &e.to_string())]))?;
-            (provider, key)
-        };
-        (provider, api_key, state.temp_dir.clone())
+        (crate::pipeline::transcription_source(&state, settings).await?, state.temp_dir.clone())
     };
     let extension = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
     let size = std::fs::metadata(path).map(|m| m.len()).map_err(|e| tf(&lang, "file.read_failed", &[("e", &e.to_string())]))?;
     let request = |audio_path: PathBuf| TranscriptionRequest {
         audio_path,
-        model: settings.model.clone(),
+        model: source.model.clone(),
         language: settings.language_code(),
         prompt: settings.vocabulary_prompt(),
     };
 
     // 1) Formato nativo y tamaño razonable: se sube tal cual.
-    if NATIVE_FORMATS.contains(&extension.as_str()) && size <= DIRECT_UPLOAD_MAX_BYTES {
+    if direct_upload(source.route, &extension, size)? {
         if !update(app, id, |j| {
             j.stage = Stage::Transcribing;
             j.chunk = 1;
@@ -185,7 +174,7 @@ async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Res
         }) {
             return Err("cancelado".into());
         }
-        let result = crate::pipeline::transcribe_with_retry(provider.as_ref(), api_key.as_deref(), &request(path.to_path_buf()))
+        let result = crate::pipeline::transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request(path.to_path_buf()))
             .await
             .map_err(|e| e.localized(&lang))?;
         return Ok((result.text.trim().to_string(), result.duration_secs.unwrap_or(0.0) as f32));
@@ -227,11 +216,26 @@ async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Res
         }
         let chunk_path = wav::new_temp_path(&temp_dir);
         wav::write_wav_mono_i16(&chunk_path, &samples[range], TARGET_SAMPLE_RATE).map_err(|e| e.to_string())?;
-        let result = crate::pipeline::transcribe_with_retry(provider.as_ref(), api_key.as_deref(), &request(chunk_path.clone())).await;
+        let result = crate::pipeline::transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request(chunk_path.clone())).await;
         let _ = std::fs::remove_file(&chunk_path);
         texts.push(result.map_err(|e| e.localized(&lang))?.text.trim().to_string());
     }
     Ok((texts.join(" ").trim().to_string(), duration_secs))
+}
+
+/// The original Free Cloud file must already be a small WAV. Do not silently turn
+/// unsupported original formats into eligible files through the paid/BYOK converter.
+fn direct_upload(route: TranscriptionRoute, extension: &str, size: u64) -> Result<bool, String> {
+    if route == TranscriptionRoute::FreeCloud {
+        if extension != "wav" || size > FREE_UPLOAD_MAX_BYTES {
+            return Err("Free Cloud accepts WAV files up to two minutes and 4 MB. Use Pro or your own API key for other files.".into());
+        }
+        // PCM encoding and actual duration are independently validated by the server.
+        return Ok(true);
+    }
+    Ok(route != TranscriptionRoute::ProCloud
+        && NATIVE_FORMATS.contains(&extension)
+        && size <= DIRECT_UPLOAD_MAX_BYTES)
 }
 
 /// Lee un WAV cualquiera y lo deja como PCM 16 bits mono a 16 kHz.
@@ -251,4 +255,27 @@ fn read_wav_as_16k_mono(path: &Path) -> Result<Vec<i16>, String> {
     .map_err(|e| e.to_string())?;
     let raw = RawRecording { samples, sample_rate: spec.sample_rate, channels: spec.channels };
     Ok(audio::prepare(&raw).samples)
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+
+    #[test]
+    fn free_original_formats_cannot_bypass_limits_through_conversion() {
+        for extension in ["caf", "aiff", "mp3", "m4a", "flac"] {
+            assert!(direct_upload(TranscriptionRoute::FreeCloud, extension, 1024).is_err());
+        }
+        assert_eq!(direct_upload(TranscriptionRoute::FreeCloud, "wav", FREE_UPLOAD_MAX_BYTES), Ok(true));
+        assert!(direct_upload(TranscriptionRoute::FreeCloud, "wav", FREE_UPLOAD_MAX_BYTES + 1).is_err());
+    }
+
+    #[test]
+    fn pro_always_converts_and_personal_keys_keep_native_uploads() {
+        assert_eq!(direct_upload(TranscriptionRoute::ProCloud, "mp3", 1024), Ok(false));
+        assert_eq!(direct_upload(TranscriptionRoute::ProCloud, "wav", 1024), Ok(false));
+        assert_eq!(direct_upload(TranscriptionRoute::OwnKey, "mp3", 1024), Ok(true));
+        assert_eq!(direct_upload(TranscriptionRoute::OwnKey, "caf", 1024), Ok(false));
+        assert_eq!(direct_upload(TranscriptionRoute::OwnKey, "wav", DIRECT_UPLOAD_MAX_BYTES + 1), Ok(false));
+    }
 }

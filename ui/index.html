@@ -64,6 +64,8 @@
       </button>
     </nav>
 
+    <button id="btn-onboarding" class="ghost onboarding-launch" data-i18n="onboarding.open"></button>
+
     <div class="sidebar-foot">
       <span id="foot-dot" class="foot-dot"></span>
       <span id="foot-model" class="foot-model"></span>
@@ -134,64 +136,66 @@
     <!-- Plan -->
     <section class="page" data-page="plan">
       <div class="plans">
+        <div class="plan" id="plan-own">
+          <div class="plan-head"><strong data-i18n="plan.own.name"></strong><span class="plan-badge" data-i18n="plan.current" hidden></span></div>
+          <div class="plan-price" data-i18n="plan.free.price"></div>
+          <p class="plan-desc" data-i18n="plan.own.desc"></p>
+          <ul class="plan-list"><li data-i18n="plan.own.f1"></li><li data-i18n="plan.own.f2"></li><li data-i18n="plan.own.f3"></li></ul>
+          <button id="btn-use-own" class="ghost" data-i18n="plan.own.choose"></button>
+        </div>
         <div class="plan" id="plan-free">
-          <div class="plan-head">
-            <strong data-i18n="plan.free.name"></strong>
-            <span class="plan-badge" data-i18n="plan.current" hidden></span>
-          </div>
+          <div class="plan-head"><strong data-i18n="plan.free.name"></strong><span class="plan-badge" data-i18n="plan.current" hidden></span></div>
           <div class="plan-price" data-i18n="plan.free.price"></div>
           <p class="plan-desc" data-i18n="plan.free.desc"></p>
-          <ul class="plan-list">
-            <li data-i18n="plan.free.f1"></li>
-            <li data-i18n="plan.free.f2"></li>
-            <li data-i18n="plan.free.f3"></li>
-          </ul>
+          <ul class="plan-list"><li data-i18n="plan.free.f1"></li><li data-i18n="plan.free.f2"></li><li data-i18n="plan.free.f3"></li></ul>
+          <button id="btn-use-cloud" class="ghost" data-i18n="account.create"></button>
         </div>
-        <div class="plan featured" id="plan-pro">
-          <div class="plan-head">
-            <strong data-i18n="plan.pro.name"></strong>
-            <span class="plan-badge" data-i18n="plan.current" hidden></span>
-          </div>
+        <div class="plan" id="plan-pro">
+          <div class="plan-head"><strong data-i18n="plan.pro.name"></strong><span class="plan-badge" data-i18n="plan.current" hidden></span></div>
           <div class="plan-price" data-i18n="plan.pro.price"></div>
           <p class="plan-desc" data-i18n="plan.pro.desc"></p>
-          <ul class="plan-list">
-            <li data-i18n="plan.pro.f1"></li>
-            <li data-i18n="plan.pro.f2"></li>
-            <li data-i18n="plan.pro.f3"></li>
-            <li data-i18n="plan.pro.f4"></li>
-          </ul>
+          <ul class="plan-list"><li data-i18n="plan.pro.f2"></li><li data-i18n="plan.pro.f3"></li><li data-i18n="plan.pro.f4"></li></ul>
           <button id="btn-get-pro" class="primary" data-i18n="plan.get"></button>
         </div>
       </div>
       <p class="footnote" data-i18n="plan.soon"></p>
-      <div class="card" id="account-card">
-        <div class="card-title" data-i18n="account.title"></div>
-        <div class="row stack">
-          <p id="account-status" class="footnote" role="status" aria-live="polite"></p>
-          <form id="account-signin" class="actions full">
-            <input id="account-email" type="email" autocomplete="email" required aria-label="Email">
-            <button id="btn-send-code" type="submit" class="primary" data-i18n="account.send"></button>
-          </form>
-          <form id="account-verify" class="actions full" hidden>
-            <input id="account-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10" required aria-label="Verification code">
-            <button id="btn-verify-code" type="submit" class="primary" data-i18n="account.verify"></button>
-          </form>
-          <div id="account-usage" class="usage-panel" hidden>
-            <strong id="usage-label"></strong>
-            <progress id="usage-progress" max="2000" value="0" aria-label="Weekly words used"></progress>
-            <span id="usage-renews" class="footnote"></span>
-            <div class="actions">
-              <button id="btn-refresh-usage" class="ghost" data-i18n="account.refresh"></button>
-              <button id="btn-signout" class="ghost" data-i18n="account.signout"></button>
+      <div id="account-home">
+        <div class="card" id="account-card">
+          <div class="card-title" data-i18n="account.title"></div>
+          <div class="row stack">
+            <p id="account-status" class="footnote" role="status" aria-live="polite"></p>
+            <div id="account-auth">
+              <div class="auth-tabs" role="tablist" aria-label="Account">
+                <button id="btn-auth-create" type="button" role="tab" data-i18n="account.create"></button>
+                <button id="btn-auth-signin" type="button" role="tab" data-i18n="account.signin"></button>
+              </div>
+              <button id="btn-google-auth" type="button" class="google-auth"><span class="google-mark" aria-hidden="true">G</span><span data-i18n="account.google"></span></button>
+              <div class="auth-divider"><span data-i18n="account.or"></span></div>
+              <form id="account-signin" class="auth-form">
+                <label><span data-i18n="account.email"></span><input id="account-email" type="email" autocomplete="email" required></label>
+                <label id="account-password-field"><span data-i18n="account.password"></span><input id="account-password" type="password" autocomplete="new-password" minlength="8" required></label>
+                <label id="account-code-field" hidden><span data-i18n="account.code"></span><input id="account-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10"></label>
+                <p id="account-password-hint" class="footnote" data-i18n="account.password.hint"></p>
+                <button id="btn-account-submit" type="submit" class="primary" data-i18n="account.create"></button>
+              </form>
+              <button id="btn-cancel-google" type="button" class="link" data-i18n="account.google.cancel" hidden></button>
+              <button id="btn-resend-confirmation" type="button" class="link" data-i18n="account.resend" hidden></button>
+              <button id="btn-forgot-password" type="button" class="link" data-i18n="account.forgot" hidden></button>
             </div>
+            <div id="account-usage" class="usage-panel" hidden>
+              <p id="account-pro-note" class="footnote" data-i18n="account.pro.note" hidden></p>
+              <strong id="usage-label"></strong>
+              <progress id="usage-progress" max="2000" value="0" aria-label="Weekly words used"></progress>
+              <span id="usage-renews" class="footnote"></span>
+              <div class="actions"><button id="btn-refresh-usage" class="ghost" data-i18n="account.refresh"></button><button id="btn-signout" class="ghost" data-i18n="account.signout"></button></div>
+            </div>
+            <p id="account-free-details" class="footnote" data-i18n="account.free.details"></p>
           </div>
-          <label class="own-key-choice"><input id="use-own-key" type="checkbox"><span data-i18n="account.ownkey"></span></label>
-          <p class="footnote" data-i18n="account.free.details"></p>
         </div>
       </div>
-
-
-      <div class="card">
+      <div id="license-home">
+      <div class="card" id="license-card">
+        <button id="btn-wizard-checkout" class="primary" data-i18n="plan.get" hidden></button>
         <div class="row stack">
           <div class="label"><strong data-i18n="plan.license"></strong><span id="license-status"></span></div>
           <div class="actions full">
@@ -201,11 +205,13 @@
           </div>
         </div>
       </div>
+      </div>
     </section>
 
-    <!-- Modelos -->
+    <!-- Models -->
     <section class="page" data-page="models">
-      <div class="card">
+      <div id="models-cloud-notice" class="card" hidden><div class="row stack"><div class="label"><strong data-i18n="models.cloud.title"></strong><span id="models-cloud-desc"></span></div><button id="btn-models-own" class="ghost" data-i18n="plan.own.choose"></button></div></div>
+      <div class="card byok-models">
         <div class="card-title" data-i18n="models.provider"></div>
         <div id="provider-chips" class="chips"></div>
         <div class="row stack">
@@ -219,7 +225,7 @@
         <p class="hint"><button id="link-key" class="link" data-i18n="models.getkey"></button></p>
       </div>
 
-      <div class="card">
+      <div class="card byok-models">
         <div class="card-title" data-i18n="models.model"></div>
         <div id="model-list" class="model-list"></div>
       </div>
@@ -365,6 +371,39 @@
     </section>
   </main>
 </div>
+
+<dialog id="onboarding-dialog" aria-labelledby="onboarding-title">
+  <div class="wizard-shell">
+    <header class="wizard-head"><div><span id="onboarding-step" class="eyebrow"></span><h2 id="onboarding-title"></h2><p id="onboarding-desc"></p></div><button id="btn-close-onboarding" class="ghost close-button" aria-label="Close">×</button></header>
+    <div class="wizard-progress" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="wizard-body">
+      <div id="onboarding-choose" class="wizard-options">
+        <button class="wizard-option" data-onboarding-mode="own"><span class="wizard-symbol">⌘</span><strong data-i18n="plan.own.name"></strong><span data-i18n="onboarding.own.desc"></span></button>
+        <button class="wizard-option" data-onboarding-mode="free"><span class="wizard-symbol">☁</span><strong data-i18n="plan.free.name"></strong><span data-i18n="onboarding.free.desc"></span></button>
+        <button class="wizard-option" data-onboarding-mode="pro"><span class="wizard-symbol">✦</span><strong data-i18n="plan.pro.name"></strong><span data-i18n="onboarding.pro.desc"></span></button>
+      </div>
+      <div id="onboarding-setup" hidden>
+        <form id="onboarding-key-form" class="auth-form" hidden>
+          <label><span data-i18n="models.provider"></span><select id="onboarding-provider"></select></label>
+          <label><span data-i18n="models.model"></span><select id="onboarding-model"></select></label>
+          <p id="onboarding-key-status" class="footnote" role="status"></p>
+          <label><span data-i18n="models.apikey"></span><input id="onboarding-api-key" type="password" autocomplete="off" spellcheck="false"></label>
+          <div class="actions"><button type="submit" class="primary" data-i18n="models.save"></button><button id="onboarding-get-key" type="button" class="link" data-i18n="models.getkey"></button></div>
+          <p class="footnote" data-i18n="models.privacy"></p>
+        </form>
+        <div id="onboarding-account"></div>
+        <div id="onboarding-license"></div>
+      </div>
+      <div id="onboarding-ready" hidden>
+        <div class="shortcut-demo"><kbd id="onboarding-hotkey"></kbd><strong data-i18n="onboarding.try"></strong><p data-i18n="onboarding.try.desc"></p></div>
+        <div class="card"><div class="row"><label for="onboarding-language" data-i18n="general.dictlang"></label><select id="onboarding-language"></select></div></div>
+        <div id="onboarding-permissions" class="card"></div>
+        <p class="footnote" data-i18n="onboarding.permissions.note"></p>
+      </div>
+    </div>
+    <footer class="wizard-foot"><button id="btn-onboarding-back" class="ghost" data-i18n="onboarding.back"></button><button id="btn-onboarding-later" class="link" data-i18n="onboarding.later"></button><button id="btn-onboarding-next" class="primary" data-i18n="onboarding.next"></button></footer>
+  </div>
+</dialog>
 
 <div id="toast" class="toast" hidden></div>
 <script src="i18n.js"></script>

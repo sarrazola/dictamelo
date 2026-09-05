@@ -13,6 +13,7 @@ use crate::transcription::{TranscriptionError, TranscriptionProvider, Transcript
 use crate::util::lock;
 use crate::{app_windows, tray};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -174,7 +175,14 @@ async fn start_stream(app: &AppHandle, state: &AppState, settings: &Settings, la
             let generation = set_status(app, Status::Recording);
             sound(app, SoundKind::Start);
             spawn_level_monitor(app.clone(), generation);
-            spawn_watchdog(app.clone(), generation, if state.is_free_cloud() { settings.max_recording_secs.min(119) } else { settings.max_recording_secs });
+            let max_seconds = if state.is_free_cloud() {
+                settings.max_recording_secs.min(119)
+            } else if state.uses_cloud() {
+                settings.max_recording_secs.min(599)
+            } else {
+                settings.max_recording_secs
+            };
+            spawn_watchdog(app.clone(), generation, max_seconds);
         }
         Err(e) => fail(app, e.localized(lang)),
     }
@@ -237,7 +245,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
     let state = app.state::<AppState>();
     let settings = state.settings();
     let lang = settings.ui_lang();
-    let (provider, api_key) = match transcription_source(&state, &settings).await {
+    let source = match transcription_source(&state, &settings).await {
         Ok(pair) => pair,
         Err(e) => {
             fail(app, tf(&lang, "err.keychain", &[("e", &e)]));
@@ -252,12 +260,12 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
     }
     let request = TranscriptionRequest {
         audio_path: path.clone(),
-        model: settings.model.clone(),
+        model: source.model.clone(),
         language: settings.language_code(),
         prompt: settings.vocabulary_prompt(),
     };
     let started = Instant::now();
-    let result = transcribe_with_retry(provider.as_ref(), api_key.as_deref(), &request).await;
+    let result = transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request).await;
 
     // El audio temporal se elimina siempre, haya ido bien o mal.
     match std::fs::remove_file(&path) {
@@ -284,7 +292,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             if settings.cleanup_enabled {
                 set_status(app, Status::Cleaning);
                 let started = Instant::now();
-                match clean_text(&state, &settings, &text).await {
+                match clean_text(&state, &settings, &source, &text).await {
                     Ok(cleaned) if !cleaned.trim().is_empty() => {
                         log::info!("Texto limpio en {:.1}s ({} → {} caracteres)", started.elapsed().as_secs_f32(), text.chars().count(), cleaned.chars().count());
                         text = cleaned.trim().to_string();
@@ -297,7 +305,12 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
                     }
                 }
             }
-            deliver(app, text.clone(), result.language, audio.duration_secs(), &settings, cleanup_failed).await;
+            // History records the provider/model that processed this request, even if the
+            // user changes their preferred personal provider while the request is in flight.
+            let mut delivery_settings = settings.clone();
+            delivery_settings.provider = source.provider.info().id;
+            delivery_settings.model = source.model.clone();
+            deliver(app, text.clone(), result.language, audio.duration_secs(), &delivery_settings, cleanup_failed).await;
             Some(text)
         }
         Err(e) => {
@@ -310,40 +323,82 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
     }
 }
 
-/// Proveedor y credencial que tocan ahora: nuestro servidor si hay Pro, si no el del usuario.
-async fn transcription_source(
-    state: &AppState,
-    settings: &Settings,
-) -> Result<(std::sync::Arc<dyn crate::transcription::TranscriptionProvider>, Option<String>), String> {
-    if state.uses_cloud() {
-        return Ok((state.backend_provider.clone(), state.cloud_credential().await?));
-    }
-    let provider = state
-        .providers
-        .get(&settings.provider)
-        .ok_or_else(|| format!("proveedor desconocido: {}", settings.provider))?;
-    let key = state.api_key_for(&settings.provider).map_err(|e| e.to_string())?;
-    Ok((provider, key))
+/// One route is captured before a request. A later UI mode change applies to the next
+/// request, not to cleanup, billing credentials, file conversion or history for this one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TranscriptionRoute {
+    OwnKey,
+    FreeCloud,
+    ProCloud,
 }
 
-/// Pasa el texto por el modelo de limpieza configurado.
-async fn clean_text(state: &AppState, settings: &Settings, text: &str) -> Result<String, TranscriptionError> {
-    if state.is_free_cloud() { return Ok(text.to_string()); }
-    let (cleaner, api_key) = if state.is_pro() {
-        (state.backend_cleaner.clone(), crate::license::stored_key(&state.secrets))
+impl TranscriptionRoute {
+    fn from_flags(configured: bool, own_key: bool, pro: bool, signed_in: bool) -> Self {
+        if !configured || own_key {
+            Self::OwnKey
+        } else if pro {
+            Self::ProCloud
+        } else if signed_in {
+            Self::FreeCloud
+        } else {
+            Self::OwnKey
+        }
+    }
+}
+
+pub(crate) struct TranscriptionSource {
+    pub provider: Arc<dyn TranscriptionProvider>,
+    pub api_key: Option<String>,
+    pub route: TranscriptionRoute,
+    pub model: String,
+}
+
+fn source_model(route: TranscriptionRoute, personal_model: &str, provider: &crate::transcription::ProviderInfo) -> String {
+    if route == TranscriptionRoute::OwnKey { personal_model.to_string() } else { provider.default_model.clone() }
+}
+
+pub(crate) async fn transcription_source(
+    state: &AppState,
+    settings: &Settings,
+) -> Result<TranscriptionSource, String> {
+    let configured = crate::cloud_config::configured();
+    let pro = state.is_pro();
+    let signed_in = configured && !settings.use_own_key && !pro && state.account.signed_in();
+    let route = TranscriptionRoute::from_flags(configured, settings.use_own_key, pro, signed_in);
+    let (provider, api_key) = match route {
+        TranscriptionRoute::ProCloud => (state.backend_provider.clone(), crate::license::stored_key(&state.secrets)),
+        TranscriptionRoute::FreeCloud => (state.backend_provider.clone(), Some(format!("Bearer {}", state.account.token().await?))),
+        TranscriptionRoute::OwnKey => {
+            let provider = state.providers.get(&settings.provider)
+                .ok_or_else(|| format!("Unknown transcription provider: {}", settings.provider))?;
+            let key = state.api_key_for(&settings.provider).map_err(|e| e.to_string())?;
+            (provider, key)
+        }
+    };
+    let model = source_model(route, &settings.model, &provider.info());
+    Ok(TranscriptionSource { provider, api_key, route, model })
+}
+
+/// Cleanup keeps the transcription request's captured route and Pro credential.
+async fn clean_text(state: &AppState, settings: &Settings, source: &TranscriptionSource, text: &str) -> Result<String, TranscriptionError> {
+    if source.route == TranscriptionRoute::FreeCloud { return Ok(text.to_string()); }
+    let (cleaner, api_key, model) = if source.route == TranscriptionRoute::ProCloud {
+        let cleaner = state.backend_cleaner.clone();
+        let model = cleaner.info().default_model;
+        (cleaner, source.api_key.clone(), model)
     } else {
         let cleaner = state
             .cleaners
             .get(&settings.cleanup_provider)
-            .ok_or_else(|| TranscriptionError::Rejected(format!("limpiador desconocido: {}", settings.cleanup_provider)))?;
+            .ok_or_else(|| TranscriptionError::Rejected(format!("Unknown cleanup provider: {}", settings.cleanup_provider)))?;
         let key_provider = cleaner.info().key_provider;
         let key = state
             .api_key_for(&key_provider)
             .map_err(|e| TranscriptionError::Rejected(e.to_string()))?;
-        (cleaner, key)
+        (cleaner, key, settings.cleanup_model.clone())
     };
     cleaner
-        .clean(api_key.as_deref(), &settings.cleanup_model, &settings.cleanup_system_prompt(), text)
+        .clean(api_key.as_deref(), &model, &settings.cleanup_system_prompt(), text)
         .await
 }
 
@@ -463,5 +518,36 @@ pub fn startup_checks(app: &AppHandle) {
     );
     if !key_ok || !permissions.all_granted() {
         app_windows::show_settings(app);
+    }
+}
+
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+
+    #[test]
+    fn personal_keys_and_unconfigured_builds_never_select_hosted_billing() {
+        for configured in [false, true] {
+            for pro in [false, true] {
+                for signed_in in [false, true] {
+                    assert_eq!(TranscriptionRoute::from_flags(configured, true, pro, signed_in), TranscriptionRoute::OwnKey);
+                    assert_eq!(TranscriptionRoute::from_flags(false, false, pro, signed_in), TranscriptionRoute::OwnKey);
+                }
+            }
+        }
+        assert_eq!(TranscriptionRoute::from_flags(true, false, true, true), TranscriptionRoute::ProCloud);
+        assert_eq!(TranscriptionRoute::from_flags(true, false, false, true), TranscriptionRoute::FreeCloud);
+        assert_eq!(TranscriptionRoute::from_flags(true, false, false, false), TranscriptionRoute::OwnKey);
+    }
+
+    #[test]
+    fn cloud_request_and_history_metadata_do_not_inherit_a_personal_model() {
+        let provider = crate::transcription::dictamelo::DictameloProvider::new(crate::transcription::shared_http_client()).info();
+        assert_eq!(provider.id, "dictamelo");
+        for route in [TranscriptionRoute::FreeCloud, TranscriptionRoute::ProCloud] {
+            assert_eq!(source_model(route, "gpt-4o-transcribe", &provider), "whisper-large-v3-turbo");
+            assert_eq!(source_model(route, "whisper-large-v3", &provider), "whisper-large-v3-turbo");
+        }
+        assert_eq!(source_model(TranscriptionRoute::OwnKey, "gpt-4o-transcribe", &provider), "gpt-4o-transcribe");
     }
 }

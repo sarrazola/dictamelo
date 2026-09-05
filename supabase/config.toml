@@ -2,7 +2,7 @@ project_id = "iburiyhhfodndqgmsaot"
 
 [auth]
 site_url = "https://dictamelo.com"
-additional_redirect_urls = []
+additional_redirect_urls = ["http://127.0.0.1:*/auth/callback/**"]
 
 [auth.mfa.totp]
 enroll_enabled = true
@@ -21,8 +21,12 @@ subject = "Your Dictámelo sign-in code"
 content_path = "./supabase/templates/sign-in.html"
 
 [auth.email.template.confirmation]
-subject = "Your Dictámelo sign-in code"
-content_path = "./supabase/templates/sign-in.html"
+subject = "Confirm your Dictámelo account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Dictámelo password"
+content_path = "./supabase/templates/recovery.html"
 
 # Gateway JWT checks are disabled for legacy Pro license headers. Free-account requests
 # validate their JWT against Supabase Auth inside the function before accessing quota.

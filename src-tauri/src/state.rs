@@ -106,14 +106,16 @@ impl AppState {
     }
 
     pub fn is_free_cloud(&self) -> bool {
-        !self.is_pro() && !self.settings().use_own_key && self.account.signed_in()
+        crate::cloud_config::configured()
+            && !self.is_pro()
+            && !self.settings().use_own_key
+            && self.account.signed_in()
     }
 
-    pub fn uses_cloud(&self) -> bool { self.is_pro() || self.is_free_cloud() }
-
-    pub async fn cloud_credential(&self) -> Result<Option<String>, String> {
-        if self.is_pro() { return Ok(crate::license::stored_key(&self.secrets)); }
-        Ok(Some(format!("Bearer {}", self.account.token().await?)))
+    pub fn uses_cloud(&self) -> bool {
+        crate::cloud_config::configured()
+            && !self.settings().use_own_key
+            && (self.is_pro() || self.is_free_cloud())
     }
 
     /// API key del proveedor indicado (`None` si no está configurada).

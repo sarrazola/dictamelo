@@ -1,6 +1,6 @@
 [package]
 name = "dictamelo"
-version = "0.2.0"
+version = "0.3.0"
 description = "Voice dictation for macOS and Windows. Hold a shortcut, speak, and paste text at your cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"
@@ -25,7 +25,9 @@ log = "0.4"
 thiserror = "2"
 anyhow = "1"
 async-trait = "0.1"
-tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "net", "io-util"] }
+base64 = "0.22"
+sha2 = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["multipart", "json", "rustls"] }
 cpal = "0.18"
 hound = "3.5"

@@ -4,108 +4,120 @@
 
 Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, and release: the text appears at your cursor. Built with Rust and Tauri 2, with a small HTML/CSS/JavaScript interface.
 
-[Website](https://dictamelo.com) · [Latest release](https://github.com/sarrazola/dictamelo/releases/latest) · [Release guide](docs/RELEASING.md) · [Testing](docs/TESTING.md)
+[Website](https://dictamelo.com) · [Latest public release](https://github.com/sarrazola/dictamelo/releases/latest) · [Release guide](docs/RELEASING.md) · [Testing](docs/TESTING.md)
 
-**0.2.0 release status:** the new free account backend and all three installers have been verified and are available in an authenticated draft release. Public email-code sign-in still requires production SMTP configuration and a real delivery check before publication. The current public release remains 0.1.2; the features below describe the 0.2.0 source. See [release status](docs/releases/0.2.0-status.md).
+**0.3.0 is a built and locally installed Mac preview.** Its app and DMG are signed, notarized and stapled. It adds clearer plans, email/password account flows and a repeatable onboarding wizard. Google login is implemented but its live setup/test, production email delivery and the proposed Pro trial remain pending. See [preview notes](docs/releases/0.3.0.md). The public release remains **0.1.2**; the verified **0.2.0** installers remain in draft. This iteration does not replace those assets or produce new Windows installers.
 
-## Download
+## Download and install
 
-Installer filenames for **0.2.0**, currently in draft as explained above. The [current public release](https://github.com/sarrazola/dictamelo/releases/latest) is 0.1.2 and includes only Apple Silicon and Windows ARM64:
+Use the [latest public release](https://github.com/sarrazola/dictamelo/releases/latest) for publicly available installers. It currently includes Apple Silicon and Windows ARM64. Windows Intel/AMD support was built and checked for the separate 0.2.0 draft; see its [release status](docs/releases/0.2.0-status.md).
 
-| Computer | Installer |
-| --- | --- |
-| Mac with Apple Silicon, macOS 12 or later | `Dictamelo_<version>_aarch64.dmg` |
-| Windows 10/11 with Intel or AMD, 64-bit | `Dictamelo_<version>_x86_64-setup.exe` |
-| Windows 11 on ARM, including Snapdragon | `Dictamelo_<version>_aarch64-setup.exe` |
+| Computer | Installer naming | Current distribution |
+| --- | --- | --- |
+| Apple Silicon Mac, macOS 12 or later | `Dictamelo_<version>_aarch64.dmg` | 0.1.2 public; 0.2.0 draft; 0.3.0 verified local preview |
+| Windows 10/11, Intel or AMD 64-bit | `Dictamelo_<version>_x86_64-setup.exe` | 0.2.0 draft; no new build in this iteration |
+| Windows 11 on ARM | `Dictamelo_<version>_aarch64-setup.exe` | 0.1.2 public; 0.2.0 draft |
 
-The macOS release process requires **Developer ID signing, Apple notarization, and stapling** for both the app and the DMG. Windows installers are signed for the Tauri updater; this is separate from Microsoft Authenticode. Windows may show a SmartScreen warning while the installer has no Authenticode certificate/reputation. Windows 32-bit, older Windows versions, Intel Macs, and Linux are not included in the published installers.
+On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
-On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer; it installs for your user and can install WebView2 if needed. Allow desktop microphone access in Windows Settings.
+The 0.3.0 Mac preview app and DMG passed Developer ID, Apple notarization, stapling and Gatekeeper checks, including the mounted and installed app. It was installed locally from the verified DMG; it is not a public GitHub release. Historical 0.1.x Mac installers were signed but not notarized. Windows updater signatures are separate from Microsoft Authenticode; the existing Windows installers have no Authenticode certificate. See the [verification record](docs/TESTING.md) for exact results.
 
-## Start dictating
+## Start dictating in the preview
 
-1. Open **Plan**, enter your email, and enter the verification code you receive.
-2. Your free account includes **2,000 words each week**, shared across all your computers.
-3. Hold **Alt/Option + Shift + Space**, speak, and release to paste.
-4. Check **Plan → Account & weekly usage** for words used, words remaining, and the next renewal date.
+1. Open **Onboarding** to choose your own API keys, Free Cloud or Pro. The button is deliberately visible while the wizard is being tested; reopening it lets you review your choices.
+2. For personal keys, select Groq or OpenAI in **Models** and enter your key. No Dictámelo account is needed.
+3. In a cloud-configured build, **Create free account** uses email/password, with email confirmation; existing users can sign in with their password. **Continue with Google** opens the system browser when the Google provider is configured. Password/confirmation/recovery API checks passed with a temporary test account; actual mailbox delivery and a complete Google return-to-app test remain pending.
+4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release to paste.
+5. Free Cloud usage appears in **Plan**, with words used, words remaining and the next renewal time. Existing Pro customers can still activate their Lemon Squeezy license.
 
-Already using a personal Groq or OpenAI key? Keep it in **Models**, and choose **Use my own API key** in Plan. Your provider bills that usage; it does not consume the included free allowance.
+## Three plans
 
-## Plans
-
-| | Free account | Pro license | Your own API key |
+| | Free — your own keys | Free Cloud | Pro |
 | --- | --- | --- | --- |
-| Included transcription | 2,000 words/week | Up to 20 audio hours per rolling 30 days | Billed by your provider |
-| Sign-in | Email verification code | Existing Lemon Squeezy license | Not required |
-| Dictation | Up to two minutes per recording | Configurable recording duration | Configurable recording duration |
-| Audio files | Mono 16 kHz PCM WAV, up to two minutes | Supported formats and long files | Supported formats and long files |
-| AI cleanup | — | Included | Uses your provider key |
-| Usage storage | Account-level weekly word count | License-level audio duration | Local history |
+| Dictámelo price | Free; your provider may charge | Free | $4.99/month |
+| Account | Not required | Email/password or Google | Existing Pro license supported |
+| Transcription allowance | Your provider's limits | 2,000 words/week across devices | 60 hours per rolling 30 days |
+| Hosted recording limit | Not applicable | Two minutes | Ten minutes per request |
+| Audio files | Supported formats and local splitting | Mono 16 kHz PCM WAV, up to two minutes | Local conversion and ten-minute chunks in the Mac preview |
+| Text cleanup | Uses your provider key | Not included | Included within token allowance |
 
-Free words renew **Monday at 00:00 UTC**. The app displays that moment in your local time. The last recording is delivered in full even if it crosses 2,000 words; further recordings are blocked until renewal. A 200-request weekly safeguard and one request at a time per account limit abuse. Failed provider requests consume no words. Reinstalling or signing out does not reset usage.
+**Free Cloud:** words renew Monday at 00:00 UTC, shown in your local time. The last recording is delivered in full even if it crosses 2,000 words; further recordings wait for renewal. A 200-request weekly safeguard and one active request per account limit abuse. Failed provider requests use no words. Signing out or reinstalling does not reset usage.
 
-Pro activation is retained for existing licenses. The purchase product must be published and `CHECKOUT_URL` updated to its actual checkout before advertising Pro sales; the repository does not publish or alter the Lemon Squeezy product.
+**Pro:** the rolling window counts the last 30 days, not a calendar-month reset. Each transcription counts at least ten seconds. The hosted service uses Whisper Large v3 Turbo and GPT-OSS 20B, with 12,000 total provider requests, 3 million cleanup input tokens and 2 million completion tokens per rolling 30 days. Completion tokens include reasoning. Cleanup exhaustion does not remove the remaining transcription allowance. Larger or different-model workloads can use personal keys. These are explicit limits, not an unlimited plan.
+
+The updated hosted Pro quota service is deployed, with live quota and access-control checks recorded in [Testing](docs/TESTING.md).
+
+A seven-day trial is being evaluated. **It is not advertised as available:** the preview's trial flag remains off until checkout, immediate access, cancellation and expiry have been verified. See [the initial release review](docs/INITIAL_RELEASE_REVIEW.md) for provider comparisons and pricing assumptions.
 
 ## Features
 
 - Menu bar/system tray app with a configurable push-to-talk shortcut.
 - Paste at the cursor and restore the previous clipboard, including images and files; preserve anything the user copies during the operation.
 - Floating recording indicator that does not take focus; Escape cancels without transcription.
-- Six interface languages: English, Spanish, Portuguese, French, German, and Italian.
-- Optional launch at login, system sounds, custom vocabulary, and AI cleanup.
-- Audio-file transcription with local conversion and silence-aware splitting for long recordings (Pro/personal key).
-- Small local history with copy/delete controls and retry for failed dictation.
-- Signed automatic updates from GitHub Releases, checked at startup and every six hours.
+- Six interface languages: English, Spanish, Portuguese, French, German and Italian.
+- Optional launch at login, system sounds, custom vocabulary and AI cleanup.
+- Audio-file transcription with local conversion and splitting for long recordings.
+- Local history with copy/delete controls and retry for failed dictation.
+- Signed automatic updates from GitHub Releases in explicitly enabled official builds. Default source builds leave updates disabled; a local preview does not publish an update.
 
-Windows uses Win32 for keyboard/clipboard and Media Foundation for audio conversion. Windows cannot paste into an elevated administrator app from a regular process; the text remains on the clipboard. AIFF/CAF decoding is not available through the Windows decoder. ARM VM testing of an x64 executable is emulation, not testing on physical Intel/AMD hardware.
+Windows uses Win32 for keyboard/clipboard and Media Foundation for conversion. A regular process cannot paste into an elevated administrator app; text remains on the clipboard. AIFF/CAF decoding is not available through that decoder. ARM VM testing of x64 is emulation, not testing on physical Intel/AMD hardware. This preview has no new Windows verification.
 
-## Privacy and credentials
+## Public source and credentials
 
-Free/Pro audio passes through Supabase Edge Functions to Groq. Personal-key mode sends it directly to the selected provider. The app removes temporary audio after use and stores history locally. The backend stores usage and license metadata, not audio or transcript contents. Supabase Auth stores the account email. Provider retention policies still apply.
+This repository contains the real application used to build the official edition. **A clean source build uses personal keys and leaves hosted services and automatic updates disabled.** Official or self-hosted builds inject public service metadata using the same source; there is no second editable copy of the app. See [Auth and cloud configuration](docs/AUTH_AND_CLOUD.md).
 
-Session tokens, license keys, and personal provider keys use macOS Keychain or Windows Credential Manager. The provider's server key is an Edge Function secret and is never bundled in the app. `src-tauri/src/supabase-public-key.txt` is intentionally public: it contains only the client `anon` key; all quota tables and mutation functions are restricted to the server's service role.
+Free/Pro audio travels through the configured backend to Groq. Personal-key mode sends it to the selected provider. Temporary audio is removed after use and history stays local. The backend records account/license usage metadata, not audio or transcript contents. Supabase Auth manages the account. Provider retention policies still apply.
+
+Session tokens, license keys and personal keys use macOS Keychain or Windows Credential Manager. Public Supabase URLs, anon/publishable keys, Google client IDs and checkout identifiers are not provider secrets. Google client secrets, SMTP credentials, service-role keys and hosted provider keys belong on the server, never in app bundles or source control. A private deployment repository can be useful for operations, but is not required to make public login code safe.
 
 ## Development
 
-Install current stable Rust, Node.js 20+, and the platform prerequisites in [Tauri's setup guide](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode Command Line Tools. Windows needs Visual Studio 2022 C++ Build Tools, a Windows SDK, WebView2, NASM for x64, and Clang for ARM64.
+Install current stable Rust, Node.js 20+ and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode Command Line Tools. Windows build prerequisites and release commands remain in the release guide for a later cross-platform release.
 
 ```sh
 npm ci
-npm run dev
+npm run dev                         # personal keys; cloud disabled by default
 npm test
-npm run test:backend                 # requires Deno
+npm run test:backend                # requires Deno
 npm run check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-For a UI-only preview (mock data, no real account or audio), run `python3 -m http.server 4179 --directory ui` and open `http://localhost:4179`.
+For an explicitly configured cloud build, prepare an ignored `.env.cloud-build` file containing only public build metadata, then run:
+
+```sh
+python3 scripts/with-cloud-config.py --config .env.cloud-build -- npm run dev
+```
+
+The wrapper injects compile-time configuration; changing the file requires a rebuild. `DICTAMELO_UPDATES_ENABLED` defaults to `false`; enable it only for an official build or after configuring your own updater endpoint and verification key. Do not source a general production `.env` into the desktop build. The [configuration guide](docs/AUTH_AND_CLOUD.md) lists the exact allowed fields and server-only secrets.
+
+For a UI-only preview with mock data, run `python3 -m http.server 4179 --directory ui` and open `http://localhost:4179`. Browser mock login does not create a real account or prove email, Google or microphone behavior.
 
 ## Project structure
 
 ```text
-ui/                         Interface, translations, and browser preview mocks
-src-tauri/src/account.rs     Email-code login, session refresh, secure session storage
-src-tauri/src/pipeline.rs    Record → transcribe → clean → paste
-src-tauri/src/platform/      macOS and Windows system integration
-src-tauri/src/transcription/ Provider interface, Groq/OpenAI and hosted transcription
-src-tauri/src/cleanup/       Optional text cleanup providers
-src-tauri/src/license.rs     Existing Pro license activation
-src-tauri/src/updates.rs     Signed updater and release signature verification
-src-tauri/src/secrets.rs     OS credential-store implementation (tracked source code)
-supabase/functions/         Hosted transcription, cleanup, account usage
-supabase/migrations/        Database schema and server-only quota functions
-supabase/templates/         Sign-in email template
-scripts/                    Build, notarization, publishing, and diagnostics
-docs/                       Release instructions and verification records
+ui/                          Interface, onboarding, translations and browser mocks
+src-tauri/src/account.rs      Account creation, password/Google login, session storage
+src-tauri/src/cloud_config.rs Optional public hosted-service build configuration
+src-tauri/src/pipeline.rs     Record → transcribe → clean → paste
+src-tauri/src/platform/       macOS and Windows integration
+src-tauri/src/transcription/  Groq/OpenAI and hosted transcription
+src-tauri/src/cleanup/        Optional text cleanup providers
+src-tauri/src/license.rs      Existing Pro license activation
+src-tauri/src/secrets.rs      OS credential store (tracked source code)
+supabase/functions/          Hosted transcription, cleanup and usage
+supabase/migrations/         Server-owned schemas and quotas
+scripts/                     Configuration, building, signing and release tools
+docs/                        Configuration, release and verification guides
 ```
 
-To add a transcription provider, implement `TranscriptionProvider` and register it in `ProviderRegistry::with_defaults()`. To add a cleaner, implement `TextCleaner` and register it in `CleanerRegistry::with_defaults()`. Keep platform-specific changes under `platform/`.
+To add a provider, implement `TranscriptionProvider` or `TextCleaner` and register it in the corresponding registry. Keep platform-specific changes under `platform/`. Groq is the established provider path; OpenAI already has an adapter but must be tested with real credentials before claiming equivalent verification. Additional providers are a separate scoped decision.
 
 ## Releasing a new version
 
-Follow **[docs/RELEASING.md](docs/RELEASING.md)**. It covers version bumps, README/changelog updates, backend deployment, Windows x64/ARM64 builds, macOS notarization, updater signatures, GitHub Releases, and verification of the publicly downloaded installers.
+Follow **[docs/RELEASING.md](docs/RELEASING.md)** for versions, English documentation, backend compatibility, signing, notarization and artifact checks. The current 0.3.0 task is a local Mac preview: do not run the full publication script or change the existing release assets for it.
 
-`AGENTS.md` carries these maintenance rules for coding assistants. `.gitignore` only controls which files Git tracks; it is not the place for release instructions. Installers belong in **GitHub Releases**, not in source commits.
+`AGENTS.md` carries maintenance rules for coding assistants. `.gitignore` excludes private/generated files; it does not replace release instructions. Installers belong in **GitHub Releases**, not source commits.
 
 ## License
 
