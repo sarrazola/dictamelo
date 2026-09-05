@@ -29,6 +29,10 @@ for arch, machine in [('x86_64', 0x8664), ('aarch64', 0xaa64)]:
 for source,name in files:
     assert source.is_file() and source.stat().st_size > 0, f'Missing artifact: {source}'
     shutil.copy2(source, stage/name)
+allowed = {name for _, name in files} | {'latest.json', 'SHA256SUMS.txt'}
+unexpected = {p.name for p in stage.iterdir()} - allowed
+if unexpected:
+    raise SystemExit(f'Unexpected staging files; review before publishing: {sorted(unexpected)}')
 platforms = {}
 for platform,name in [('darwin-aarch64',f'Dictamelo_{version}_aarch64.app.tar.gz'),('windows-x86_64',f'Dictamelo_{version}_x86_64-setup.exe'),('windows-aarch64',f'Dictamelo_{version}_aarch64-setup.exe')]:
     platforms[platform] = {'signature': (stage/(name+'.sig')).read_text().strip(), 'url': f'https://github.com/sarrazola/dictamelo/releases/download/v{version}/{name}'}

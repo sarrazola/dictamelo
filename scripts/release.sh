@@ -19,6 +19,8 @@ APP='src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Dictámelo.app'
 xcrun stapler validate "$APP"
 spctl --assess --type execute --verbose=2 "$APP"
 xcrun stapler validate "$STAGE/Dictamelo_${VERSION}_aarch64.dmg"
+codesign --verify --strict "$STAGE/Dictamelo_${VERSION}_aarch64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=2 "$STAGE/Dictamelo_${VERSION}_aarch64.dmg"
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   [[ "$(git rev-list -n 1 "$TAG")" == "$(git rev-parse HEAD)" ]] || { echo 'Tag does not match HEAD.' >&2; exit 1; }
 else
