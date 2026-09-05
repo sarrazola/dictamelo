@@ -43,6 +43,26 @@ firma y se instala con el nombre acentuado, la API key migrada al nuevo servicio
 diálogos (`api_key=true`), el historial se copió al nuevo directorio y, como cambia la identidad de la app,
 macOS vuelve a pedir Micrófono y Accesibilidad una sola vez.
 
+## Sistema de actualizaciones (probado de extremo a extremo)
+
+Publicadas v0.1.1 y v0.1.2 en GitHub Releases con el script `scripts/release.sh`.
+
+| Prueba | Resultado |
+| --- | --- |
+| `latest.json` en el endpoint que consulta la app | HTTP 200, versión 0.1.2, firma y URL correctas |
+| Descarga del paquete desde la URL publicada | HTTP 200, 4.939.199 bytes |
+| Detección: app 0.1.1 instalada, reiniciada | Registró «Hay una versión nueva disponible: 0.1.2» a los 8 s |
+| Firma del release contra la llave pública del binario | Verificada con `minisign-verify` (prueba `published_release_signature_is_valid`) |
+| **Instalación real**: 0.1.1 → descarga → verifica → reemplaza | `/Applications` pasó de 0.1.1 a 0.1.2 |
+| Firma de código tras actualizarse | `codesign --verify --deep --strict` correcto, mismo Team ID y runtime endurecido |
+| Permisos tras actualizarse | Micrófono y Accesibilidad siguen concedidos; la API key del llavero se conserva |
+
+Lo importante de que el Team ID no cambie: los permisos de macOS están atados a la firma, así que una
+actualización que la rompiera dejaría al usuario sin micrófono ni accesibilidad. No ocurre.
+
+Gatekeeper sigue diciendo «Unnotarized Developer ID», igual que antes de actualizar: es la
+notarización pendiente, no una regresión del actualizador.
+
 ## Backend de Pro en Supabase (desplegado y probado)
 
 Funciones `transcribe` y `cleanup` en el proyecto `iburiyhhfodndqgmsaot`, con la clave de Groq como

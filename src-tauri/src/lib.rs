@@ -128,6 +128,7 @@ pub fn run() {
             autostart::sync_with_settings(&handle);
             // Comprobación silenciosa de actualizaciones, sin estorbar el arranque.
             updates::check_on_startup(&handle);
+            updates::maybe_selftest(&handle);
             // La licencia se comprueba aparte para no retrasar el arranque.
             let license_handle = handle.clone();
             tauri::async_runtime::spawn(async move {

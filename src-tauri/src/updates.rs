@@ -138,3 +138,99 @@ pub fn check_on_startup(app: &AppHandle) {
         }
     });
 }
+
+/// Comprueba que el release publicado se puede verificar con la llave pública que lleva la app.
+/// Es la prueba que atrapa los errores de publicación más caros: firmar con otra llave, subir un
+/// archivo corrupto o apuntar `latest.json` a una URL equivocada.
+///
+/// Requiere red; se ejecuta con `DICTAMELO_LIVE_TESTS=1`.
+#[cfg(test)]
+mod live_tests {
+    /// La misma llave que va en `tauri.conf.json` y que el binario usa para validar.
+    fn public_key() -> String {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("tauri.conf.json válido");
+        conf["plugins"]["updater"]["pubkey"].as_str().expect("pubkey en la configuración").to_string()
+    }
+
+    #[test]
+    fn published_release_signature_is_valid() {
+        if std::env::var("DICTAMELO_LIVE_TESTS").is_err() {
+            eprintln!("omitido: define DICTAMELO_LIVE_TESTS=1");
+            return;
+        }
+        let endpoint = "https://github.com/sarrazola/dictamelo/releases/latest/download/latest.json";
+        let manifest: serde_json::Value = reqwest::blocking::get(endpoint)
+            .expect("descargar latest.json")
+            .json()
+            .expect("latest.json es JSON");
+        let platform = &manifest["platforms"]["darwin-aarch64"];
+        let url = platform["url"].as_str().expect("url del paquete");
+        let signature = platform["signature"].as_str().expect("firma del paquete");
+        eprintln!("versión publicada: {}", manifest["version"]);
+
+        let bytes = reqwest::blocking::get(url).expect("descargar el paquete").bytes().expect("leer el paquete");
+        assert!(bytes.len() > 1_000_000, "el paquete parece vacío: {} bytes", bytes.len());
+
+        // La llave pública y la firma vienen en base64 tal como las escribe Tauri.
+        let decoded_key = String::from_utf8(
+            base64_decode(&public_key()).expect("llave pública en base64"),
+        )
+        .expect("llave pública en texto");
+        let decoded_sig = String::from_utf8(base64_decode(signature).expect("firma en base64"))
+            .expect("firma en texto");
+
+        // La segunda línea del archivo de llave es el base64 en crudo que espera `from_base64`.
+        let key = minisign_verify::PublicKey::from_base64(decoded_key.lines().nth(1).expect("línea de la llave").trim())
+            .expect("llave pública válida");
+        let sig = minisign_verify::Signature::decode(&decoded_sig).expect("firma válida");
+        key.verify(&bytes, &sig, false).expect("la firma del release NO valida contra nuestra llave pública");
+        eprintln!("firma verificada contra la llave pública de la app");
+    }
+
+    /// Base64 sin arrastrar otra dependencia solo para la prueba.
+    fn base64_decode(input: &str) -> Option<Vec<u8>> {
+        const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut buffer = 0u32;
+        let mut bits = 0u32;
+        let mut out = Vec::new();
+        for byte in input.bytes().filter(|b| !b.is_ascii_whitespace() && *b != b'=') {
+            let value = TABLE.iter().position(|c| *c == byte)? as u32;
+            buffer = (buffer << 6) | value;
+            bits += 6;
+            if bits >= 8 {
+                bits -= 8;
+                out.push((buffer >> bits) as u8);
+            }
+        }
+        Some(out)
+    }
+}
+
+/// Autodiagnóstico: con `DICTAMELO_SELFTEST_UPDATE=1` la app busca, descarga, verifica e instala
+/// la actualización y sale. Sirve para comprobar el circuito completo tras publicar una versión,
+/// sin depender de que alguien pulse el botón.
+pub fn maybe_selftest(app: &AppHandle) {
+    if std::env::var_os("DICTAMELO_SELFTEST_UPDATE").is_none() {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        let result = match check(&app).await {
+            Ok(info) if info.available => {
+                let version = info.version.clone().unwrap_or_default();
+                install(&app).await.map(|()| version)
+            }
+            Ok(info) => Err(format!("no hay actualización (versión actual {})", info.current_version)),
+            Err(e) => Err(e),
+        };
+        let ok = result.is_ok();
+        match result {
+            Ok(version) => println!("SELFTEST_UPDATE_OK instalada {version}"),
+            Err(e) => eprintln!("SELFTEST_UPDATE_FAIL {e}"),
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        app.exit(if ok { 0 } else { 1 });
+    });
+}
