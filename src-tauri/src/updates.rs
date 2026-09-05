@@ -164,28 +164,34 @@ mod live_tests {
             .expect("descargar latest.json")
             .json()
             .expect("latest.json es JSON");
-        let platform = &manifest["platforms"]["darwin-aarch64"];
-        let url = platform["url"].as_str().expect("url del paquete");
-        let signature = platform["signature"].as_str().expect("firma del paquete");
         eprintln!("versión publicada: {}", manifest["version"]);
 
-        let bytes = reqwest::blocking::get(url).expect("descargar el paquete").bytes().expect("leer el paquete");
-        assert!(bytes.len() > 1_000_000, "el paquete parece vacío: {} bytes", bytes.len());
-
-        // La llave pública y la firma vienen en base64 tal como las escribe Tauri.
+        // La llave pública viene en base64 tal como la escribe Tauri; la segunda línea del
+        // archivo de llave es el base64 en crudo que espera `from_base64`.
         let decoded_key = String::from_utf8(
             base64_decode(&public_key()).expect("llave pública en base64"),
         )
         .expect("llave pública en texto");
-        let decoded_sig = String::from_utf8(base64_decode(signature).expect("firma en base64"))
-            .expect("firma en texto");
-
-        // La segunda línea del archivo de llave es el base64 en crudo que espera `from_base64`.
         let key = minisign_verify::PublicKey::from_base64(decoded_key.lines().nth(1).expect("línea de la llave").trim())
             .expect("llave pública válida");
-        let sig = minisign_verify::Signature::decode(&decoded_sig).expect("firma válida");
-        key.verify(&bytes, &sig, false).expect("la firma del release NO valida contra nuestra llave pública");
-        eprintln!("firma verificada contra la llave pública de la app");
+
+        // Se comprueban TODAS las plataformas del manifiesto: publicar desde dos máquinas
+        // distintas (macOS y Windows) es justo cuando se cuela un paquete firmado con otra llave.
+        let platforms = manifest["platforms"].as_object().expect("plataformas en latest.json");
+        assert!(!platforms.is_empty(), "latest.json no publica ninguna plataforma");
+        for (name, platform) in platforms {
+            let url = platform["url"].as_str().expect("url del paquete");
+            let signature = platform["signature"].as_str().expect("firma del paquete");
+            let bytes = reqwest::blocking::get(url).expect("descargar el paquete").bytes().expect("leer el paquete");
+            assert!(bytes.len() > 1_000_000, "{name}: el paquete parece vacío: {} bytes", bytes.len());
+
+            let decoded_sig = String::from_utf8(base64_decode(signature).expect("firma en base64"))
+                .expect("firma en texto");
+            let sig = minisign_verify::Signature::decode(&decoded_sig).expect("firma válida");
+            key.verify(&bytes, &sig, false)
+                .unwrap_or_else(|e| panic!("{name}: la firma NO valida contra nuestra llave pública: {e}"));
+            eprintln!("{name}: firma verificada ({} bytes)", bytes.len());
+        }
     }
 
     /// Base64 sin arrastrar otra dependencia solo para la prueba.

@@ -252,9 +252,16 @@ cd src-tauri && cargo test       # pruebas unitarias
 
 Requisitos: Rust estable (`rustup`, host `*-pc-windows-msvc`), Node ≥ 18, Visual Studio Build Tools
 2022 con «Desarrollo para el escritorio con C++» y el Windows SDK, y el runtime de WebView2 (viene
-con Windows 11). Además, para la criptografía de `rustls` (`aws-lc-sys`): en **ARM64** el componente
-«C++ Clang Compiler for Windows» de Build Tools, y en **x64** NASM. Todo se puede instalar con
-`winget` (`Rustlang.Rustup`, `OpenJS.NodeJS.LTS`, `Microsoft.VisualStudio.2022.BuildTools`, `NASM.NASM`).
+con Windows 11). Además, para la criptografía de `rustls` (`aws-lc-sys` y `ring`): en **ARM64** el
+componente «C++ Clang Compiler for Windows» de Build Tools, y en **x64** NASM. Todo se puede instalar
+con `winget` (`Rustlang.Rustup`, `OpenJS.NodeJS.LTS`, `Microsoft.VisualStudio.2022.BuildTools`, `NASM.NASM`).
+
+En ARM64, `ring` invoca `clang` a secas, así que su carpeta tiene que estar en el `PATH`
+(`scripts\build-release.ps1` la añade solo si hace falta):
+
+```powershell
+$env:Path = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\ARM64\bin;$env:Path"
+```
 
 ```powershell
 npm install                                              # instala @tauri-apps/cli

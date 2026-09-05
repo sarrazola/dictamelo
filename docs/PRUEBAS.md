@@ -139,8 +139,8 @@ queda pendiente de hacerla a mano.**
 # Pruebas en Windows (Windows 11 ARM64 en una VM sobre Apple Silicon, 4 GB de RAM, 2026-09-05)
 
 Entorno: Rust 1.98 (`aarch64-pc-windows-msvc`), Node 24, VS Build Tools 2022 (C++ ARM64, SDK 26100 y
-el componente Clang, que `aws-lc-sys` exige en ARM64), WebView2 152. Al no existir `secrets.rs` en el
-repositorio (`.gitignore` lo excluía con `secrets*`), se reconstruyó a partir de su uso.
+el componente Clang, que `aws-lc-sys` y `ring` exigen en ARM64), WebView2 152. Al no existir
+`secrets.rs` en el repositorio (`.gitignore` lo excluía con `secrets*`), se reconstruyó a partir de su uso.
 
 ## Automatizadas (`cargo test`, 29 pruebas, todas en verde)
 
@@ -178,9 +178,32 @@ Las 24 de macOS más:
 `api_key=true`, ambas vistas web listas, 28 MB de RAM en reposo) y escribe su registro en
 `%LOCALAPPDATA%\com.dictamelo.desktop\logs\dictamelo.log`.
 
+## Publicación de la 0.1.2 desde Windows (`scripts/release-windows.ps1`)
+
+El release `v0.1.2` ya existía con los artefactos de macOS; desde Windows se le añadió
+`Dictamelo_0.1.2_aarch64-setup.exe` (3,2 MB) y se reescribió `latest.json` conservando la entrada
+de macOS. Comprobado después de subir: `latest.json` publica `darwin-aarch64` y `windows-aarch64`,
+la URL de Windows coincide con el nombre real del archivo, y la prueba
+`published_release_signature_is_valid` (ampliada para recorrer **todas** las plataformas del
+manifiesto, no solo macOS) valida ambas firmas contra la llave pública incrustada en la app.
+
+Cuatro cosas que hubo que arreglar del script, ninguna visible sin ejecutarlo en Windows:
+
+| Problema | Efecto | Arreglo |
+| --- | --- | --- |
+| Los bloques de Python se pasaban como argumento (`python - $Version @'…'@`), no por la entrada estándar | En PowerShell un here-string suelto es un argumento más: `python -` esperaba un programa que nunca llegaba y la compilación se quedaba colgada; en un contexto sin consola habría subido el release **sin** `latest.json` | Se canaliza con `$codigo | python - args` |
+| `$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''` | En Windows asignar `''` **borra** la variable, así que Tauri no encontraba la contraseña, la pedía por consola y la compilación se colgaba en «Decrypting updater signing key» | La compilación se lanza con `ProcessStartInfo`, que sí sabe escribir `VAR=` en el bloque de entorno |
+| El instalador se elegía con `Select-Object -First 1` sobre `*-setup.exe` | Con un bundle viejo en la carpeta (0.1.0 < 0.1.2 por orden alfabético) habría subido el instalador equivocado con el nombre de la versión nueva | Se limpia la carpeta antes de compilar y se filtra por versión, exigiendo exactamente un archivo |
+| El artefacto del actualizador se publicaba como `.nsis.zip` | Tauri firma el **instalador `.exe` tal cual**, sin comprimirlo: el archivo era un `.exe` con nombre de `.zip`. Funciona (el actualizador detecta el tipo por el contenido, no por la extensión) pero engaña a quien lo descargue a mano | Se publica un único `…-setup.exe` que sirve para actualizar y para instalar |
+
+La comprobación posterior lee `latest.json` con `gh` (la API) y no por la URL pública de descarga:
+esa la sirve una caché que durante unos minutos devuelve el manifiesto anterior, y la primera
+versión de la comprobación falló en falso por eso aunque la subida había ido bien.
+
 ## No probado en Windows
 
 - Dictar hablando de verdad (el micrófono de la VM solo entrega silencio o ruido).
 - Pegar en apps que corren como administrador (UIPI lo impide por diseño; el texto queda en el portapapeles).
-- Instalar con el `.exe` de NSIS en otro equipo (aquí se probó el ejecutable de release directamente).
+- Instalar con el `.exe` de NSIS y actualizar de una versión a otra desde la app (`DICTAMELO_SELFTEST_UPDATE=1`):
+  haría falta tener instalada una versión anterior de Windows, que no existe todavía. La 0.1.2 es la primera.
 - Windows x64 (aquí solo hay ARM64): `aws-lc-sys` necesita NASM en x64.
