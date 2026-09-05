@@ -23,3 +23,7 @@ supabase/.branches/
 *.mobileprovision
 # Keep example configuration without real credentials.
 !.env.example
+
+# Python helper bytecode
+__pycache__/
+*.pyc
