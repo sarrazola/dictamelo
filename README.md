@@ -2,12 +2,14 @@
 
 # Dictámelo
 
-Dicta en cualquier app de tu Mac: mantén presionado un atajo, habla, suelta, y el texto aparece donde
-está el cursor. App de barra de menú hecha en Rust + Tauri 2. La transcripción la hace un proveedor
-remoto (Groq en esta versión) detrás de una interfaz que permite cambiarlo sin tocar el resto de la app.
+Dicta en cualquier app de tu Mac o de tu PC con Windows: mantén presionado un atajo, habla, suelta, y
+el texto aparece donde está el cursor. App de barra de menú (bandeja del sistema en Windows) hecha en
+Rust + Tauri 2. La transcripción la hace un proveedor remoto (Groq en esta versión) detrás de una
+interfaz que permite cambiarlo sin tocar el resto de la app.
 
 **Descarga:** [última versión para macOS (Apple Silicon)](https://github.com/sarrazola/dictamelo/releases/latest).
 Como todavía no está notarizada, la primera vez ábrela con clic derecho → Abrir.
+En Windows, por ahora, se compila desde el código (ver [Windows](#windows)).
 Más información en [dictamelo.com](https://dictamelo.com).
 
 ## Qué hace
@@ -66,13 +68,17 @@ src-tauri/
     autostart.rs         Inicio con el sistema
     file_transcription.rs Cola de archivos: subida directa o conversión local + tramos
     clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
-    platform/            TODO lo dependiente del SO: macos/ (completo) y windows/ (esqueleto)
+    platform/            TODO lo dependiente del SO: macos/ (AppKit, CoreAudio) y windows/ (Win32, Media Foundation)
     i18n.rs              Textos del menú de la barra, estados y errores (mismos 6 idiomas)
-    hotkey.rs, tray.rs, app_windows.rs, commands.rs, settings.rs, history.rs, secrets.rs, selftest.rs
+    secrets.rs           API keys en el Llavero / Administrador de credenciales (crate keyring)
+    hotkey.rs, tray.rs, app_windows.rs, commands.rs, settings.rs, history.rs, selftest.rs
+  tauri.windows.conf.json Ajustes del bundle que solo aplican en Windows (instalador NSIS por usuario)
 scripts/
-  build-release.sh       Compila .app + .dmg firmados con Developer ID
+  build-release.sh       Compila .app + .dmg firmados con Developer ID (macOS)
+  build-release.ps1      Compila el instalador NSIS (Windows)
   check_env.swift        Diagnóstico de permisos del proceso actual
   press_hotkey.swift     Simula mantener presionado el atajo (requiere Accesibilidad)
+  paste_target.swift/.ps1 Ventana destino para la prueba de pegado de extremo a extremo
 assets/make_icons.py     Genera el ícono de la app y los de la barra de menú
 ```
 
@@ -100,15 +106,40 @@ instrucciones predeterminadas están en `cleanup/mod.rs` (`DEFAULT_PROMPT`).
 
 La prueba `every_language_has_all_keys` avisa si queda alguna traducción vacía.
 
-### Portabilidad a Windows
+## Windows
 
-`src/platform/windows/mod.rs` ya expone la misma API que la implementación de macOS para que la app
-compile; falta implementar (y probar) el pegado (`SendInput` Ctrl+V), el portapapeles completo
-(`GetClipboardSequenceNumber` + todos los formatos), la ventana flotante sin foco, los sonidos, el
-monitor de Esc y la conversión local de audio (Media Foundation o ffmpeg; mientras tanto solo se
-transcriben archivos en formatos nativos del proveedor de hasta 24 MB). Atajo global,
-bandeja, audio (WASAPI vía cpal), Llavero (Credential Manager), red, historial y configuración ya
-son multiplataforma. **No se ha compilado ni probado en Windows.**
+La misma app, con `src/platform/windows/` como única parte dependiente del sistema (el resto del
+código es idéntico al de macOS):
+
+- **Pegado**: `SendInput` con Ctrl+V. Si el atajo sigue pulsado al pegar (duración máxima
+  alcanzada), sus modificadores se sueltan antes para que no llegue como Ctrl+Alt+Shift+V.
+- **Portapapeles**: instantánea de todos los formatos (texto, imágenes DIB, HTML, archivos,
+  formatos registrados por nombre…) y restauración fiel; `GetClipboardSequenceNumber` detecta si el
+  usuario copió algo mientras tanto. La restauración se marca para que el historial de Win+V no
+  duplique la entrada.
+- **Indicador flotante**: ventana `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` mostrada con
+  `SWP_NOACTIVATE`; nunca roba el foco ni aparece en Alt+Tab.
+- **Esc cancela**: un hilo sondea `GetAsyncKeyState(VK_ESCAPE)` cada 25 ms (sin hook global de
+  teclado, que Windows retira en silencio si el hilo tarda en atenderlo y que los antivirus miran
+  con recelo); no consume la tecla.
+- **Sonidos**: `PlaySound` con los sonidos de dictado de Windows (`Speech On/Off`), o el alias del
+  esquema de sonidos si no existen.
+- **Archivos de audio**: los formatos nativos del proveedor de hasta 24 MB se suben tal cual; el
+  resto (WMA, AAC, MP4/MOV, WAV grandes…) se convierte con **Media Foundation** a PCM mono (16 kHz
+  si el lector remuestrea) y, si dura más de 10 minutos, se parte en silencios como en macOS. AIFF y
+  CAF no tienen decodificador en Windows.
+- **Permisos**: no hay permiso de Accesibilidad; el micrófono se lee de los interruptores de
+  Configuración → Privacidad y seguridad → Micrófono (registro `CapabilityAccessManager`), y la
+  ventana ofrece abrir esa página si está bloqueado.
+- **Bandeja**: el ícono se hace cuadrado y, con la barra de tareas oscura, el trazo negro del ícono
+  de reposo se vuelve blanco. Los de color (grabando, transcribiendo…) se muestran tal cual.
+- **API keys**: Administrador de credenciales de Windows (mismo crate `keyring` que en macOS).
+- **Idioma**: el idioma de visualización de Windows (`GetUserPreferredUILanguages`).
+- **Inicio con el sistema**: clave `Run` del registro (plugin de autostart).
+
+Limitaciones conocidas: el pegado no llega a apps que corren como administrador (UIPI de Windows;
+el texto queda en el portapapeles), y el indicador no lleva desenfoque detrás (solo el fondo CSS
+translúcido).
 
 ## Compilar y ejecutar
 
@@ -120,6 +151,24 @@ npx tauri dev                    # ejecuta en modo desarrollo
 cd src-tauri && cargo test       # pruebas unitarias
 ./scripts/build-release.sh       # .app y .dmg firmados (usa el Developer ID del Llavero si existe)
 ```
+
+### En Windows
+
+Requisitos: Rust estable (`rustup`, host `*-pc-windows-msvc`), Node ≥ 18, Visual Studio Build Tools
+2022 con «Desarrollo para el escritorio con C++» y el Windows SDK, y el runtime de WebView2 (viene
+con Windows 11). Además, para la criptografía de `rustls` (`aws-lc-sys`): en **ARM64** el componente
+«C++ Clang Compiler for Windows» de Build Tools, y en **x64** NASM. Todo se puede instalar con
+`winget` (`Rustlang.Rustup`, `OpenJS.NodeJS.LTS`, `Microsoft.VisualStudio.2022.BuildTools`, `NASM.NASM`).
+
+```powershell
+npm install                                              # instala @tauri-apps/cli
+npx tauri dev                                            # ejecuta en modo desarrollo
+cd src-tauri; cargo test                                 # pruebas unitarias
+powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1   # instalador NSIS (por usuario)
+```
+
+El instalador queda en `src-tauri\target\release\bundle\nsis\`. En modo desarrollo la app abre una
+consola con el registro; el ejecutable de release no.
 
 Pruebas opcionales que tocan recursos reales:
 
@@ -141,6 +190,14 @@ La ventana de configuración muestra el estado de ambos permisos y tiene botones
 abrir el panel correcto. La app está firmada con Developer ID para que macOS mantenga los permisos
 entre versiones.
 
+## Permisos en Windows
+
+- **Micrófono**: Configuración → Privacidad y seguridad → Micrófono. Deben estar activados «Acceso
+  al micrófono» y «Permitir que las aplicaciones de escritorio accedan al micrófono». Si alguno está
+  apagado, la app lo muestra como denegado y ofrece abrir esa página.
+- **Accesibilidad**: no existe en Windows; el pegado (Ctrl+V) funciona sin permisos, salvo hacia
+  ventanas de apps que corren como administrador.
+
 ## Dónde guarda las cosas
 
 | Qué | Dónde |
@@ -150,5 +207,14 @@ entre versiones.
 | Historial | `~/Library/Application Support/com.dictamelo.desktop/history.json` |
 | Audio temporal | `~/Library/Caches/com.dictamelo.desktop/audio/` (se borra tras cada uso) |
 | Registros | `~/Library/Logs/com.dictamelo.desktop/dictado.log` |
+
+En Windows:
+
+| Qué | Dónde |
+| --- | --- |
+| API keys | Administrador de credenciales (credencial genérica `com.dictamelo.desktop`, usuario = id del proveedor) |
+| Configuración e historial | `%APPDATA%\com.dictamelo.desktop\settings.json` y `history.json` |
+| Audio temporal | `%LOCALAPPDATA%\com.dictamelo.desktop\audio\` (se borra tras cada uso) |
+| Registros | `%LOCALAPPDATA%\com.dictamelo.desktop\logs\dictamelo.log` |
 
 Las API keys nunca se escriben en archivos, en el repositorio ni en los registros.

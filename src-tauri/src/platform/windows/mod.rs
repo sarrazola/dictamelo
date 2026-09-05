@@ -1,80 +1,80 @@
-//! Esqueleto para Windows. Mantiene la misma API que `macos/` para que el resto de la app
-//! compile sin cambios. PENDIENTE (no implementado ni probado en esta versión):
-//! - `send_paste_keystroke`: `SendInput` con Ctrl+V.
-//! - Portapapeles con todos los formatos y `GetClipboardSequenceNumber`.
-//! - Ventana flotante sin foco (`SW_SHOWNOACTIVATE`, `WS_EX_NOACTIVATE`).
+//! Implementación Windows: `SendInput` (Ctrl+V), portapapeles Win32 con todos los formatos y
+//! `GetClipboardSequenceNumber`, ventana flotante sin activación, sonidos con `PlaySound`, sondeo
+//! de la tecla Esc, Media Foundation para convertir audio y el Administrador de credenciales
+//! (vía `keyring`) para las API keys.
 
-use super::{PermissionKind, PermissionState, PermissionsStatus, PlatformError};
-use crate::clipboard::ClipboardBackend;
-use tauri::WebviewWindow;
+mod audio_decode;
+mod clipboard;
+mod keyboard;
+mod locale;
+mod permissions;
+mod sound;
+mod tray_icon;
+mod window;
 
-pub fn permissions_status() -> PermissionsStatus {
-    // Windows no requiere permiso explícito de accesibilidad; el micrófono se gestiona en
-    // Configuración → Privacidad, y cpal falla si está bloqueado.
-    PermissionsStatus { microphone: PermissionState::NotApplicable, accessibility: PermissionState::NotApplicable }
+pub use audio_decode::decode_audio_to_wav;
+pub use clipboard::clipboard_backend;
+pub use keyboard::{install_cancel_key_monitor, press_hotkey_for_test, send_paste_keystroke};
+pub use locale::system_language;
+pub use permissions::{
+    open_permission_settings, permissions_status, request_accessibility_permission,
+    request_microphone_permission,
+};
+pub use sound::play_sound;
+pub use tray_icon::tray_icon;
+pub use window::{activate_app, configure_overlay_window, hide_window, refresh_window_shadow, show_window_without_focus};
+
+use windows::core::PCWSTR;
+use windows::Win32::Foundation::ERROR_SUCCESS;
+use windows::Win32::System::Registry::{RegGetValueW, HKEY, RRF_RT_REG_DWORD, RRF_RT_REG_SZ};
+
+/// Texto como UTF-16 terminado en NUL, para las APIs «W».
+fn wide(text: &str) -> Vec<u16> {
+    text.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-pub fn request_microphone_permission(on_result: Box<dyn FnOnce(bool) + Send + 'static>) {
-    on_result(true);
-}
-
-pub fn request_accessibility_permission() -> bool {
-    true
-}
-
-pub fn open_permission_settings(kind: PermissionKind) -> Result<(), PlatformError> {
-    let url = match kind {
-        PermissionKind::Microphone => "ms-settings:privacy-microphone",
-        PermissionKind::Accessibility => "ms-settings:privacy",
+/// Valor de texto (REG_SZ) del registro; `None` si no existe o no es texto.
+fn registry_string(root: HKEY, subkey: &str, value: &str) -> Option<String> {
+    let subkey = wide(subkey);
+    let value = wide(value);
+    let mut buf = [0u16; 256];
+    let mut size = (buf.len() * 2) as u32;
+    // SAFETY: búfer y tamaño coherentes; RegGetValueW garantiza el NUL final para REG_SZ.
+    let status = unsafe {
+        RegGetValueW(
+            root,
+            PCWSTR(subkey.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            Some(buf.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
     };
-    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| PlatformError::Other(e.to_string()))
+    if status != ERROR_SUCCESS {
+        return None;
+    }
+    let chars = (size as usize / 2).min(buf.len());
+    Some(String::from_utf16_lossy(&buf[..chars]).trim_end_matches('\0').to_string())
 }
 
-pub fn send_paste_keystroke() -> Result<(), PlatformError> {
-    Err(PlatformError::Unsupported("el pegado automático en Windows aún no está implementado".into()))
-}
-
-pub fn press_hotkey_for_test(_hotkey: &str, _hold: std::time::Duration) -> Result<(), PlatformError> {
-    Err(PlatformError::Unsupported("autodiagnóstico con atajo no implementado en esta plataforma".into()))
-}
-
-pub fn clipboard_backend() -> Box<dyn ClipboardBackend> {
-    Box::new(crate::clipboard::generic::ArboardClipboard)
-}
-
-pub fn configure_overlay_window(_window: &WebviewWindow) -> Result<(), PlatformError> {
-    Ok(())
-}
-
-pub fn show_window_without_focus(window: &WebviewWindow) -> Result<(), PlatformError> {
-    window.show().map_err(|e| PlatformError::Other(e.to_string()))
-}
-
-pub fn hide_window(window: &WebviewWindow) -> Result<(), PlatformError> {
-    window.hide().map_err(|e| PlatformError::Other(e.to_string()))
-}
-
-pub fn activate_app() {}
-
-pub fn refresh_window_shadow(_window: &WebviewWindow) {}
-
-/// Conversión de audio: pendiente (en Windows, Media Foundation o ffmpeg).
-pub fn decode_audio_to_wav(_input: &std::path::Path, _output: &std::path::Path) -> Result<(), PlatformError> {
-    Err(PlatformError::Unsupported("conversión de audio no implementada en esta plataforma".into()))
-}
-
-/// Esc para cancelar: pendiente (en Windows, un hook de teclado de bajo nivel).
-pub fn install_cancel_key_monitor(_on_escape: std::sync::Arc<dyn Fn() + Send + Sync>) {}
-
-/// Sonidos de aviso: pendiente (en Windows, `PlaySound` con los sonidos del sistema).
-pub fn play_sound(_app: &tauri::AppHandle, _kind: super::SoundKind) {}
-
-/// Idioma preferido del sistema, leído de las variables de entorno.
-pub fn system_language() -> String {
-    std::env::var("LC_ALL")
-        .or_else(|_| std::env::var("LANG"))
-        .ok()
-        .and_then(|v| v.split('.').next().map(str::to_string))
-        .filter(|v| !v.is_empty() && v != "C" && v != "POSIX")
-        .unwrap_or_else(|| "en".to_string())
+/// Valor numérico (REG_DWORD) del registro; `None` si no existe o no es un DWORD.
+fn registry_dword(root: HKEY, subkey: &str, value: &str) -> Option<u32> {
+    let subkey = wide(subkey);
+    let value = wide(value);
+    let mut data = 0u32;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    // SAFETY: `data` tiene exactamente `size` bytes.
+    let status = unsafe {
+        RegGetValueW(
+            root,
+            PCWSTR(subkey.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_DWORD,
+            None,
+            Some((&mut data as *mut u32).cast()),
+            Some(&mut size),
+        )
+    };
+    (status == ERROR_SUCCESS).then_some(data)
 }

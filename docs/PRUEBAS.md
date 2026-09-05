@@ -90,4 +90,53 @@ queda pendiente de hacerla a mano.**
 - Dictar con un micrófono físico hablando de verdad (las pruebas usaron audio sintetizado con `say`
   y el dispositivo virtual BlackHole).
 - Ver el texto aparecer en una app real (ver «Limitación de la verificación automática»).
-- Windows: solo existe el esqueleto de `platform/windows`, sin compilar ni probar.
+- Windows: solo existía el esqueleto de `platform/windows`; ver la sección siguiente.
+
+# Pruebas en Windows (Windows 11 ARM64 en una VM sobre Apple Silicon, 4 GB de RAM, 2026-09-05)
+
+Entorno: Rust 1.98 (`aarch64-pc-windows-msvc`), Node 24, VS Build Tools 2022 (C++ ARM64, SDK 26100 y
+el componente Clang, que `aws-lc-sys` exige en ARM64), WebView2 152. Al no existir `secrets.rs` en el
+repositorio (`.gitignore` lo excluía con `secrets*`), se reconstruyó a partir de su uso.
+
+## Automatizadas (`cargo test`, 29 pruebas, todas en verde)
+
+Las 24 de macOS más:
+
+| Área | Prueba | Qué verifica |
+| --- | --- | --- |
+| Portapapeles | `format_names_roundtrip` | Formatos estándar como `cf:N` y registrados por nombre; detección de formatos por handle |
+| Portapapeles | `snapshot_and_restore_roundtrip` (`DICTAMELO_CLIPBOARD_TESTS=1`, portapapeles real) | La instantánea guarda `cf:13` (texto Unicode), el número de secuencia sube al escribir y la restauración recupera el contenido previo |
+| Teclado | `maps_plugin_key_names_to_virtual_keys`, `key_events_carry_scan_codes` | Nombres del plugin → códigos virtuales; los eventos llevan código de escaneo y bandera extendida |
+| Bandeja | `tray_icons_become_square_and_keep_alpha` | El ícono queda cuadrado sin perder píxeles opacos |
+| Secretos | `roundtrip_in_system_store` (`DICTAMELO_KEYRING_TESTS=1`, Administrador de credenciales real) | Guardar, sobrescribir, leer y borrar (dos veces) una entrada |
+
+## Con recursos reales (binario de desarrollo, key de Groq en el Administrador de credenciales)
+
+| Prueba | Resultado |
+| --- | --- |
+| `DICTAMELO_SELFTEST_WAV` con una frase sintetizada por la voz TTS de Windows (16 kHz mono) y `scripts/paste_target.ps1` como ventana destino | Key leída del Administrador de credenciales, transcripción en 0,9–1,5 s, Ctrl+V sintético recibido por la ventana destino (104 caracteres, comprobado con el registro de teclas de la propia ventana), portapapeles previo restaurado, entrada en el historial, WAV temporal borrado |
+| Hallazgo durante esa prueba | Un Ctrl+V enviado solo con el código virtual no pega en un cuadro de texto de Windows, y con un Alt «colgado» en el hilo destino la ventana entra en modo de menú. Ahora los eventos llevan código de escaneo y antes de la V se sueltan Shift y Alt (y Win si está pulsado) |
+| `DICTAMELO_SELFTEST_HOTKEY_SECS=6` (Alt+Shift+Space sintético, micrófono real de la VM) | `RegisterHotKey` recibe la pulsación, grabación de 5,7 s a 48 kHz estéreo, liberación detectada, transcripción («.» con silencio) pegada y portapapeles restaurado. El indicador flotante se ve abajo al centro («Recording» con el nivel del micrófono) sin quitar el foco a la ventana destino |
+| Hallazgo durante esa prueba | WASAPI avisa de discontinuidades del búfer (`Xrun`) al arrancar la captura; antes se trataban como error fatal y la grabación fallaba. Ahora solo se registran como aviso (cambio en `recorder.rs`, sin efecto en macOS, donde no ocurren) |
+| `DICTAMELO_SELFTEST_ESC_AFTER_MS=2000` | «Grabación cancelada con Esc» a los 2 s, sin transcribir. El hook `WH_KEYBOARD_LL` de la primera versión no reaccionaba en esta VM; se sustituyó por un sondeo de `GetAsyncKeyState` cada 25 ms |
+| `DICTAMELO_SELFTEST_FILE` con un WAV de 27,9 MB / 14,5 min (150 frases numeradas con pausas) | Supera 24 MB → Media Foundation lo decodifica y remuestrea a 16 kHz mono → 2 tramos cortados en silencio → 3620 caracteres con las 150 frases en orden, 41 s en total, sin temporales |
+| `DICTAMELO_SELFTEST_FILE` con un WMA (127 KB) | Formato no nativo → Media Foundation → transcripción correcta en ~1 s |
+| `DICTAMELO_SELFTEST_FILE` con un M4A (161 KB) | Formato nativo → subida directa → transcripción correcta |
+| Limpieza con IA (`cleanupEnabled`, `autoPaste=false`, vocabulario «Andrés») | «Um, so, send the email to Andres on Thursday, no wait, on Friday, and, uh, …» → «Send the email to Andrés on Friday and tell him that the meeting is at 3.» en 0,5 s; el texto limpio queda en el portapapeles y otras apps lo leen |
+| Arranque normal | `api_key=true micrófono=Granted accesibilidad=NotApplicable`, ambas vistas web listas, sin ventana de configuración (nada que corregir), ícono en la bandeja |
+
+## Release e instalador
+
+`npx tauri build` (perfil release con LTO) tardó 7 min en la VM y produjo
+`src-tauri\target\release\dictamelo.exe` (10 MB, sin consola) y el instalador NSIS por usuario
+`src-tauri\target\release\bundle\nsis\Dictámelo_0.1.0_arm64-setup.exe` (2,8 MB), con la configuración de
+`tauri.windows.conf.json`. El ejecutable de release arranca igual que el de desarrollo (atajo registrado,
+`api_key=true`, ambas vistas web listas, 28 MB de RAM en reposo) y escribe su registro en
+`%LOCALAPPDATA%\com.dictamelo.desktop\logs\dictamelo.log`.
+
+## No probado en Windows
+
+- Dictar hablando de verdad (el micrófono de la VM solo entrega silencio o ruido).
+- Pegar en apps que corren como administrador (UIPI lo impide por diseño; el texto queda en el portapapeles).
+- Instalar con el `.exe` de NSIS en otro equipo (aquí se probó el ejecutable de release directamente).
+- Windows x64 (aquí solo hay ARM64): `aws-lc-sys` necesita NASM en x64.

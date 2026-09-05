@@ -2,7 +2,8 @@
 //!
 //! Cada plataforma expone la misma API (permisos, teclado, portapapeles, ventanas):
 //! - `macos/`   implementación completa y probada.
-//! - `windows/` esqueleto con la misma firma, pendiente de implementar y probar.
+//! - `windows/` implementación completa (Win32 + Media Foundation), probada en Windows 11.
+//! - `unsupported.rs` (Linux) funcionalidad mínima para que compile.
 //! El resto de la app nunca usa `#[cfg(target_os)]` directamente.
 
 use serde::{Deserialize, Serialize};
@@ -77,3 +78,10 @@ pub use windows::*;
 mod unsupported;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub use unsupported::*;
+
+/// Ícono de la bandeja a partir del PNG embebido. En macOS (y Linux) se usa tal cual: el de
+/// reposo es una plantilla que el sistema tiñe. Windows lo adapta en `windows::tray_icon`.
+#[cfg(not(target_os = "windows"))]
+pub fn tray_icon(bytes: &'static [u8]) -> tauri::image::Image<'static> {
+    tauri::image::Image::from_bytes(bytes).expect("los íconos PNG embebidos son válidos")
+}

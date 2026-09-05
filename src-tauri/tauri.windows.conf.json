@@ -1,0 +1,13 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "targets": ["nsis"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Spanish", "English", "PortugueseBR", "French", "German", "Italian"],
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

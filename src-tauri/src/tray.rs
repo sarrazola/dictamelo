@@ -135,7 +135,7 @@ fn icon_for(status: &Status) -> Image<'static> {
         Status::Pasting => include_bytes!("../icons/tray/pasting.png"),
         Status::Error { .. } => include_bytes!("../icons/tray/error.png"),
     };
-    Image::from_bytes(bytes).expect("los íconos PNG embebidos son válidos")
+    crate::platform::tray_icon(bytes)
 }
 
 /// Texto junto al ícono. Solo se muestra mientras hay algo en curso.

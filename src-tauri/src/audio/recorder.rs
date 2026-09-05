@@ -248,6 +248,12 @@ where
                 level.store(rms.to_bits(), Ordering::Relaxed);
             },
             move |err| {
+                // Una discontinuidad del búfer (xrun) es un pequeño salto en el audio, no el fin de la
+                // captura: WASAPI (Windows) la avisa con frecuencia al arrancar y el stream sigue vivo.
+                if matches!(err.kind(), cpal::ErrorKind::Xrun) {
+                    log::warn!("Aviso del stream de audio (se sigue grabando): {err}");
+                    return;
+                }
                 log::error!("Error en el stream de audio: {err}");
                 *error.lock().unwrap_or_else(|e| e.into_inner()) = Some(err.to_string());
             },

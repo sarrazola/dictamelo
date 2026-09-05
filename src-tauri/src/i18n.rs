@@ -99,6 +99,32 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
         "msg.nothing_retry" => pick(lang, ["No hay nada que reintentar", "Nothing to retry", "Nada para tentar novamente", "Rien à réessayer", "Nichts zu wiederholen", "Niente da riprovare"]),
 
         // --- Errores del flujo ---
+        // Variantes para Windows (Administrador de credenciales, Configuración, bandeja); en
+        // macOS estas claves siguen usando los textos de más abajo.
+        "err.keychain" if cfg!(target_os = "windows") => pick(lang, [
+            "No se pudo leer la API key del Administrador de credenciales: {e}",
+            "Could not read the API key from Credential Manager: {e}",
+            "Não foi possível ler a chave de API do Gerenciador de Credenciais: {e}",
+            "Impossible de lire la clé API du Gestionnaire d'informations d'identification : {e}",
+            "API-Schlüssel konnte nicht aus der Anmeldeinformationsverwaltung gelesen werden: {e}",
+            "Impossibile leggere l'API key da Gestione credenziali: {e}",
+        ]),
+        "err.mic_denied" if cfg!(target_os = "windows") => pick(lang, [
+            "Sin acceso al micrófono. Actívalo en Configuración → Privacidad y seguridad → Micrófono",
+            "No microphone access. Enable it in Settings → Privacy & security → Microphone",
+            "Sem acesso ao microfone. Ative em Configurações → Privacidade e segurança → Microfone",
+            "Pas d'accès au micro. Activez-le dans Paramètres → Confidentialité et sécurité → Microphone",
+            "Kein Mikrofonzugriff. Aktiviere ihn unter Einstellungen → Datenschutz und Sicherheit → Mikrofon",
+            "Nessun accesso al microfono. Attivalo in Impostazioni → Privacy e sicurezza → Microfono",
+        ]),
+        "err.retry_hint" if cfg!(target_os = "windows") => pick(lang, [
+            "{e}. Puedes reintentar desde el ícono de la bandeja.",
+            "{e}. You can retry from the tray icon.",
+            "{e}. Você pode tentar novamente pelo ícone da bandeja.",
+            "{e}. Vous pouvez réessayer depuis l'icône de la zone de notification.",
+            "{e}. Du kannst es über das Symbol im Infobereich erneut versuchen.",
+            "{e}. Puoi riprovare dall'icona nell'area di notifica.",
+        ]),
         "err.api_key_missing" => pick(lang, [
             "Configura tu API key de {p} en Configuración",
             "Set up your {p} API key in Settings",

@@ -52,7 +52,10 @@ const PERMISSION_KEY = {
 
 function t(key, vars) {
   const table = window.I18N[ui.lang] || window.I18N.en;
-  let text = table[key] ?? window.I18N.en[key] ?? key;
+  // Fuera de macOS, una clave con variante «.win» (Administrador de credenciales, nombres de
+  // teclas, formatos…) tiene prioridad; si no existe, se usa el texto común.
+  const platformKey = !isMac() && `${key}.win` in table ? `${key}.win` : key;
+  let text = table[platformKey] ?? window.I18N.en[platformKey] ?? table[key] ?? window.I18N.en[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, v);
   return text;
 }

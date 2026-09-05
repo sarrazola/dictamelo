@@ -3,7 +3,7 @@
 //! El flujo de pegado guarda una instantánea, escribe el texto, envía ⌘V y, si nadie más
 //! tocó el portapapeles mientras tanto (`change_count` no cambió), restaura la instantánea.
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub mod generic;
 
 #[derive(Debug, Clone, Default, PartialEq)]

@@ -9,3 +9,5 @@ scripts/paste_target
 .env.*
 *.key
 secrets*
+# El módulo de secretos sí es código fuente (el patrón anterior lo dejaba fuera del repositorio).
+!src-tauri/src/secrets.rs
