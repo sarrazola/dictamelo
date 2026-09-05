@@ -6,6 +6,8 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 [Website](https://dictamelo.com) · [Latest release](https://github.com/sarrazola/dictamelo/releases/latest) · [Release guide](docs/RELEASING.md) · [Testing](docs/TESTING.md)
 
+**0.2.0 release status:** the new free account and installers are being prepared in a draft release. Public email-code sign-in still requires production SMTP configuration. The current public release remains 0.1.2; the features below describe the 0.2.0 source. See [release status](docs/releases/0.2.0-status.md).
+
 ## Download
 
 Choose the installer for your computer from the [latest release](https://github.com/sarrazola/dictamelo/releases/latest):
