@@ -62,8 +62,11 @@ function Get-TargetArch([string]$Target) {
 
 # Not redirecting stderr on purpose: with ErrorActionPreference=Stop, `2>$null` on a native
 # executable turns any stderr line into an exception and the message below would be lost.
-gh release view $Tag --repo $Repo | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Release $Tag does not exist yet. Publish from macOS first." }
+$releaseInfo = gh release view $Tag --repo $Repo --json isDraft | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw "Release $Tag does not exist yet. Create a draft from macOS first." }
+if (-not $releaseInfo.isDraft -and -not $DryRun) {
+    throw 'Public release artifacts are immutable. Create a new version and upload to its draft.'
+}
 
 # ---------------------------------------------------------------------------
 # Build and stage one installer per target
@@ -169,10 +172,8 @@ foreach ($platform in $before) {
     if ($after -notcontains $platform) { throw "The merge dropped platform $platform" }
 }
 
-# ConvertTo-Json escapes every non-ASCII character; the release notes are written in Spanish, so
-# they are turned back into readable text. Both forms are valid JSON, this one is just readable.
+# Preserve JSON escaping; manually decoding Unicode escapes can corrupt quoted release notes.
 $json = ($manifest | ConvertTo-Json -Depth 10)
-$json = [regex]::Replace($json, '\\u([0-9a-fA-F]{4})', { param($m) [char][int]('0x' + $m.Groups[1].Value) })
 $manifestPath = Join-Path $Stage 'latest.json'
 [System.IO.File]::WriteAllText((Resolve-Path $Stage).Path + '\latest.json', $json + "`n", (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "    platforms: $($after -join ', ')"
@@ -204,15 +205,17 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not list the release assets' }
 foreach ($item in $built) {
     $entry = $published.platforms."windows-$($item.Arch)"
     if (-not $entry) { throw "The published latest.json has no windows-$($item.Arch)" }
+    if ($entry.signature -ne $item.Signature) { throw "Signature readback mismatch for windows-$($item.Arch)" }
     if ($entry.url -notlike "*/$($item.AssetName)") { throw "windows-$($item.Arch) does not point at $($item.AssetName)" }
     # And the file has to exist under that exact name: if GitHub had renamed it, the updater would
     # hit a 404 and nobody would notice until someone tried to update.
     $asset = $assets | Where-Object { $_.name -eq $item.AssetName }
     if (-not $asset) { throw "The release has no asset named $($item.AssetName)" }
+    if ($asset.size -ne $item.Bytes) { throw "Asset size mismatch for $($item.AssetName)" }
     Write-Host ("    windows-{0} -> {1} ({2:N0} bytes)" -f $item.Arch, $item.AssetName, $asset.size)
 }
 Write-Host "    latest.json $($published.version): $($published.platforms.PSObject.Properties.Name -join ', ')"
 
 Write-Host ''
-Write-Host 'Done. Installed Windows copies will see the update on their next check.'
-Write-Host 'Verify the signatures end to end with:  cd src-tauri; $env:DICTAMELO_LIVE_TESTS=1; cargo test published_release'
+Write-Host 'Done. The Windows artifacts and draft manifest are ready for final publication.'
+Write-Host 'After publication, verify the signatures end to end with:  cd src-tauri; $env:DICTAMELO_LIVE_TESTS=1; cargo test published_release'

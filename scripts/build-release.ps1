@@ -124,8 +124,8 @@ if ($crossBuild -and $vs) {
 
 if (-not (Test-Path 'node_modules\@tauri-apps\cli')) {
     Write-Host '==> Installing @tauri-apps/cli'
-    npm install --no-audit --no-fund
-    if ($LASTEXITCODE -ne 0) { throw 'npm install failed' }
+    npm ci --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
 }
 
 Write-Host '==> Building'

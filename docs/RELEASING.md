@@ -41,6 +41,8 @@ For email-code login, configure a production SMTP sender in the project's **Auth
 
 Required Edge Function secret: `GROQ_API_KEY`. Optional Pro safeguard: `MONTHLY_SECONDS` (default 72,000 seconds). The free allowance is 2,000 words in the migration functions. SQL functions and quota tables are server-only; do not grant authenticated clients access to the reservation/finish functions.
 
+Review and commit the tested application source, then push `main` before starting builds on other machines. Keep all build machines on that same application source and version. Later documentation-only verification records can be committed separately.
+
 ## 3. Build and verify macOS
 
 The Mac needs a valid **Developer ID Application** certificate and a `notarytool` keychain profile for its Apple Developer team. The existing build machine has profile `SnipHaloNotary` for team `2V4GNZ89F6`; the script's portable default profile name is `DictameloNotary`. Use the existing profile or create one with `xcrun notarytool store-credentials DictameloNotary` interactively. Do not put Apple passwords or private keys in the repository.
@@ -77,7 +79,13 @@ Dictamelo_0.2.1_aarch64-setup.exe
 Dictamelo_0.2.1_aarch64-setup.exe.sig
 ```
 
-A private/draft GitHub Release can transfer artifacts between machines (`gh release upload` / `gh release download`). Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The existing Windows publishing helper can append a platform to a draft/staged release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
+Create a draft to transfer artifacts between machines:
+
+```sh
+gh release create v0.2.1 --draft --target main --title "Dictámelo 0.2.1" --notes-file docs/releases/0.2.1.md
+```
+
+Use `gh release upload` / `gh release download` to transfer files. Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The Windows publishing helper refuses to overwrite public releases and can append a platform to a draft release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
 
 ## 5. Commit, stage, and publish
 
