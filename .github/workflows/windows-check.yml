@@ -1,0 +1,54 @@
+name: Windows x64 verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - 'ui/**'
+      - 'package*.json'
+      - '.github/workflows/windows-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install build prerequisites
+        shell: pwsh
+        run: |
+          choco install nasm --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NASM installation failed' }
+          Add-Content $env:GITHUB_PATH 'C:\Program Files\NASM'
+          rustup target add x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Rust target installation failed' }
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+      - name: Test on native x64 Windows
+        shell: pwsh
+        run: |
+          if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw 'This check requires native x64 Windows' }
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Rust tests failed' }
+      - name: Build an unsigned verification installer
+        shell: pwsh
+        run: |
+          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis --no-sign
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS build failed' }
+          $exe = 'src-tauri/target/x86_64-pc-windows-msvc/release/dictamelo.exe'
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path $exe))
+          $offset = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ([BitConverter]::ToUInt16($bytes, $offset + 4) -ne 0x8664) { throw 'App payload is not x64' }
+          Write-Output "Verified x64 PE payload: $exe"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-x64-verification-only
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+          retention-days: 7
+          if-no-files-found: error
