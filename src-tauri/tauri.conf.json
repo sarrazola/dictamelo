@@ -16,7 +16,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Productivity",
     "shortDescription": "Dictámelo: dictado por voz para cualquier aplicación",
     "longDescription": "Mantén presionado un atajo global, habla y suelta: la transcripción se pega donde estaba el cursor.",
@@ -31,8 +34,26 @@
       "minimumSystemVersion": "12.0",
       "entitlements": "Entitlements.plist",
       "dmg": {
-        "appPosition": { "x": 180, "y": 170 },
-        "applicationFolderPosition": { "x": 480, "y": 170 }
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        }
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/sarrazola/dictamelo/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBOTY3Njg2QUY2RkMyNjMKUldSandtK3ZobmFXdW1XNVdpNGlscUtzcjZZRnp1aWlmWjF5T0hIVk04eDY5TERaYlgreGJ6OFgK",
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

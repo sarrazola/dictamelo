@@ -233,6 +233,25 @@ pub fn retry_last_transcription(app: AppHandle) {
     tauri::async_runtime::spawn(async move { pipeline::retry_last(&app).await });
 }
 
+// ---------- Actualizaciones ----------
+
+#[tauri::command]
+pub async fn check_for_updates(app: AppHandle) -> Result<crate::updates::UpdateInfo, String> {
+    crate::updates::check(&app).await
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    crate::updates::install(&app).await
+}
+
+/// Reinicia para terminar de aplicar la actualización.
+#[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    log::info!("Reiniciando para aplicar la actualización");
+    app.restart();
+}
+
 // ---------- Licencia Pro ----------
 
 #[tauri::command]

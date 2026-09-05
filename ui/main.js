@@ -15,6 +15,7 @@ const ui = {
   page: "general",
   capturing: false,
   license: { active: false },
+  update: { available: false, installed: false, busy: false },
   deleteArmed: false,
 };
 
@@ -325,6 +326,57 @@ async function refreshKeyStatus() {
   $("#btn-delete-key").textContent = t("models.delete");
 }
 
+// ---------- Actualizaciones ----------
+
+function renderUpdate() {
+  const u = ui.update;
+  const status = $("#update-status");
+  const check = $("#btn-check-update");
+  const install = $("#btn-install-update");
+  const restart = $("#btn-restart");
+
+  $("#nav-update-dot").hidden = !u.available || u.installed;
+  $("#update-notes").hidden = !u.notes;
+  if (u.notes) $("#update-notes-text").textContent = u.notes;
+
+  check.hidden = u.available || u.busy;
+  check.disabled = u.busy;
+  install.hidden = !u.available || u.busy || u.installed;
+  restart.hidden = !u.installed;
+
+  if (u.installed) status.textContent = t("update.ready");
+  else if (u.busy && u.progress !== undefined) status.textContent = t("update.downloading", { p: u.progress });
+  else if (u.busy) status.textContent = t(u.available ? "update.installing" : "update.checking");
+  else if (u.available) status.textContent = t("update.available", { v: u.version });
+  else if (u.checked) status.textContent = t("update.uptodate");
+  else status.textContent = t("about.updates.desc");
+}
+
+function applyUpdateInfo(info) {
+  ui.update = {
+    ...ui.update,
+    available: info.available,
+    version: info.version,
+    notes: info.notes,
+    checked: true,
+    busy: false,
+    progress: undefined,
+  };
+  renderUpdate();
+}
+
+async function checkForUpdates(manual) {
+  ui.update.busy = true;
+  renderUpdate();
+  try {
+    applyUpdateInfo(await invoke("check_for_updates"));
+  } catch (err) {
+    ui.update.busy = false;
+    renderUpdate();
+    if (manual) toast(String(err), true);
+  }
+}
+
 // ---------- Plan y licencia ----------
 
 function renderPlan() {
@@ -355,6 +407,7 @@ async function refreshLicense() {
     ui.license = { active: false };
   }
   renderPlan();
+  renderUpdate();
 }
 
 // ---------- Archivos ----------
@@ -517,6 +570,7 @@ function renderAll() {
   renderAdvanced();
   renderAbout();
   renderPlan();
+  renderUpdate();
 }
 
 // ---------- Acciones ----------
@@ -730,6 +784,25 @@ function wireEvents() {
       toast(String(err), true);
     }
   });
+  $("#btn-check-update").addEventListener("click", () => checkForUpdates(true));
+  $("#btn-install-update").addEventListener("click", async () => {
+    ui.update.busy = true;
+    ui.update.progress = 0;
+    renderUpdate();
+    try {
+      await invoke("install_update");
+      ui.update = { ...ui.update, busy: false, installed: true, progress: undefined };
+      renderUpdate();
+      toast(t("toast.update_ready"));
+    } catch (err) {
+      ui.update.busy = false;
+      ui.update.progress = undefined;
+      renderUpdate();
+      toast(String(err), true);
+    }
+  });
+  $("#btn-restart").addEventListener("click", () => invoke("restart_app").catch((e) => toast(String(e), true)));
+
   $("#btn-get-pro").addEventListener("click", () =>
     invoke("open_checkout").catch((e) => toast(String(e), true)));
   $("#btn-activate-license").addEventListener("click", async () => {
@@ -808,6 +881,16 @@ async function init() {
   await listen("status", (e) => renderStatus(e.payload));
   await listen("history-changed", refreshHistory);
   await listen("file-jobs-changed", (e) => renderFileJobs(e.payload));
+  await listen("update-available", (e) => applyUpdateInfo(e.payload));
+  await listen("update-progress", (e) => {
+    const { downloaded, total } = e.payload || {};
+    if (total) {
+      ui.update.progress = Math.min(100, Math.round((downloaded / total) * 100));
+      $("#update-bar").hidden = false;
+      $("#update-bar").querySelector("i").style.width = `${ui.update.progress}%`;
+      renderUpdate();
+    }
+  });
   await listen("license-changed", (e) => {
     ui.license = e.payload;
     renderPlan();

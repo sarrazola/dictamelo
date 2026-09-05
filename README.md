@@ -48,6 +48,29 @@ Más información en [dictamelo.com](https://dictamelo.com).
   claro; API key inválida, límite de uso, micrófono ausente o sin permiso, falta de Accesibilidad
   (el texto queda copiado en el portapapeles) → mensaje en la barra, en el indicador y en la ventana.
 
+## Actualizaciones
+
+La app se actualiza sola desde GitHub Releases. Al abrirse consulta `latest.json` del último
+release, y si hay una versión nueva la ofrece en Acerca de con sus notas. Cada paquete va firmado
+con una llave privada que vive en el llavero; la app lleva incrustada la pública y **rechaza
+cualquier paquete cuya firma no cuadre**, así que ni un release manipulado ni un intermediario en la
+red podrían instalar código ajeno.
+
+Publicar una versión nueva es un comando:
+
+```bash
+./scripts/release.sh 0.2.0 "Lo que cambió en esta versión"
+```
+
+El script pone la versión en los tres manifiestos, compila y firma, arma `latest.json`, crea la
+etiqueta y sube a GitHub el `.dmg` (para instalar a mano), el `.app.tar.gz` con su firma (lo que
+consume el actualizador) y el propio `latest.json`. Si dejas los artefactos de Windows en
+`dist/windows/` (el `.exe` del instalador y su `.sig`), entran en el mismo `latest.json`.
+
+La llave de firma se generó una vez y está en el llavero bajo la cuenta `updater_private_key`.
+**Guarda una copia en un sitio seguro**: si se pierde, las apps ya instaladas dejarían de aceptar
+actualizaciones y habría que reinstalarlas a mano con una llave nueva.
+
 ## Planes
 
 | | Gratis | Pro |
@@ -111,6 +134,7 @@ src-tauri/
     cleanup/             Trait TextCleaner, instrucciones predeterminadas, cliente de chat, Groq (GPT-OSS)
     autostart.rs         Inicio con el sistema
     license.rs           Licencia Pro con Lemon Squeezy (activar, validar, desactivar)
+    updates.rs           Actualizaciones firmadas desde GitHub Releases
     transcription/dictamelo.rs  Transcripción por nuestro servidor cuando hay Pro
     cleanup/dictamelo.rs        Limpieza por nuestro servidor cuando hay Pro
 supabase/
@@ -125,7 +149,8 @@ supabase/
     hotkey.rs, tray.rs, app_windows.rs, commands.rs, settings.rs, history.rs, selftest.rs
   tauri.windows.conf.json Ajustes del bundle que solo aplican en Windows (instalador NSIS por usuario)
 scripts/
-  build-release.sh       Compila .app + .dmg firmados con Developer ID (macOS)
+  build-release.sh       Compila .app + .dmg firmados con Developer ID
+  release.sh             Publica una versión: firma, latest.json y GitHub Releases (macOS)
   build-release.ps1      Compila el instalador NSIS (Windows)
   check_env.swift        Diagnóstico de permisos del proceso actual
   press_hotkey.swift     Simula mantener presionado el atajo (requiere Accesibilidad)

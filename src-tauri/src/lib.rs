@@ -32,6 +32,7 @@ mod state;
 mod status;
 mod transcription;
 mod tray;
+mod updates;
 mod util;
 
 use tauri::{Manager, WindowEvent};
@@ -61,6 +62,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin({
             let autostart = tauri_plugin_autostart::Builder::new();
             // `macos_launcher` solo existe en macOS; en Windows el plugin usa la clave Run del registro.
@@ -79,6 +81,9 @@ pub fn run() {
             commands::activate_license,
             commands::deactivate_license,
             commands::open_checkout,
+            commands::check_for_updates,
+            commands::install_update,
+            commands::restart_app,
             commands::get_api_key_status,
             commands::set_api_key,
             commands::delete_api_key,
@@ -121,6 +126,8 @@ pub fn run() {
             tray::create(&handle)?;
             hotkey::apply_from_settings(&handle);
             autostart::sync_with_settings(&handle);
+            // Comprobación silenciosa de actualizaciones, sin estorbar el arranque.
+            updates::check_on_startup(&handle);
             // La licencia se comprueba aparte para no retrasar el arranque.
             let license_handle = handle.clone();
             tauri::async_runtime::spawn(async move {

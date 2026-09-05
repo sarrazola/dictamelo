@@ -60,6 +60,7 @@
           <circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r="1.1" fill="currentColor" stroke="none"/>
         </svg>
         <span data-i18n="nav.about"></span>
+        <span id="nav-update-dot" class="nav-dot" hidden></span>
       </button>
     </nav>
 
@@ -311,6 +312,21 @@
         <div id="about-perm-rows"></div>
       </div>
       <div class="card">
+        <div class="row stack">
+          <div class="update-row">
+            <div class="label"><strong data-i18n="about.updates"></strong><span id="update-status"></span></div>
+            <div class="actions">
+              <button id="btn-check-update" class="ghost" data-i18n="update.check"></button>
+              <button id="btn-install-update" class="primary" hidden data-i18n="update.install"></button>
+              <button id="btn-restart" class="primary" hidden data-i18n="update.restart"></button>
+            </div>
+          </div>
+          <div id="update-bar" class="progress" hidden><i></i></div>
+          <details id="update-notes" hidden>
+            <summary data-i18n="update.notes"></summary>
+            <pre id="update-notes-text"></pre>
+          </details>
+        </div>
         <div class="row">
           <div class="label"><strong data-i18n="about.logs"></strong><span data-i18n="about.logs.desc"></span></div>
           <div class="actions"><button id="btn-logs" class="ghost" data-i18n="about.openlogs"></button></div>
