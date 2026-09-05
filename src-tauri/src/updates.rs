@@ -112,20 +112,29 @@ mod tests {
     }
 }
 
-/// Comprueba en segundo plano poco después de arrancar y avisa a la interfaz si hay novedad.
-/// Nunca interrumpe: si no hay red o no hay releases, solo queda anotado en el registro.
+/// Cada cuánto se vuelve a mirar. Una app de barra de menú puede pasar semanas abierta,
+/// así que comprobar solo al arrancar dejaría a mucha gente en una versión vieja.
+const CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
+
+/// Comprueba en segundo plano poco después de arrancar y luego cada pocas horas, avisando a la
+/// interfaz si hay novedad. Nunca interrumpe: sin red o sin releases solo queda en el registro.
 pub fn check_on_startup(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         // Un respiro para no competir con el arranque ni con la comprobación de licencia.
         tokio::time::sleep(std::time::Duration::from_secs(8)).await;
-        match check(&app).await {
-            Ok(info) if info.available => {
-                log::info!("Hay una versión nueva disponible: {}", info.version.clone().unwrap_or_default());
-                let _ = app.emit("update-available", info);
+        loop {
+            match check(&app).await {
+                Ok(info) if info.available => {
+                    log::info!("Hay una versión nueva disponible: {}", info.version.clone().unwrap_or_default());
+                    let _ = app.emit("update-available", info);
+                    // Ya se avisó: no tiene sentido seguir preguntando hasta que reinicie.
+                    return;
+                }
+                Ok(_) => log::debug!("La app está al día"),
+                Err(e) => log::info!("No se pudo comprobar actualizaciones: {e}"),
             }
-            Ok(_) => log::debug!("La app está al día"),
-            Err(e) => log::info!("No se pudo comprobar actualizaciones: {e}"),
+            tokio::time::sleep(CHECK_EVERY).await;
         }
     });
 }
