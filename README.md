@@ -10,7 +10,7 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 ## Download
 
-Choose the installer for your computer from the [latest release](https://github.com/sarrazola/dictamelo/releases/latest):
+Installer filenames for **0.2.0**, currently in draft as explained above. The [current public release](https://github.com/sarrazola/dictamelo/releases/latest) is 0.1.2 and includes only Apple Silicon and Windows ARM64:
 
 | Computer | Installer |
 | --- | --- |
