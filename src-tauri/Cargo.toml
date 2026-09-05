@@ -1,6 +1,6 @@
 [package]
 name = "dictamelo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Dictámelo: dictado por voz. Mantén presionado un atajo, habla y el texto aparece donde estaba el cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"
