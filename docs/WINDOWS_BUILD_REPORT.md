@@ -15,9 +15,9 @@ the final `latest.json` are handled elsewhere.
 | Assembler | NASM 2.16 (`winget install NASM.NASM`), installed per-user in `%LOCALAPPDATA%\bin\NASM` |
 | Other | WebView2 152, GitHub CLI 2.100, Python 3.13 |
 
-**There is no physical Intel/AMD machine here.** Everything labelled x64 below was produced by
-cross-compiling and exercised under the ARM64 x64 emulation layer. See *Emulation* for how far
-that evidence goes.
+**There is no physical Intel/AMD machine here.** Local x64 builds were cross-compiled; the draft's
+x64 installer was built on a native CI runner. All x64 execution on this VM uses ARM64 emulation.
+See *Emulation* for how far that evidence goes.
 
 ## Toolchain prerequisites, by target
 
@@ -110,7 +110,7 @@ draft with `gh`, that is the one built by the native CI runner, not the copy cro
 | `DICTAMELO_SELFTEST_WAV`, transcription | 104 characters in 1.0 s | 104 characters in 0.9 s |
 | Paste into a real window | not captured | `scripts\paste_target.ps1` logged `Ctrl` down, `V` down, `text len=104` |
 | Clipboard restored | yes | yes, byte-identical to the marker set before the run |
-| `DICTAMELO_SELFTEST_HOTKEY_SECS=6`, microphone | 5.7 s captured | 4.89 s captured |
+| `DICTAMELO_SELFTEST_HOTKEY_SECS=6`, microphone | Historical 0.1.2 result: 5.7 s captured; not repeated for 0.2.0 | 4.89 s captured on 0.2.0 |
 | Capture device | `Microphone (High Definition Audio Device)`, 48 kHz, 2 channels, F32 | same |
 
 On the x64 run the global hotkey (`RegisterHotKey`) received its synthetic press and release,
@@ -125,9 +125,9 @@ delivers samples for the whole hold, and the pipeline carries them through trans
 paste. It does **not** prove audio quality, gain, or that a real voice transcribes correctly on
 x64 hardware.
 
-Recording duration is also shorter than the hold on both builds (4.89 s and 5.7 s of a 6.0 s
-synthetic hold), which is stream start-up latency plus the modifier press/release steps of the
-self-test; single samples on a loaded 2-CPU VM, not a measurement worth drawing conclusions from.
+Recording duration was shorter than the 6.0 s hold: 4.89 s on the current x64 build and 5.7 s in
+the historical ARM64 test. Stream start-up and the self-test's modifier steps may contribute;
+these individual runs on a loaded 2-CPU VM do not establish the cause or typical latency.
 
 ## Script guards (validated at `df0b29c`)
 
