@@ -104,6 +104,29 @@ release is a draft.
 1.0 s (104 characters), pasted with `Ctrl+V`, and the previous clipboard contents restored intact.
 The dictation pipeline still works end to end on Windows in 0.2.0.
 
+## Script guards (validated at `df0b29c`)
+
+| Check | Result |
+| --- | --- |
+| PowerShell syntax of both scripts, tokenizer and AST parser | No errors. Both files keep their UTF-8 BOM, which PowerShell 5.1 needs to read the accented characters correctly. |
+| `release-windows.ps1 0.2.0 -SkipBuild -AssetsOnly -DryRun` | Staged both installers and both `.exe.sig` files into `dist\v0.2.0-windows`, uploaded nothing. Draft assets byte-for-byte identical before and after. |
+| `release-windows.ps1 0.1.2 -AssetsOnly` against the **public** v0.1.2 | Refused in 3.2 s with *"Public release artifacts are immutable. Create a new version and upload to its draft."* No compiler ran, no local bundle was touched, and the four v0.1.2 assets were unchanged. |
+| `release-windows.ps1 9.9.9 -SkipBuild -AssetsOnly` | *"Release v9.9.9 does not exist yet. Create a draft from macOS first."* |
+
+`npm ci` needs `package-lock.json`, which is committed, so the build path is unaffected.
+
+**One sharp edge worth knowing.** `-Targets` defaults to *both* architectures, so a plain
+`-AssetsOnly` run from this machine stages the locally cross-compiled x64 installer and would
+replace the CI-built `Dictamelo_0.2.0_x86_64-setup.exe` in the draft (3,615,197 B against the CI
+build's 3,616,318 B — different bytes, both valid and correctly signed). While the published x64
+artifact comes from the native runner, pass the target explicitly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.2.0 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
+```
+
+That is how the ARM64 pair was uploaded; the x86_64 assets were left untouched.
+
 ## Emulation: what the x64 evidence is worth
 
 `IsWow64Process2` reports `processMachine = IMAGE_FILE_MACHINE_UNKNOWN` for these processes, which
