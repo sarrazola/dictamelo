@@ -60,3 +60,7 @@ Record exact versions, architectures, and results for future releases. Do not tr
 ### Live free-account backend verification
 
 A temporary account redeemed an email OTP generated through the Auth admin test API (no email sent), fetched zero initial usage, transcribed synthesized speech through the real hosted free endpoint, and recorded 11 words. After exhausting only that test account's allowance, another request returned HTTP 429. Missing/invalid authentication and direct client quota access were rejected. Refresh-token rotation succeeded. The temporary account and its usage were removed. Actual SMTP inbox delivery is a separate check.
+
+### Clean checkout and final macOS updater archive
+
+A fresh archive of tracked source at `28160ef` passed `npm ci` and `cargo check --locked`. The final macOS updater archive was extracted into a fresh temporary directory; the extracted app passed strict code-signature, stapler, and Gatekeeper verification. All new account labels are present in all six interface languages.

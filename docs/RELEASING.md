@@ -29,6 +29,10 @@ supabase db query --linked --file supabase/tests/free_quota.sql
 supabase functions deploy transcribe cleanup usage --project-ref iburiyhhfodndqgmsaot
 ```
 
+For a repeatable hosted test on macOS with Python `requests` installed, run `python3 scripts/verify-free-backend.py --live`. It creates its own temporary account, redeems an admin-generated email code without sending a message, transcribes one short synthesized recording, verifies quota/auth/refresh behavior, and removes that account. This incurs one small provider request.
+
+The manually triggered **Windows x64 verification** GitHub Actions workflow runs tests and builds an unsigned installer on a native x64 Windows runner. Its artifact is for verification only; release installers still need the existing Tauri signing key. Trigger it with `gh workflow run windows-check.yml --ref main`.
+
 Deploy compatible schema before dependent functions, and functions before distributing clients. The quota SQL test rolls back its temporary account and usage. Verify invalid authentication, real free transcription, word accounting, quota exhaustion, session refresh, and existing Pro requests. Use a temporary test account, never a customer's account.
 
 For email-code login, configure a production SMTP sender in the project's **Authentication → Email → SMTP settings**. Supabase's default email service does not deliver to arbitrary users. Both Magic Link and Confirmation templates must include `{{ .Token }}`; their source is `supabase/templates/sign-in.html`. Keep email confirmations enabled. Verify actual delivery and code redemption with your own mailbox before announcing the free plan.
