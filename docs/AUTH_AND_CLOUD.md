@@ -68,6 +68,8 @@ Apply compatible migrations before deploying dependent Edge Functions. Quota tab
 
 The preview supports account creation with email and password, ordinary password login, account confirmation and password recovery. Tokens are used for confirmation/recovery, not as the normal sign-in method. Passwords are sent to Supabase Auth; session tokens use the operating system credential store.
 
+The 0.3.1 credential store uses a release runtime namespace and a separate debug namespace. Release builds can silently migrate accessible legacy entries; debug builds cannot read or migrate the installed app's credentials. See [Local credentials](LOCAL_CREDENTIALS.md) for caching, denied-access recovery and logout deletion markers.
+
 Keep email confirmations enabled. Live readback confirmed that setting and both confirmation/recovery token templates; SMTP currently has no host configured. Configure a production transactional sender in Supabase Auth's SMTP settings. Supabase manages identity and authentication; the SMTP provider delivers the messages. Changing the login screen to use a password does not remove confirmation and recovery email requirements.
 
 Confirmation and recovery templates must show `{{ .Token }}` so the user can enter the code in the app. Do not replace normal password login with magic-link-only wording. Preserve any required legacy template behavior for existing draft clients while they remain in use.
@@ -78,13 +80,15 @@ The live Auth API contract passed confirmation, replay rejection, password login
 
 ## Google sign-in
 
-Use the user-selected Google Cloud project and configure an OAuth **Web application** client for Supabase. The Google callback is:
+The official deployment now uses an OAuth **Web application** client in the user-selected **Megacubos** Google Cloud project, `ardent-particle-507721-s2`. Required Google terms were accepted with the user's authorization. The provider is enabled in the correct Supabase project, `iburiyhhfodndqgmsaot`. The Google callback is:
 
 ```text
 https://iburiyhhfodndqgmsaot.supabase.co/auth/v1/callback
 ```
 
 For a self-hosted deployment, substitute its actual Supabase project callback. Store the Google client secret in Supabase Auth's Google provider configuration. The desktop app starts OAuth through Supabase, so it needs neither a Google client secret nor a direct Google client ID in its executable.
+
+The configured client secret was checked through masked provider readback. Temporary credential downloads were cleaned after the server transfer; the secret was not added to desktop configuration or source files.
 
 The native client opens the system browser and uses PKCE. Its temporary loopback listener uses an ephemeral port and a nonce path. The matching Supabase redirect allowlist entry is:
 
@@ -94,7 +98,11 @@ http://127.0.0.1:*/auth/callback/**
 
 Do not expand this to arbitrary remote hosts. Request only identity scopes (`openid`, email and profile). Check Google consent-screen branding, audience/test-user restrictions and publishing status before claiming general availability. A configured button is not proof that browser sign-in returns to the installed app.
 
-Verify sign-in with an owned Google account, correct account display, cancellation, timeout, an invalid callback, session persistence and sign-out. The redirect allowlist above is present in the live Supabase configuration. Google sign-in is still disabled pending completion of Google Cloud setup/terms and a complete live return-to-app test.
+The redirect allowlist above is present in the live Supabase configuration. An owned account added as a Google test user completed the installed 0.3.1 candidate's browser → Supabase → native PKCE callback flow. The app displayed the correct account and 0/2,000-word usage. Quitting and reopening preserved the session without a Keychain prompt. This is real native verification, not a mock or admin-generated token test; it does not establish cancellation/timeout behavior or general Google availability.
+
+Google's audience remains **Testing**. Production publishing is disabled while branding is incomplete. The current `dictamelo.com` HTTP 200 response leads to a parked/lander page through JavaScript, so it is not a verified product homepage or privacy policy. The maintainer must supply the actual homepage and privacy-policy URLs before completing production branding. Do not invent a policy or treat a successful HTTP status as sufficient. Production Google publication is separate from configuring Supabase and allowing a test account.
+
+Google's [branding requirements](https://support.google.com/cloud/answer/15549049?hl=en) also require public terms of service for external production apps. Complete the homepage, privacy-policy and terms links, register the domains used in branding/client configuration, and verify the owned brand before public rollout. The current test login requests only name/profile and email identity information; it does not grant Gmail inbox access.
 
 ## Seven-day Pro trial
 
@@ -104,4 +112,4 @@ Do not infer trial entitlement from a success screen or an unverified client fla
 
 ## Deployment, preview and publication are separate
 
-Deploying the backend changes the hosted service. Building/installing a Mac preview changes the local application. Publishing a GitHub release makes installers and an updater manifest public. This iteration built, notarized and locally installed the 0.3.0 Mac preview; it does not publish a release, modify the public 0.1.2 assets or replace the 0.2.0 draft installers.
+Deploying the backend changes the hosted service. Building/installing a Mac preview changes the local application. Publishing a GitHub release makes installers and an updater manifest public. The final 0.3.1 preview has been notarized, installed and verified locally, including the native application-menu update action and retained Google session. Google production publication and real SMTP delivery are additional external steps. This iteration does not publish a release, modify public 0.1.2 assets or replace the 0.2.0 draft installers. The [0.3.0 record](releases/0.3.0.md) remains historical evidence of its own checks and pending setup at that time.

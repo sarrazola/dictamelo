@@ -1043,7 +1043,7 @@ dependencies = [
 
 [[package]]
 name = "dictamelo"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "arboard",
@@ -1063,6 +1063,7 @@ dependencies = [
  "objc2-av-foundation",
  "objc2-foundation",
  "reqwest",
+ "security-framework",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1079,6 +1080,7 @@ dependencies = [
  "uuid",
  "window-vibrancy",
  "windows 0.62.2",
+ "zeroize",
 ]
 
 [[package]]

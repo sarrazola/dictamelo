@@ -368,8 +368,9 @@ function renderUpdate() {
   restart.hidden = !u.installed;
 
   if (u.installed) status.textContent = t("update.ready");
+  else if (u.error) status.textContent = u.error;
   else if (u.busy && u.progress !== undefined) status.textContent = t("update.downloading", { p: u.progress });
-  else if (u.busy) status.textContent = t(u.available ? "update.installing" : "update.checking");
+  else if (u.busy) status.textContent = t(u.checking ? "update.checking" : "update.installing");
   else if (u.available) status.textContent = t("update.available", { v: u.version });
   else if (u.checked) status.textContent = t("update.uptodate");
   else status.textContent = t("about.updates.desc");
@@ -383,21 +384,35 @@ function applyUpdateInfo(info) {
     notes: info.notes,
     checked: true,
     busy: false,
+    checking: false,
+    error: null,
     progress: undefined,
   };
   renderUpdate();
 }
 
 async function checkForUpdates(manual) {
+  if (ui.update.busy || ui.update.installed) return;
   ui.update.busy = true;
+  ui.update.checking = true;
+  ui.update.error = null;
   renderUpdate();
   try {
     applyUpdateInfo(await invoke("check_for_updates"));
   } catch (err) {
     ui.update.busy = false;
+    ui.update.checking = false;
+    ui.update.error = String(err);
     renderUpdate();
     if (manual) toast(String(err), true);
   }
+}
+
+function openUpdateCheck() {
+  if ($("#onboarding-dialog").open) closeOnboarding();
+  showPage("about");
+  checkForUpdates(true);
+  $("#update-status").closest(".card").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 // ---------- Plan y licencia ----------
@@ -980,6 +995,8 @@ function wireEvents() {
   $("#btn-check-update").addEventListener("click", () => checkForUpdates(true));
   $("#btn-install-update").addEventListener("click", async () => {
     ui.update.busy = true;
+    ui.update.checking = false;
+    ui.update.error = null;
     ui.update.progress = 0;
     renderUpdate();
     try {
@@ -1170,6 +1187,8 @@ async function init() {
 
   renderAll();
   wireEvents();
+  // Register menu navigation before slower account/license refreshes finish.
+  await listen("check-for-updates-requested", openUpdateCheck);
   await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs(), refreshLicense(), refreshAccount()]);
   renderStatus(await invoke("get_status"));
 

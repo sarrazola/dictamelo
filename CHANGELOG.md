@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — Mac preview, not published
+
+See [preview notes](docs/releases/0.3.1.md) and the [verification record](docs/TESTING.md).
+
+- Cache runtime credentials and prevent interactive macOS Keychain requests. Add a separate runtime namespace, silent legacy migration, deletion markers and debug-build isolation while retaining OS-backed storage.
+- Configure Google OAuth through Supabase and verify sign-in, account usage and session persistence in an installed candidate. Google remains limited to permitted test users until production branding and website requirements are completed.
+- Add **Check for Updates…** to the tray and native Mac application menu, opening the existing update screen without automatically installing anything. Verify the native application-menu action in the final installed, notarized preview.
+- Pass 55 Rust tests, including synthetic native Keychain persistence/update/deletion and debug isolation, plus strict Clippy. Production SMTP and the proposed seven-day trial remain pending.
+- Keep this iteration Mac-only; public 0.1.2 and draft 0.2.0 assets and updater manifests remain unchanged.
+
 ## 0.3.0 — Mac preview, not published
 
 See [preview notes](docs/releases/0.3.0.md) and the [verification record](docs/TESTING.md).

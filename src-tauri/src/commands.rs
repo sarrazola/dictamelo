@@ -87,6 +87,7 @@ pub struct ApiKeyStatus {
 
 #[tauri::command]
 pub fn get_api_key_status(state: State<'_, AppState>, provider: String) -> Result<ApiKeyStatus, String> {
+    state.providers.get(&provider).ok_or_else(|| format!("Proveedor desconocido: {provider}"))?;
     match state.secrets.get(&provider).map_err(|e| e.to_string())? {
         Some(key) if !key.trim().is_empty() => {
             let key = key.trim();
@@ -115,6 +116,7 @@ pub fn set_api_key(state: State<'_, AppState>, provider: String, api_key: String
 
 #[tauri::command]
 pub fn delete_api_key(state: State<'_, AppState>, provider: String) -> Result<(), String> {
+    state.providers.get(&provider).ok_or_else(|| format!("Proveedor desconocido: {provider}"))?;
     state.secrets.delete(&provider).map_err(|e| format!("No se pudo eliminar del llavero: {e}"))?;
     log::info!("API key de {provider} eliminada del llavero");
     Ok(())

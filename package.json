@@ -1,6 +1,6 @@
 {
   "name": "dictamelo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Voice dictation for macOS and Windows",
   "scripts": {
     "dev": "tauri dev",

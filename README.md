@@ -4,9 +4,9 @@
 
 Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, and release: the text appears at your cursor. Built with Rust and Tauri 2, with a small HTML/CSS/JavaScript interface.
 
-[Website](https://dictamelo.com) · [Latest public release](https://github.com/sarrazola/dictamelo/releases/latest) · [Release guide](docs/RELEASING.md) · [Testing](docs/TESTING.md)
+[Latest public release](https://github.com/sarrazola/dictamelo/releases/latest) · [Release guide](docs/RELEASING.md) · [Testing](docs/TESTING.md)
 
-**0.3.0 is a built and locally installed Mac preview.** Its app and DMG are signed, notarized and stapled. It adds clearer plans, email/password account flows and a repeatable onboarding wizard. Google login is implemented but its live setup/test, production email delivery and the proposed Pro trial remain pending. See [preview notes](docs/releases/0.3.0.md). The public release remains **0.1.2**; the verified **0.2.0** installers remain in draft. This iteration does not replace those assets or produce new Windows installers.
+**0.3.1 is a built and locally installed Mac preview.** The final app and DMG are signed, notarized and stapled. Google sign-in and restart persistence passed without a Keychain prompt, and the native application-menu update action was verified. Google remains restricted to permitted test users; production email delivery and the proposed Pro trial are pending. See [preview notes](docs/releases/0.3.1.md). The public release remains **0.1.2**; the verified **0.2.0** installers remain in draft. This iteration does not replace those assets or produce new Windows installers.
 
 ## Download and install
 
@@ -14,19 +14,19 @@ Use the [latest public release](https://github.com/sarrazola/dictamelo/releases/
 
 | Computer | Installer naming | Current distribution |
 | --- | --- | --- |
-| Apple Silicon Mac, macOS 12 or later | `Dictamelo_<version>_aarch64.dmg` | 0.1.2 public; 0.2.0 draft; 0.3.0 verified local preview |
+| Apple Silicon Mac, macOS 12 or later | `Dictamelo_<version>_aarch64.dmg` | 0.1.2 public; 0.2.0 draft; 0.3.1 verified local preview |
 | Windows 10/11, Intel or AMD 64-bit | `Dictamelo_<version>_x86_64-setup.exe` | 0.2.0 draft; no new build in this iteration |
 | Windows 11 on ARM | `Dictamelo_<version>_aarch64-setup.exe` | 0.1.2 public; 0.2.0 draft |
 
 On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
-The 0.3.0 Mac preview app and DMG passed Developer ID, Apple notarization, stapling and Gatekeeper checks, including the mounted and installed app. It was installed locally from the verified DMG; it is not a public GitHub release. Historical 0.1.x Mac installers were signed but not notarized. Windows updater signatures are separate from Microsoft Authenticode; the existing Windows installers have no Authenticode certificate. See the [verification record](docs/TESTING.md) for exact results.
+The final 0.3.1 Mac preview passed Developer ID, Apple notarization, stapling and Gatekeeper checks. Its installed executable matches the app in the read-only DMG, and the signed updater archive was verified independently. Local previews are not public GitHub releases. Historical 0.1.x Mac installers were signed but not notarized. Windows updater signatures are separate from Microsoft Authenticode; the existing Windows installers have no Authenticode certificate. See the [verification record](docs/TESTING.md) for exact results.
 
 ## Start dictating in the preview
 
 1. Open **Onboarding** to choose your own API keys, Free Cloud or Pro. The button is deliberately visible while the wizard is being tested; reopening it lets you review your choices.
 2. For personal keys, select Groq or OpenAI in **Models** and enter your key. No Dictámelo account is needed.
-3. In a cloud-configured build, **Create free account** uses email/password, with email confirmation; existing users can sign in with their password. **Continue with Google** opens the system browser when the Google provider is configured. Password/confirmation/recovery API checks passed with a temporary test account; actual mailbox delivery and a complete Google return-to-app test remain pending.
+3. In a cloud-configured build, **Create free account** uses email/password, with email confirmation; existing users can sign in with their password. **Continue with Google** opens the system browser. Installed 0.3.1 passed Google sign-in and restart persistence with an allowed test user; Google's audience is still in Testing. Password/confirmation/recovery API checks passed separately, but actual mailbox delivery remains pending.
 4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release to paste.
 5. Free Cloud usage appears in **Plan**, with words used, words remaining and the next renewal time. Existing Pro customers can still activate their Lemon Squeezy license.
 
@@ -68,7 +68,9 @@ This repository contains the real application used to build the official edition
 
 Free/Pro audio travels through the configured backend to Groq. Personal-key mode sends it to the selected provider. Temporary audio is removed after use and history stays local. The backend records account/license usage metadata, not audio or transcript contents. Supabase Auth manages the account. Provider retention policies still apply.
 
-Session tokens, license keys and personal keys use macOS Keychain or Windows Credential Manager. Public Supabase URLs, anon/publishable keys, Google client IDs and checkout identifiers are not provider secrets. Google client secrets, SMTP credentials, service-role keys and hosted provider keys belong on the server, never in app bundles or source control. A private deployment repository can be useful for operations, but is not required to make public login code safe.
+Session tokens, license keys and personal keys use macOS Keychain or Windows Credential Manager. The 0.3.1 Mac implementation caches runtime credentials and performs noninteractive Keychain access; debug builds use a separate namespace. An inaccessible old credential asks for re-entry in the app. Keys are not moved into unencrypted SQLite or JSON. See [Local credentials](docs/LOCAL_CREDENTIALS.md) for migration behavior.
+
+Public Supabase URLs, anon/publishable keys, Google client IDs and checkout identifiers are not provider secrets. Google client secrets, SMTP credentials, service-role keys and hosted provider keys belong on the server, never in app bundles or source control. A private deployment repository can be useful for operations, but is not required to make public login code safe.
 
 ## Development
 
@@ -115,7 +117,7 @@ To add a provider, implement `TranscriptionProvider` or `TextCleaner` and regist
 
 ## Releasing a new version
 
-Follow **[docs/RELEASING.md](docs/RELEASING.md)** for versions, English documentation, backend compatibility, signing, notarization and artifact checks. The current 0.3.0 task is a local Mac preview: do not run the full publication script or change the existing release assets for it.
+Follow **[docs/RELEASING.md](docs/RELEASING.md)** for versions, English documentation, backend compatibility, signing, notarization and artifact checks. The current 0.3.1 task is a local Mac preview: do not run the full publication script or change the existing release assets for it.
 
 `AGENTS.md` carries maintenance rules for coding assistants. `.gitignore` excludes private/generated files; it does not replace release instructions. Installers belong in **GitHub Releases**, not source commits.
 

@@ -56,6 +56,10 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Tieni premuto {k} e parla",
         ]),
         "tray.settings" => pick(lang, ["Configuración…", "Settings…", "Configurações…", "Réglages…", "Einstellungen…", "Impostazioni…"]),
+        "tray.check_updates" => pick(lang, [
+            "Buscar actualizaciones…", "Check for Updates…", "Buscar atualizações…",
+            "Rechercher des mises à jour…", "Nach Updates suchen…", "Cerca aggiornamenti…",
+        ]),
         "tray.retry" => pick(lang, [
             "Reintentar última transcripción",
             "Retry last transcription",
@@ -417,7 +421,7 @@ mod tests {
     #[test]
     fn every_language_has_all_keys() {
         // Comprueba que ninguna traducción quedó vacía.
-        for key in ["status.idle", "tray.quit", "msg.pasted", "err.ax_denied", "tr.timeout"] {
+        for key in ["status.idle", "tray.quit", "tray.check_updates", "msg.pasted", "err.ax_denied", "tr.timeout"] {
             for lang in LANGS {
                 assert!(!t(lang, key).is_empty(), "{lang}/{key} vacío");
             }

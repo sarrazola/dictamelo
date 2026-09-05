@@ -16,6 +16,8 @@ pub struct TrayHandles {
     hint_item: MenuItem<Wry>,
     open_item: MenuItem<Wry>,
     retry_item: MenuItem<Wry>,
+    #[cfg(target_os = "macos")]
+    update_item: MenuItem<Wry>,
     autopaste_item: CheckMenuItem<Wry>,
     quit_item: MenuItem<Wry>,
 }
@@ -34,6 +36,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     )?;
     let open_item = MenuItem::with_id(app, "open", t(&lang, "tray.settings"), true, None::<&str>)?;
     let retry_item = MenuItem::with_id(app, "retry", t(&lang, "tray.retry"), false, None::<&str>)?;
+    #[cfg(target_os = "macos")]
+    let update_item = MenuItem::with_id(app, "check-updates", t(&lang, "tray.check_updates"), true, None::<&str>)?;
     let autopaste_item =
         CheckMenuItem::with_id(app, "autopaste", t(&lang, "tray.autopaste"), true, settings.auto_paste, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", t(&lang, "tray.quit"), true, None::<&str>)?;
@@ -45,12 +49,17 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &hint_item,
             &PredefinedMenuItem::separator(app)?,
             &open_item,
+            #[cfg(target_os = "macos")]
+            &update_item,
             &retry_item,
             &autopaste_item,
             &PredefinedMenuItem::separator(app)?,
             &quit_item,
         ],
     )?;
+
+    #[cfg(target_os = "macos")]
+    add_update_to_app_menu(app, &update_item)?;
 
     let tray = TrayIconBuilder::with_id("main")
         .icon(icon_for(&Status::Idle))
@@ -61,13 +70,48 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| handle_menu(app, event.id().as_ref()))
         .build(app)?;
 
-    app.manage(TrayHandles { tray, status_item, hint_item, open_item, retry_item, autopaste_item, quit_item });
+    app.manage(TrayHandles {
+        tray, status_item, hint_item, open_item, retry_item, autopaste_item, quit_item,
+        #[cfg(target_os = "macos")]
+        update_item,
+    });
+    Ok(())
+}
+
+/// Tauri's default macOS menu starts with the app submenu. Share the same item
+/// with the tray so its ID, enabled state and translated label remain synchronized.
+#[cfg(target_os = "macos")]
+fn add_update_to_app_menu(app: &AppHandle, update_item: &MenuItem<Wry>) -> tauri::Result<()> {
+    let menu = match app.menu() {
+        Some(menu) => menu,
+        None => {
+            let menu = Menu::default(app)?;
+            app.set_menu(menu.clone())?;
+            menu
+        }
+    };
+    if let Some(tauri::menu::MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        if app_menu.get(update_item.id()).is_none() {
+            // After About, before the default separator and Services section.
+            app_menu.insert(update_item, 1.min(app_menu.items()?.len()))?;
+        }
+    }
+    // TrayIconBuilder::on_menu_event is global, including this app-menu item.
+    // Registering another handler here would trigger two update requests.
     Ok(())
 }
 
 fn handle_menu(app: &AppHandle, id: &str) {
     match id {
         "open" => app_windows::show_settings(app),
+        #[cfg(target_os = "macos")]
+        "check-updates" => {
+            app_windows::show_settings(app);
+            // Reuse the visible About-page flow. Checking never downloads or installs.
+            if let Err(error) = app.emit_to(app_windows::MAIN, "check-for-updates-requested", ()) {
+                log::warn!("Could not open the update check: {error}");
+            }
+        }
         "retry" => {
             let app = app.clone();
             tauri::async_runtime::spawn(async move { pipeline::retry_last(&app).await });
@@ -110,6 +154,8 @@ pub fn relabel(app: &AppHandle) {
     let _ = handles.hint_item.set_text(tf(&lang, "tray.hint", &[("k", &pretty_hotkey(&settings.hotkey))]));
     let _ = handles.open_item.set_text(t(&lang, "tray.settings"));
     let _ = handles.retry_item.set_text(t(&lang, "tray.retry"));
+    #[cfg(target_os = "macos")]
+    let _ = handles.update_item.set_text(t(&lang, "tray.check_updates"));
     let _ = handles.autopaste_item.set_text(t(&lang, "tray.autopaste"));
     let _ = handles.quit_item.set_text(t(&lang, "tray.quit"));
     let _ = handles.status_item.set_text(pipeline::current_status(app).label(&lang));

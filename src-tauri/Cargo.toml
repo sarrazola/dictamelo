@@ -1,6 +1,6 @@
 [package]
 name = "dictamelo"
-version = "0.3.0"
+version = "0.3.1"
 description = "Voice dictation for macOS and Windows. Hold a shortcut, speak, and paste text at your cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"
@@ -28,6 +28,7 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread", "net", "io-util"] }
 base64 = "0.22"
 sha2 = "0.10"
+zeroize = "1"
 reqwest = { version = "0.13", default-features = false, features = ["multipart", "json", "rustls"] }
 cpal = "0.18"
 hound = "3.5"
@@ -40,6 +41,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2.11.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSString", "NSEnumerator", "NSObject", "NSLocale"] }
 objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSPasteboardItem", "NSWindow", "NSApplication", "NSResponder", "NSScreen", "NSSound", "NSEvent", "block2"] }
