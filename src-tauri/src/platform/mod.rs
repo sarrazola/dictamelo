@@ -4,6 +4,7 @@
 //! - `macos/`   implementación completa y probada.
 //! - `windows/` implementación completa (Win32 + Media Foundation), probada en Windows 11.
 //! - `unsupported.rs` (Linux) funcionalidad mínima para que compile.
+//!
 //! El resto de la app nunca usa `#[cfg(target_os)]` directamente.
 
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Dictámelo",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "identifier": "com.dictamelo.desktop",
   "build": {
     "frontendDist": "../ui"
@@ -21,8 +21,8 @@
       "dmg"
     ],
     "category": "Productivity",
-    "shortDescription": "Dictámelo: dictado por voz para cualquier aplicación",
-    "longDescription": "Mantén presionado un atajo global, habla y suelta: la transcripción se pega donde estaba el cursor.",
+    "shortDescription": "Voice dictation for any app",
+    "longDescription": "Hold a global shortcut, speak, and release to paste the transcription at your cursor.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -164,6 +164,32 @@
         </div>
       </div>
       <p class="footnote" data-i18n="plan.soon"></p>
+      <div class="card" id="account-card">
+        <div class="card-title" data-i18n="account.title"></div>
+        <div class="row stack">
+          <p id="account-status" class="footnote" role="status" aria-live="polite"></p>
+          <form id="account-signin" class="actions full">
+            <input id="account-email" type="email" autocomplete="email" required aria-label="Email">
+            <button id="btn-send-code" type="submit" class="primary" data-i18n="account.send"></button>
+          </form>
+          <form id="account-verify" class="actions full" hidden>
+            <input id="account-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10" required aria-label="Verification code">
+            <button id="btn-verify-code" type="submit" class="primary" data-i18n="account.verify"></button>
+          </form>
+          <div id="account-usage" class="usage-panel" hidden>
+            <strong id="usage-label"></strong>
+            <progress id="usage-progress" max="2000" value="0" aria-label="Weekly words used"></progress>
+            <span id="usage-renews" class="footnote"></span>
+            <div class="actions">
+              <button id="btn-refresh-usage" class="ghost" data-i18n="account.refresh"></button>
+              <button id="btn-signout" class="ghost" data-i18n="account.signout"></button>
+            </div>
+          </div>
+          <label class="own-key-choice"><input id="use-own-key" type="checkbox"><span data-i18n="account.ownkey"></span></label>
+          <p class="footnote" data-i18n="account.free.details"></p>
+        </div>
+      </div>
+
 
       <div class="card">
         <div class="row stack">

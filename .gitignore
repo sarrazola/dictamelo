@@ -9,9 +9,17 @@ scripts/paste_target
 .env.*
 *.key
 secrets*
-# El módulo de secretos sí es código fuente (el patrón anterior lo dejaba fuera del repositorio).
+# Credential-store implementation is source code and must be included in clean clones.
 !src-tauri/src/secrets.rs
 
-# Supabase: estado local del CLI (referencias y cadenas de conexión), nunca el código
+# Ignore local Supabase CLI state, but keep migrations and function source.
 supabase/.temp/
 supabase/.branches/
+
+# Private signing material and local verification artifacts
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+# Keep example configuration without real credentials.
+!.env.example

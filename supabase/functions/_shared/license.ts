@@ -44,10 +44,17 @@ export class Db {
     const response = await fetch(`${this.base}${path}`, { ...init, headers: { ...this.headers, ...init.headers } });
     const text = await response.text();
     if (!response.ok) {
+      if (text.includes("weekly_word_limit")) throw new LicenseError(429, "You have used your 2,000 free words this week. Your allowance renews on Monday at 00:00 UTC. Upgrade to Pro or use your own API key.");
+      if (text.includes("weekly_request_limit")) throw new LicenseError(429, "This week's free request limit has been reached.");
+      if (text.includes("request_in_progress")) throw new LicenseError(409, "Another recording is being processed. Please try again in a few seconds.");
       console.error("PostgREST", response.status, text.slice(0, 300));
       throw new LicenseError(500, "Error de base de datos");
     }
     return text ? JSON.parse(text) : null;
+  }
+
+  async rpc(name: string, body: Record<string, unknown>): Promise<unknown> {
+    return await this.request(`/rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
   }
 
   async findLicense(keyHash: string): Promise<{ id: string; status: string; checked_at: string } | null> {

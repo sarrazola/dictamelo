@@ -3,6 +3,7 @@
 //! Para añadir un proveedor (OpenAI, Gemini, Grok, Deepgram, un modelo local…):
 //! 1. Crear un módulo que implemente `TranscriptionProvider`.
 //! 2. Registrarlo en `ProviderRegistry::with_defaults`.
+//!
 //! Nada más cambia: la UI lista los proveedores/modelos a partir de `ProviderInfo`.
 
 pub mod dictamelo;

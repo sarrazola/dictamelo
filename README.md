@@ -2,322 +2,109 @@
 
 # Dictámelo
 
-Dicta en cualquier app de tu Mac o de tu PC con Windows: mantén presionado un atajo, habla, suelta, y
-el texto aparece donde está el cursor. App de barra de menú (bandeja del sistema en Windows) hecha en
-Rust + Tauri 2. La transcripción la hace un proveedor remoto (Groq en esta versión) detrás de una
-interfaz que permite cambiarlo sin tocar el resto de la app.
+Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, and release: the text appears at your cursor. Built with Rust and Tauri 2, with a small HTML/CSS/JavaScript interface.
 
-**Descarga:** [última versión para macOS (Apple Silicon)](https://github.com/sarrazola/dictamelo/releases/latest).
-Como todavía no está notarizada, la primera vez ábrela con clic derecho → Abrir.
-En Windows, por ahora, se compila desde el código (ver [Windows](#windows)).
-Más información en [dictamelo.com](https://dictamelo.com).
+[Website](https://dictamelo.com) · [Latest release](https://github.com/sarrazola/dictamelo/releases/latest) · [Release guide](docs/RELEASING.md) · [Testing](docs/TESTING.md)
 
-## Qué hace
+## Download
 
-- Vive en la barra de menú (sin ícono en el Dock). El ícono cambia con el estado y el menú muestra
-  «Grabando…», «Transcribiendo…», «Pegando…», «Listo» o el error ocurrido.
-- Atajo global configurable (por defecto `⌥⇧Espacio`, poco usado por otras apps). Se graba solo
-  mientras el atajo está presionado; al soltarlo se transcribe.
-- Pega el texto en la app donde estaba el cursor (⌘V sintético) y **restaura el portapapeles
-  anterior** con todos sus formatos (texto, imágenes, archivos…), salvo que el usuario haya copiado
-  algo nuevo mientras tanto: entonces se conserva lo nuevo.
-- Indicador flotante (no roba el foco) con el estado y el nivel del micrófono.
-- Ventana de configuración con barra lateral (General · Modelos · Historial · Avanzado · Acerca de),
-  para que no aparezcan decenas de opciones de corrido. El aviso de permisos solo sale cuando falta
-  alguno; el resto del tiempo no estorba.
-- **Interfaz en 6 idiomas** (español, inglés, portugués, francés, alemán, italiano), incluidos el menú
-  de la barra y los mensajes de error. Por defecto sigue el idioma del sistema.
-- **Iniciar con el sistema** (LaunchAgent), **sonidos sutiles** del sistema al empezar y terminar de
-  grabar, y **Esc cancela** una grabación sin transcribir ni gastar API.
-- **Vocabulario propio**: nombres y términos que Whisper suele confundir se envían como contexto.
-- **Limpieza con IA opcional** (apagada por defecto): un modelo de lenguaje quita muletillas, arregla
-  la puntuación y aplica tus autocorrecciones («no, mejor el viernes»). Usa GPT-OSS en Groq con la
-  misma API key; viene con unas instrucciones predeterminadas que puedes editar o restablecer. Si la
-  limpieza falla, se pega el texto original y se avisa.
-- **Transcribir archivos**: arrastra un audio a la ventana (o elígelo) y el texto aparece en la
-  sección Archivos, con copiar y guardar como .txt. Sin servidores propios: MP3, M4A, WAV, FLAC,
-  OGG, WebM y MP4 de hasta 24 MB se envían tal cual al proveedor; el resto (AIFF, CAF, AAC, MOV…)
-  y los archivos grandes se convierten en local con CoreAudio (`afconvert`, incluido en macOS) a
-  WAV 16 kHz mono y, si duran más de 10 minutos, se parten en tramos cortando en el silencio más
-  cercano. Los temporales se borran; el archivo original no se toca.
-- Historial local pequeño (JSON) con copiar/borrar/vaciar.
-- Los WAV temporales se borran justo después de usarse y también al arrancar (por si hubo un cierre
-  abrupto). Si una transcripción falla, el audio se conserva **en memoria** para «Reintentar última
-  transcripción» desde el menú.
-- Recuperación de errores: sin red / tiempo agotado / 5xx → reintento automático y luego mensaje
-  claro; API key inválida, límite de uso, micrófono ausente o sin permiso, falta de Accesibilidad
-  (el texto queda copiado en el portapapeles) → mensaje en la barra, en el indicador y en la ventana.
+Choose the installer for your computer from the [latest release](https://github.com/sarrazola/dictamelo/releases/latest):
 
-## Actualizaciones
-
-La app se actualiza sola desde GitHub Releases. Al abrirse consulta `latest.json` del último
-release, y si hay una versión nueva la ofrece en Acerca de con sus notas. Cada paquete va firmado
-con una llave privada que vive en el llavero; la app lleva incrustada la pública y **rechaza
-cualquier paquete cuya firma no cuadre**, así que ni un release manipulado ni un intermediario en la
-red podrían instalar código ajeno.
-
-Publicar una versión nueva es un comando:
-
-```bash
-./scripts/release.sh 0.2.0 "Lo que cambió en esta versión"
-```
-
-El script pone la versión en los tres manifiestos, compila y firma, arma `latest.json`, crea la
-etiqueta y sube a GitHub el `.dmg` (para instalar a mano), el `.app.tar.gz` con su firma (lo que
-consume el actualizador) y el propio `latest.json`.
-
-### Publicar también para Windows
-
-`latest.json` lleva una entrada por plataforma (`darwin-aarch64`, `windows-aarch64`,
-`windows-x86_64`…). Cada máquina compila lo suyo, así que hay dos formas de juntarlo:
-
-- **Windows después de macOS** (lo normal): en la máquina Windows, con el release ya creado,
-  `powershell -File scripts\release-windows.ps1 0.2.0`. Compila, sube el instalador y el paquete
-  del actualizador, y **añade** su entrada al `latest.json` que ya está publicado, sin borrar la de
-  macOS.
-- **Todo junto desde macOS**: deja los artefactos de Windows (el paquete del actualizador y su
-  `.sig`) en `dist/windows/` antes de correr `release.sh`. La arquitectura se deduce del nombre del
-  archivo.
-
-Mientras Windows no haya subido lo suyo, los Windows instalados simplemente no ven la actualización;
-no se rompe nada, solo esperan.
-
-> **La llave de firma tiene que ser la misma en las dos máquinas.** La app lleva grabada una sola
-> llave pública. Si Windows firmara con una llave propia, sus paquetes serían rechazados y esos
-> usuarios no podrían actualizar nunca. Copia la privada desde el llavero del Mac a la variable
-> `TAURI_SIGNING_PRIVATE_KEY` en Windows, por un canal seguro.
-
-La llave de firma se generó una vez y está en el llavero bajo la cuenta `updater_private_key`.
-**Guarda una copia en un sitio seguro**: si se pierde, las apps ya instaladas dejarían de aceptar
-actualizaciones y habría que reinstalarlas a mano con una llave nueva.
-
-## Planes
-
-| | Gratis | Pro |
-| --- | --- | --- |
-| Precio | sin costo | 4,99 USD al mes |
-| Transcripción | tu propia API key de Groq | incluida (pendiente del backend) |
-| Funciones | todas | todas |
-| Equipos | los que quieras | 5 por licencia |
-| Cuenta | no hace falta | no hace falta, solo la clave de licencia |
-
-El plan gratuito no tiene límites: pones tu clave de Groq y pagas tu consumo directamente al
-proveedor. Pro existe para quien no quiere configurar nada; se cobra con Lemon Squeezy y se activa
-pegando la clave en Plan → ¿Ya tienes una licencia?. La clave y el identificador de la instalación
-se guardan en el llavero del sistema. Si la app no puede revalidar por falta de red, conserva el
-acceso en vez de bloquear al usuario.
-
-### Cómo funciona Pro por dentro
-
-La clave de transcripción no puede vivir en la app: cualquiera abriría el binario y la sacaría. Por
-eso el audio de los usuarios Pro pasa por dos funciones de borde en Supabase (`supabase/functions/`):
-
-1. La app manda el audio con su clave de licencia en la cabecera `x-license-key`.
-2. La función valida la licencia contra Lemon Squeezy y guarda el resultado en caché una hora, para
-   que un dictado no espere a un servicio externo. Solo se guardan licencias válidas, y como hash
-   SHA-256: ni siquiera con la base de datos en la mano se podrían usar las claves de los clientes.
-3. Comprueba el tope de consumo de los últimos 30 días (20 h por licencia, configurable con la
-   variable `MONTHLY_SECONDS`), llama al proveedor con **nuestra** clave y devuelve el texto.
-4. Registra cuántos segundos se procesaron. Nunca se guarda el audio ni el texto.
-
-La validación vive en el servidor y no en la app a propósito: la app se puede modificar, el servidor
-no. `verify_jwt` está desactivado porque la credencial es la licencia, no una sesión de Supabase.
-
-Desplegar cambios del backend:
-
-```bash
-supabase link --project-ref <ref>
-supabase db push                              # aplica supabase/migrations
-supabase secrets set --env-file secrets.env   # GROQ_API_KEY y MONTHLY_SECONDS
-supabase functions deploy transcribe cleanup
-```
-
-**Estado actual:** el backend está desplegado y probado. El producto sigue en borrador en Lemon
-Squeezy hasta que decidas publicarlo.
-
-## Estructura
-
-```
-ui/                      Interfaz (HTML/CSS/JS sin framework; solo pinta y llama comandos)
-  i18n.js                Textos de la ventana en los 6 idiomas
-  main.js                Navegación lateral, render y llamadas a los comandos
-src-tauri/
-  Cargo.toml             Dependencias (rustls, sin OpenSSL; keyring → Llavero/Credential Manager)
-  tauri.conf.json        Configuración de Tauri y del bundle
-  Info.plist             LSUIElement + NSMicrophoneUsageDescription
-  Entitlements.plist     audio-input + network.client (Hardened Runtime)
-  src/
-    lib.rs               Arranque: plugins, comandos, bandeja, ventanas, atajo
-    pipeline.rs          Máquina de estados grabar → transcribir → pegar + recuperación de errores
-    audio/               cpal (hilo dedicado), mezcla a mono, remuestreo FIR a 16 kHz, WAV
-    transcription/       Trait TranscriptionProvider, registro, cliente OpenAI-compatible, Groq, OpenAI
-    cleanup/             Trait TextCleaner, instrucciones predeterminadas, cliente de chat, Groq (GPT-OSS)
-    autostart.rs         Inicio con el sistema
-    license.rs           Licencia Pro con Lemon Squeezy (activar, validar, desactivar)
-    updates.rs           Actualizaciones firmadas desde GitHub Releases
-    transcription/dictamelo.rs  Transcripción por nuestro servidor cuando hay Pro
-    cleanup/dictamelo.rs        Limpieza por nuestro servidor cuando hay Pro
-supabase/
-  migrations/            Tablas de licencias y consumo (RLS activo, sin políticas)
-  functions/transcribe/  Audio → licencia → proveedor → texto
-  functions/cleanup/     Texto → licencia → proveedor → texto limpio
-    file_transcription.rs Cola de archivos: subida directa o conversión local + tramos
-    clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
-    platform/            TODO lo dependiente del SO: macos/ (AppKit, CoreAudio) y windows/ (Win32, Media Foundation)
-    i18n.rs              Textos del menú de la barra, estados y errores (mismos 6 idiomas)
-    secrets.rs           API keys en el Llavero / Administrador de credenciales (crate keyring)
-    hotkey.rs, tray.rs, app_windows.rs, commands.rs, settings.rs, history.rs, selftest.rs
-  tauri.windows.conf.json Ajustes del bundle que solo aplican en Windows (instalador NSIS por usuario)
-scripts/
-  build-release.sh       Compila .app + .dmg firmados con Developer ID
-  release.sh             Publica una versión: firma, latest.json y GitHub Releases (macOS)
-  build-release.ps1      Compila el instalador NSIS (Windows)
-  check_env.swift        Diagnóstico de permisos del proceso actual
-  press_hotkey.swift     Simula mantener presionado el atajo (requiere Accesibilidad)
-  paste_target.swift/.ps1 Ventana destino para la prueba de pegado de extremo a extremo
-assets/make_icons.py     Genera el ícono de la app y los de la barra de menú
-```
-
-### Cómo añadir otro proveedor (OpenAI, Gemini, Grok, Deepgram, modelo local…)
-
-1. Crea `src-tauri/src/transcription/<nombre>.rs` implementando `TranscriptionProvider`
-   (`info()` con id, nombre, modelos y URL de la key; `transcribe()` que recibe la API key opcional y
-   la ruta del WAV mono 16 kHz). Para APIs compatibles con OpenAI basta reutilizar
-   `OpenAiCompatibleClient` como hace `groq.rs`.
-2. Regístralo en `ProviderRegistry::with_defaults()`.
-
-La UI, la configuración, el Llavero (una key por proveedor), el historial y el pipeline no cambian.
-`openai.rs` está incluido como ejemplo de esta extensibilidad, marcado como «sin probar».
-
-### Cómo cambiar el modelo de limpieza
-
-Misma idea que la transcripción: implementa `TextCleaner` (o reutiliza `OpenAiCompatibleChatClient`
-si la API es compatible con OpenAI) y regístralo en `CleanerRegistry::with_defaults`. Las
-instrucciones predeterminadas están en `cleanup/mod.rs` (`DEFAULT_PROMPT`).
-
-### Cómo añadir un idioma
-
-1. Copia un bloque de `ui/i18n.js`, tradúcelo y añade el nombre nativo a `UI_LANGUAGE_NAMES`.
-2. Añade el código a `LANGS` en `src-tauri/src/i18n.rs` y amplía el array de cada clave.
-
-La prueba `every_language_has_all_keys` avisa si queda alguna traducción vacía.
-
-## Windows
-
-La misma app, con `src/platform/windows/` como única parte dependiente del sistema (el resto del
-código es idéntico al de macOS):
-
-- **Pegado**: `SendInput` con Ctrl+V. Si el atajo sigue pulsado al pegar (duración máxima
-  alcanzada), sus modificadores se sueltan antes para que no llegue como Ctrl+Alt+Shift+V.
-- **Portapapeles**: instantánea de todos los formatos (texto, imágenes DIB, HTML, archivos,
-  formatos registrados por nombre…) y restauración fiel; `GetClipboardSequenceNumber` detecta si el
-  usuario copió algo mientras tanto. La restauración se marca para que el historial de Win+V no
-  duplique la entrada.
-- **Indicador flotante**: ventana `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW` mostrada con
-  `SWP_NOACTIVATE`; nunca roba el foco ni aparece en Alt+Tab.
-- **Esc cancela**: un hilo sondea `GetAsyncKeyState(VK_ESCAPE)` cada 25 ms (sin hook global de
-  teclado, que Windows retira en silencio si el hilo tarda en atenderlo y que los antivirus miran
-  con recelo); no consume la tecla.
-- **Sonidos**: `PlaySound` con los sonidos de dictado de Windows (`Speech On/Off`), o el alias del
-  esquema de sonidos si no existen.
-- **Archivos de audio**: los formatos nativos del proveedor de hasta 24 MB se suben tal cual; el
-  resto (WMA, AAC, MP4/MOV, WAV grandes…) se convierte con **Media Foundation** a PCM mono (16 kHz
-  si el lector remuestrea) y, si dura más de 10 minutos, se parte en silencios como en macOS. AIFF y
-  CAF no tienen decodificador en Windows.
-- **Permisos**: no hay permiso de Accesibilidad; el micrófono se lee de los interruptores de
-  Configuración → Privacidad y seguridad → Micrófono (registro `CapabilityAccessManager`), y la
-  ventana ofrece abrir esa página si está bloqueado.
-- **Bandeja**: el ícono se hace cuadrado y, con la barra de tareas oscura, el trazo negro del ícono
-  de reposo se vuelve blanco. Los de color (grabando, transcribiendo…) se muestran tal cual.
-- **API keys**: Administrador de credenciales de Windows (mismo crate `keyring` que en macOS).
-- **Idioma**: el idioma de visualización de Windows (`GetUserPreferredUILanguages`).
-- **Inicio con el sistema**: clave `Run` del registro (plugin de autostart).
-
-Limitaciones conocidas: el pegado no llega a apps que corren como administrador (UIPI de Windows;
-el texto queda en el portapapeles), y el indicador no lleva desenfoque detrás (solo el fondo CSS
-translúcido).
-
-## Compilar y ejecutar
-
-Requisitos: Rust estable (≥ 1.80), Node ≥ 18 (solo para el CLI de Tauri), Xcode Command Line Tools.
-
-```bash
-npm install                      # instala @tauri-apps/cli
-npx tauri dev                    # ejecuta en modo desarrollo
-cd src-tauri && cargo test       # pruebas unitarias
-./scripts/build-release.sh       # .app y .dmg firmados (usa el Developer ID del Llavero si existe)
-```
-
-### En Windows
-
-Requisitos: Rust estable (`rustup`, host `*-pc-windows-msvc`), Node ≥ 18, Visual Studio Build Tools
-2022 con «Desarrollo para el escritorio con C++» y el Windows SDK, y el runtime de WebView2 (viene
-con Windows 11). Además, para la criptografía de `rustls` (`aws-lc-sys` y `ring`): en **ARM64** el
-componente «C++ Clang Compiler for Windows» de Build Tools, y en **x64** NASM. Todo se puede instalar
-con `winget` (`Rustlang.Rustup`, `OpenJS.NodeJS.LTS`, `Microsoft.VisualStudio.2022.BuildTools`, `NASM.NASM`).
-
-En ARM64, `ring` invoca `clang` a secas, así que su carpeta tiene que estar en el `PATH`
-(`scripts\build-release.ps1` la añade solo si hace falta):
-
-```powershell
-$env:Path = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\ARM64\bin;$env:Path"
-```
-
-```powershell
-npm install                                              # instala @tauri-apps/cli
-npx tauri dev                                            # ejecuta en modo desarrollo
-cd src-tauri; cargo test                                 # pruebas unitarias
-powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1   # instalador NSIS (por usuario)
-```
-
-El instalador queda en `src-tauri\target\release\bundle\nsis\`. En modo desarrollo la app abre una
-consola con el registro; el ejecutable de release no.
-
-Pruebas opcionales que tocan recursos reales:
-
-```bash
-cd src-tauri
-DICTAMELO_LIVE_TESTS=1 cargo test live_tests -- --nocapture   # llama a la API de Groq con audio TTS
-DICTAMELO_CLIPBOARD_TESTS=1 cargo test snapshot_and_restore   # usa el portapapeles real (lo restaura)
-DICTAMELO_SELFTEST_WAV=/ruta/audio.wav ./target/debug/dictamelo  # flujo completo sin micrófono ni atajo
-```
-
-## Permisos de macOS
-
-- **Micrófono**: macOS lo pide la primera vez que grabas. Si lo negaste: Ajustes del Sistema →
-  Privacidad y seguridad → Micrófono → activa Dictámelo.
-- **Accesibilidad**: necesario para enviar ⌘V. Ajustes del Sistema → Privacidad y seguridad →
-  Accesibilidad → activa Dictámelo. Sin él, el texto se copia al portapapeles y la app te avisa.
-
-La ventana de configuración muestra el estado de ambos permisos y tiene botones para solicitarlos o
-abrir el panel correcto. La app está firmada con Developer ID para que macOS mantenga los permisos
-entre versiones.
-
-## Permisos en Windows
-
-- **Micrófono**: Configuración → Privacidad y seguridad → Micrófono. Deben estar activados «Acceso
-  al micrófono» y «Permitir que las aplicaciones de escritorio accedan al micrófono». Si alguno está
-  apagado, la app lo muestra como denegado y ofrece abrir esa página.
-- **Accesibilidad**: no existe en Windows; el pegado (Ctrl+V) funciona sin permisos, salvo hacia
-  ventanas de apps que corren como administrador.
-
-## Dónde guarda las cosas
-
-| Qué | Dónde |
+| Computer | Installer |
 | --- | --- |
-| API keys | Llavero de macOS, servicio `com.dictamelo.desktop`, cuenta = id del proveedor |
-| Configuración | `~/Library/Application Support/com.dictamelo.desktop/settings.json` |
-| Historial | `~/Library/Application Support/com.dictamelo.desktop/history.json` |
-| Audio temporal | `~/Library/Caches/com.dictamelo.desktop/audio/` (se borra tras cada uso) |
-| Registros | `~/Library/Logs/com.dictamelo.desktop/dictado.log` |
+| Mac with Apple Silicon, macOS 12 or later | `Dictamelo_<version>_aarch64.dmg` |
+| Windows 10/11 with Intel or AMD, 64-bit | `Dictamelo_<version>_x86_64-setup.exe` |
+| Windows 11 on ARM, including Snapdragon | `Dictamelo_<version>_aarch64-setup.exe` |
 
-En Windows:
+The macOS release process requires **Developer ID signing, Apple notarization, and stapling** for both the app and the DMG. Windows installers are signed for the Tauri updater; this is separate from Microsoft Authenticode. Windows may show a SmartScreen warning while the installer has no Authenticode certificate/reputation. Windows 32-bit, older Windows versions, Intel Macs, and Linux are not included in the published installers.
 
-| Qué | Dónde |
-| --- | --- |
-| API keys | Administrador de credenciales (credencial genérica `com.dictamelo.desktop`, usuario = id del proveedor) |
-| Configuración e historial | `%APPDATA%\com.dictamelo.desktop\settings.json` y `history.json` |
-| Audio temporal | `%LOCALAPPDATA%\com.dictamelo.desktop\audio\` (se borra tras cada uso) |
-| Registros | `%LOCALAPPDATA%\com.dictamelo.desktop\logs\dictamelo.log` |
+On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer; it installs for your user and can install WebView2 if needed. Allow desktop microphone access in Windows Settings.
 
-Las API keys nunca se escriben en archivos, en el repositorio ni en los registros.
+## Start dictating
+
+1. Open **Plan**, enter your email, and enter the verification code you receive.
+2. Your free account includes **2,000 words each week**, shared across all your computers.
+3. Hold **Alt/Option + Shift + Space**, speak, and release to paste.
+4. Check **Plan → Account & weekly usage** for words used, words remaining, and the next renewal date.
+
+Already using a personal Groq or OpenAI key? Keep it in **Models**, and choose **Use my own API key** in Plan. Your provider bills that usage; it does not consume the included free allowance.
+
+## Plans
+
+| | Free account | Pro license | Your own API key |
+| --- | --- | --- | --- |
+| Included transcription | 2,000 words/week | Up to 20 audio hours per rolling 30 days | Billed by your provider |
+| Sign-in | Email verification code | Existing Lemon Squeezy license | Not required |
+| Dictation | Up to two minutes per recording | Configurable recording duration | Configurable recording duration |
+| Audio files | Mono 16 kHz PCM WAV, up to two minutes | Supported formats and long files | Supported formats and long files |
+| AI cleanup | — | Included | Uses your provider key |
+| Usage storage | Account-level weekly word count | License-level audio duration | Local history |
+
+Free words renew **Monday at 00:00 UTC**. The app displays that moment in your local time. The last recording is delivered in full even if it crosses 2,000 words; further recordings are blocked until renewal. A 200-request weekly safeguard and one request at a time per account limit abuse. Failed provider requests consume no words. Reinstalling or signing out does not reset usage.
+
+Pro activation is retained for existing licenses. The purchase product must be published and `CHECKOUT_URL` updated to its actual checkout before advertising Pro sales; the repository does not publish or alter the Lemon Squeezy product.
+
+## Features
+
+- Menu bar/system tray app with a configurable push-to-talk shortcut.
+- Paste at the cursor and restore the previous clipboard, including images and files; preserve anything the user copies during the operation.
+- Floating recording indicator that does not take focus; Escape cancels without transcription.
+- Six interface languages: English, Spanish, Portuguese, French, German, and Italian.
+- Optional launch at login, system sounds, custom vocabulary, and AI cleanup.
+- Audio-file transcription with local conversion and silence-aware splitting for long recordings (Pro/personal key).
+- Small local history with copy/delete controls and retry for failed dictation.
+- Signed automatic updates from GitHub Releases, checked at startup and every six hours.
+
+Windows uses Win32 for keyboard/clipboard and Media Foundation for audio conversion. Windows cannot paste into an elevated administrator app from a regular process; the text remains on the clipboard. AIFF/CAF decoding is not available through the Windows decoder. ARM VM testing of an x64 executable is emulation, not testing on physical Intel/AMD hardware.
+
+## Privacy and credentials
+
+Free/Pro audio passes through Supabase Edge Functions to Groq. Personal-key mode sends it directly to the selected provider. The app removes temporary audio after use and stores history locally. The backend stores usage and license metadata, not audio or transcript contents. Supabase Auth stores the account email. Provider retention policies still apply.
+
+Session tokens, license keys, and personal provider keys use macOS Keychain or Windows Credential Manager. The provider's server key is an Edge Function secret and is never bundled in the app. `src-tauri/src/supabase-public-key.txt` is intentionally public: it contains only the client `anon` key; all quota tables and mutation functions are restricted to the server's service role.
+
+## Development
+
+Install current stable Rust, Node.js 20+, and the platform prerequisites in [Tauri's setup guide](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode Command Line Tools. Windows needs Visual Studio 2022 C++ Build Tools, a Windows SDK, WebView2, NASM for x64, and Clang for ARM64.
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run test:backend                 # requires Deno
+npm run check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+```
+
+For a UI-only preview (mock data, no real account or audio), run `python3 -m http.server 4179 --directory ui` and open `http://localhost:4179`.
+
+## Project structure
+
+```text
+ui/                         Interface, translations, and browser preview mocks
+src-tauri/src/account.rs     Email-code login, session refresh, secure session storage
+src-tauri/src/pipeline.rs    Record → transcribe → clean → paste
+src-tauri/src/platform/      macOS and Windows system integration
+src-tauri/src/transcription/ Provider interface, Groq/OpenAI and hosted transcription
+src-tauri/src/cleanup/       Optional text cleanup providers
+src-tauri/src/license.rs     Existing Pro license activation
+src-tauri/src/updates.rs     Signed updater and release signature verification
+src-tauri/src/secrets.rs     OS credential-store implementation (tracked source code)
+supabase/functions/         Hosted transcription, cleanup, account usage
+supabase/migrations/        Database schema and server-only quota functions
+supabase/templates/         Sign-in email template
+scripts/                    Build, notarization, publishing, and diagnostics
+docs/                       Release instructions and verification records
+```
+
+To add a transcription provider, implement `TranscriptionProvider` and register it in `ProviderRegistry::with_defaults()`. To add a cleaner, implement `TextCleaner` and register it in `CleanerRegistry::with_defaults()`. Keep platform-specific changes under `platform/`.
+
+## Releasing a new version
+
+Follow **[docs/RELEASING.md](docs/RELEASING.md)**. It covers version bumps, README/changelog updates, backend deployment, Windows x64/ARM64 builds, macOS notarization, updater signatures, GitHub Releases, and verification of the publicly downloaded installers.
+
+`AGENTS.md` carries these maintenance rules for coding assistants. `.gitignore` only controls which files Git tracks; it is not the place for release instructions. Installers belong in **GitHub Releases**, not in source commits.
+
+## License
+
+[MIT](LICENSE).

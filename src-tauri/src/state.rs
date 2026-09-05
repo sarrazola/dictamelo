@@ -36,6 +36,7 @@ pub struct AppState {
     pub backend_cleaner: Arc<dyn TextCleaner>,
     /// Última comprobación de la licencia, para no consultar en cada dictado.
     pub license: RwLock<LicenseStatus>,
+    pub account: crate::account::Account,
     pub recorder: Recorder,
     pub status: Mutex<Status>,
     /// Se incrementa en cada cambio de estado; permite descartar temporizadores obsoletos.
@@ -71,11 +72,13 @@ impl AppState {
         audio::cleanup_temp_dir(&temp_dir);
 
         log::info!("Configuración: {}", settings_path.display());
+        let secrets: Arc<dyn SecretStore> = Arc::new(KeyringSecretStore::new(KEYCHAIN_SERVICE));
         Ok(AppState {
             settings: RwLock::new(settings),
             settings_path,
             history: Mutex::new(history),
-            secrets: Arc::new(KeyringSecretStore::new(KEYCHAIN_SERVICE)),
+            account: crate::account::Account::new(secrets.clone()),
+            secrets,
             providers: ProviderRegistry::with_defaults(),
             cleaners: CleanerRegistry::with_defaults(shared_http_client()),
             backend_provider: Arc::new(crate::transcription::dictamelo::DictameloProvider::new(shared_http_client())),
@@ -100,6 +103,17 @@ impl AppState {
     /// `true` si esta instalación tiene Pro activo (usa nuestro servidor y no la clave del usuario).
     pub fn is_pro(&self) -> bool {
         read(&self.license).active
+    }
+
+    pub fn is_free_cloud(&self) -> bool {
+        !self.is_pro() && !self.settings().use_own_key && self.account.signed_in()
+    }
+
+    pub fn uses_cloud(&self) -> bool { self.is_pro() || self.is_free_cloud() }
+
+    pub async fn cloud_credential(&self) -> Result<Option<String>, String> {
+        if self.is_pro() { return Ok(crate::license::stored_key(&self.secrets)); }
+        Ok(Some(format!("Bearer {}", self.account.token().await?)))
     }
 
     /// API key del proveedor indicado (`None` si no está configurada).

@@ -402,3 +402,11 @@ body.overlay { background: transparent; overflow: hidden; }
 .hud .bars i { display: block; width: 3px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .9); transition: height .08s; }
 @keyframes hud-pulse { 50% { opacity: .45; box-shadow: 0 0 0 5px rgba(255, 69, 58, .12); } }
 @keyframes hud-spin { to { transform: rotate(360deg); } }
+
+/* Weekly account usage */
+.usage-panel { width: 100%; display: grid; gap: 10px; }
+.usage-panel progress { width: 100%; height: 9px; accent-color: var(--accent, #bf5c35); }
+.own-key-choice { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.own-key-choice input { width: auto; }
+#account-status { margin: 0; overflow-wrap: anywhere; }
+#account-card [hidden] { display: none !important; }

@@ -45,7 +45,7 @@ pub fn prepare(raw: &RawRecording) -> PreparedAudio {
 pub fn split_for_upload(samples: &[i16], sample_rate: u32, max_secs: u32) -> Vec<std::ops::Range<usize>> {
     let max_len = (sample_rate * max_secs) as usize;
     if samples.len() <= max_len || max_len == 0 {
-        return vec![0..samples.len()];
+        return std::iter::once(0..samples.len()).collect();
     }
     let search = (sample_rate * 5) as usize;
     let window = (sample_rate as usize * 3) / 10; // 300 ms
@@ -72,6 +72,35 @@ pub fn split_for_upload(samples: &[i16], sample_rate: u32, max_secs: u32) -> Vec
     }
     ranges.push(start..samples.len());
     ranges
+}
+
+/// Nombres de los dispositivos de entrada disponibles.
+pub fn list_input_devices() -> Vec<String> {
+    let host = cpal::default_host();
+    match host.input_devices() {
+        Ok(devices) => devices
+            .filter_map(|d| d.description().ok().map(|desc| desc.name().to_string()))
+            .collect(),
+        Err(e) => {
+            log::warn!("No se pudieron enumerar los dispositivos de entrada: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// Borra WAV temporales que hayan quedado de sesiones anteriores (p. ej. tras un cierre abrupto).
+pub fn cleanup_temp_dir(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "wav") && std::fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    if removed > 0 {
+        log::info!("Eliminados {removed} archivos de audio temporales antiguos");
+    }
 }
 
 #[cfg(test)]
@@ -102,34 +131,5 @@ mod split_tests {
             assert_eq!(pair[0].end, pair[1].start);
         }
         assert!(ranges.iter().all(|r| r.len() <= (rate * 10) as usize));
-    }
-}
-
-/// Nombres de los dispositivos de entrada disponibles.
-pub fn list_input_devices() -> Vec<String> {
-    let host = cpal::default_host();
-    match host.input_devices() {
-        Ok(devices) => devices
-            .filter_map(|d| d.description().ok().map(|desc| desc.name().to_string()))
-            .collect(),
-        Err(e) => {
-            log::warn!("No se pudieron enumerar los dispositivos de entrada: {e}");
-            Vec::new()
-        }
-    }
-}
-
-/// Borra WAV temporales que hayan quedado de sesiones anteriores (p. ej. tras un cierre abrupto).
-pub fn cleanup_temp_dir(dir: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    let mut removed = 0;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_some_and(|e| e == "wav") && std::fs::remove_file(&path).is_ok() {
-            removed += 1;
-        }
-    }
-    if removed > 0 {
-        log::info!("Eliminados {removed} archivos de audio temporales antiguos");
     }
 }

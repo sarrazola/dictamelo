@@ -7,7 +7,7 @@
 //! - `transcription` interfaz `TranscriptionProvider` + implementaciones (Groq, OpenAI).
 //! - `clipboard` / `paste` inserción del texto conservando el portapapeles.
 //! - `platform`      TODO lo específico del sistema operativo (permisos, teclado,
-//!                   portapapeles nativo, ventanas). Aquí se añadirá `windows/` después.
+//!   Native clipboard and windows on macOS and Windows.
 //! - `pipeline`      máquina de estados: grabar → transcribir → pegar, con recuperación.
 //! - `hotkey`, `tray`, `app_windows`, `commands`: integración con Tauri.
 
@@ -20,6 +20,7 @@ mod clipboard;
 mod commands;
 mod history;
 mod license;
+mod account;
 mod i18n;
 mod hotkey;
 mod paste;
@@ -77,6 +78,10 @@ pub fn run() {
             commands::get_status,
             commands::get_providers,
             commands::get_cleaners,
+            commands::get_account_status,
+            commands::send_sign_in_code,
+            commands::verify_sign_in_code,
+            commands::sign_out_account,
             commands::get_license_status,
             commands::activate_license,
             commands::deactivate_license,

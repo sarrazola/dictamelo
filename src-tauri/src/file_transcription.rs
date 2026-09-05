@@ -153,8 +153,8 @@ async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Res
     let (provider, api_key, temp_dir) = {
         let state = app.state::<AppState>();
         // Con Pro el audio va por nuestro servidor y la credencial es la licencia.
-        let (provider, api_key) = if state.is_pro() {
-            (state.backend_provider.clone(), crate::license::stored_key(&state.secrets))
+        let (provider, api_key) = if state.uses_cloud() {
+            (state.backend_provider.clone(), state.cloud_credential().await?)
         } else {
             let provider = state
                 .providers

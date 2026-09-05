@@ -14,6 +14,8 @@ pub struct Settings {
     pub hotkey: String,
     /// Identificador del proveedor de transcripción ("groq", "openai", ...).
     pub provider: String,
+    /// Use a personal provider key instead of the signed-in free allowance.
+    pub use_own_key: bool,
     /// Identificador del modelo dentro del proveedor.
     pub model: String,
     /// Código ISO-639-1 del idioma del dictado, o "auto" para detección automática.
@@ -53,6 +55,7 @@ impl Default for Settings {
         Self {
             hotkey: DEFAULT_HOTKEY.to_string(),
             provider: DEFAULT_PROVIDER.to_string(),
+            use_own_key: false,
             model: DEFAULT_MODEL.to_string(),
             language: "auto".to_string(),
             ui_language: "auto".to_string(),
@@ -162,10 +165,7 @@ mod tests {
     fn roundtrip_json() {
         let dir = std::env::temp_dir().join(format!("dictado-settings-{}", uuid::Uuid::new_v4()));
         let path = dir.join("settings.json");
-        let mut s = Settings::default();
-        s.hotkey = "Control+Shift+F13".into();
-        s.language = "es".into();
-        s.auto_paste = false;
+        let s = Settings { hotkey: "Control+Shift+F13".into(), language: "es".into(), auto_paste: false, ..Settings::default() };
         s.save(&path).unwrap();
         let loaded = Settings::load(&path);
         assert_eq!(loaded, s);

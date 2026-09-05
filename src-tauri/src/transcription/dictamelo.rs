@@ -87,10 +87,9 @@ impl TranscriptionProvider for DictameloProvider {
             form = form.text("prompt", prompt.clone());
         }
 
-        let response = self
-            .http
-            .post(&self.endpoint)
-            .header("x-license-key", license)
+        let builder = self.http.post(&self.endpoint);
+        let builder = if let Some(token) = license.strip_prefix("Bearer ") { builder.bearer_auth(token) } else { builder.header("x-license-key", license) };
+        let response = builder
             .multipart(form)
             .send()
             .await
@@ -101,11 +100,7 @@ impl TranscriptionProvider for DictameloProvider {
             // El servidor ya devuelve un mensaje pensado para el usuario; se respeta.
             if let Ok(parsed) = serde_json::from_str::<BackendResponse>(&body) {
                 if let Some(message) = parsed.error {
-                    return Err(match status.as_u16() {
-                        401 | 403 => TranscriptionError::Unauthorized,
-                        429 => TranscriptionError::RateLimited,
-                        _ => TranscriptionError::Rejected(message),
-                    });
+                    return Err(TranscriptionError::Rejected(message));
                 }
             }
             return Err(map_status(status, &body));

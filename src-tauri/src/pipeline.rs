@@ -117,7 +117,7 @@ async fn start_recording(app: &AppHandle) {
 
     let lang = settings.ui_lang();
     // Con Pro la credencial es la licencia, no una API key del usuario: no hay nada que revisar.
-    if state.is_pro() {
+    if state.uses_cloud() {
         return start_stream(app, &state, &settings, &lang).await;
     }
     let Some(provider) = state.providers.get(&settings.provider) else {
@@ -174,7 +174,7 @@ async fn start_stream(app: &AppHandle, state: &AppState, settings: &Settings, la
             let generation = set_status(app, Status::Recording);
             sound(app, SoundKind::Start);
             spawn_level_monitor(app.clone(), generation);
-            spawn_watchdog(app.clone(), generation, settings.max_recording_secs);
+            spawn_watchdog(app.clone(), generation, if state.is_free_cloud() { settings.max_recording_secs.min(119) } else { settings.max_recording_secs });
         }
         Err(e) => fail(app, e.localized(lang)),
     }
@@ -237,7 +237,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
     let state = app.state::<AppState>();
     let settings = state.settings();
     let lang = settings.ui_lang();
-    let (provider, api_key) = match transcription_source(&state, &settings) {
+    let (provider, api_key) = match transcription_source(&state, &settings).await {
         Ok(pair) => pair,
         Err(e) => {
             fail(app, tf(&lang, "err.keychain", &[("e", &e)]));
@@ -311,12 +311,12 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
 }
 
 /// Proveedor y credencial que tocan ahora: nuestro servidor si hay Pro, si no el del usuario.
-fn transcription_source(
+async fn transcription_source(
     state: &AppState,
     settings: &Settings,
 ) -> Result<(std::sync::Arc<dyn crate::transcription::TranscriptionProvider>, Option<String>), String> {
-    if state.is_pro() {
-        return Ok((state.backend_provider.clone(), crate::license::stored_key(&state.secrets)));
+    if state.uses_cloud() {
+        return Ok((state.backend_provider.clone(), state.cloud_credential().await?));
     }
     let provider = state
         .providers
@@ -328,6 +328,7 @@ fn transcription_source(
 
 /// Pasa el texto por el modelo de limpieza configurado.
 async fn clean_text(state: &AppState, settings: &Settings, text: &str) -> Result<String, TranscriptionError> {
+    if state.is_free_cloud() { return Ok(text.to_string()); }
     let (cleaner, api_key) = if state.is_pro() {
         (state.backend_cleaner.clone(), crate::license::stored_key(&state.secrets))
     } else {

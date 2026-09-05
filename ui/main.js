@@ -15,6 +15,9 @@ const ui = {
   page: "general",
   capturing: false,
   license: { active: false },
+  account: { signedIn: false, limitWords: 2000 },
+  signInEmail: null,
+  accountBusy: false,
   update: { available: false, installed: false, busy: false },
   deleteArmed: false,
 };
@@ -380,6 +383,7 @@ async function checkForUpdates(manual) {
 // ---------- Plan y licencia ----------
 
 function renderPlan() {
+  renderAccount();
   const active = ui.license.active;
   $("#plan-free").querySelector(".plan-badge").hidden = active;
   $("#plan-pro").querySelector(".plan-badge").hidden = !active;
@@ -397,6 +401,38 @@ function renderPlan() {
   } else {
     status.textContent = ui.license.message || t("plan.license.desc");
   }
+}
+
+function renderAccount() {
+  const a = ui.account;
+  $("#account-signin").hidden = a.signedIn;
+  $("#account-verify").hidden = a.signedIn || !ui.signInEmail;
+  $("#account-usage").hidden = !a.signedIn;
+  $("#use-own-key").checked = !!ui.settings?.useOwnKey;
+  $("#account-email").placeholder = t("account.email");
+  $("#account-code").placeholder = t("account.code");
+  $("#account-status").textContent = a.error || (a.signedIn ? a.email : t(ui.signInEmail ? "account.sent" : "account.desc"));
+  const used = a.usedWords;
+  $("#usage-label").textContent = used == null ? t("account.unavailable") : t("account.usage", { used: used.toLocaleString(ui.lang), limit: a.limitWords.toLocaleString(ui.lang), remaining: Math.max(0, a.limitWords - used).toLocaleString(ui.lang) });
+  $("#usage-progress").hidden = used == null;
+  $("#usage-progress").max = a.limitWords;
+  $("#usage-progress").value = Math.min(a.limitWords, used || 0);
+  $("#usage-renews").textContent = a.resetsAt ? t("account.renews", { date: new Date(a.resetsAt).toLocaleString(ui.lang) }) : "";
+}
+
+async function refreshAccount() {
+  try { ui.account = await invoke("get_account_status"); }
+  catch (err) { ui.account = { ...ui.account, usedWords: null, error: String(err) }; }
+  renderAccount();
+}
+
+async function accountAction(action) {
+  if (ui.accountBusy) return;
+  ui.accountBusy = true;
+  for (const button of $$("#account-card button")) button.disabled = true;
+  try { await action(); }
+  catch (err) { toast(String(err), true); $("#account-status").textContent = String(err); }
+  finally { ui.accountBusy = false; for (const button of $$("#account-card button")) button.disabled = false; }
 }
 
 async function refreshLicense() {
@@ -805,6 +841,36 @@ function wireEvents() {
 
   $("#btn-get-pro").addEventListener("click", () =>
     invoke("open_checkout").catch((e) => toast(String(e), true)));
+  $("#account-signin").addEventListener("submit", (e) => {
+    e.preventDefault();
+    accountAction(async () => {
+      const email = $("#account-email").value.trim();
+      await invoke("send_sign_in_code", { email });
+      ui.signInEmail = email;
+      ui.account.error = null;
+      renderAccount();
+      $("#account-code").focus();
+    });
+  });
+  $("#account-verify").addEventListener("submit", (e) => {
+    e.preventDefault();
+    accountAction(async () => {
+      ui.account = await invoke("verify_sign_in_code", { email: ui.signInEmail, code: $("#account-code").value.trim() });
+      $("#account-code").value = "";
+      ui.signInEmail = null;
+      renderAccount();
+    });
+  });
+  $("#btn-signout").addEventListener("click", () => accountAction(async () => {
+    await invoke("sign_out_account"); ui.signInEmail = null; await refreshAccount();
+  }));
+  $("#btn-refresh-usage").addEventListener("click", () => accountAction(refreshAccount));
+  $("#use-own-key").addEventListener("change", async (e) => {
+    const previous = ui.settings.useOwnKey;
+    ui.settings.useOwnKey = e.target.checked;
+    try { await invoke("save_settings", { settings: ui.settings }); }
+    catch (err) { ui.settings.useOwnKey = previous; renderAccount(); toast(String(err), true); }
+  });
   $("#btn-activate-license").addEventListener("click", async () => {
     const input = $("#license-key");
     const key = input.value.trim();
@@ -863,6 +929,7 @@ function wireEvents() {
   window.addEventListener("focus", () => {
     refreshPermissions();
     refreshDevices();
+    refreshAccount();
   });
 }
 
@@ -875,12 +942,12 @@ async function init() {
 
   renderAll();
   wireEvents();
-  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs(), refreshLicense()]);
+  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs(), refreshLicense(), refreshAccount()]);
   renderStatus(await invoke("get_status"));
 
   await listen("status", (e) => renderStatus(e.payload));
-  await listen("history-changed", refreshHistory);
-  await listen("file-jobs-changed", (e) => renderFileJobs(e.payload));
+  await listen("history-changed", () => { refreshHistory(); refreshAccount(); });
+  await listen("file-jobs-changed", (e) => { renderFileJobs(e.payload); if (e.payload?.some(j => j.stage === "done")) refreshAccount(); });
   await listen("update-available", (e) => applyUpdateInfo(e.payload));
   await listen("update-progress", (e) => {
     const { downloaded, total } = e.payload || {};

@@ -937,3 +937,61 @@ window.I18N = {
 window.UI_LANGUAGE_NAMES = {
   es: "Español", en: "English", pt: "Português", fr: "Français", de: "Deutsch", it: "Italiano",
 };
+
+
+// Account and weekly allowance copy. Existing application languages remain available.
+const ACCOUNT_COPY = {
+  en: {
+    "plan.subtitle": "Start with 2,000 free words each week, or use Pro.",
+    "plan.free.desc": "Transcription included. Sign in with your email to get started.",
+    "plan.free.f1": "2,000 words per week, shared across your computers",
+    "plan.free.f2": "Dictation and WAV recordings up to two minutes",
+    "plan.free.f3": "Usage counter and automatic weekly renewal",
+    "account.title": "Account & weekly usage", "account.desc": "Sign in to activate your free words. No password needed.",
+    "account.email": "Your email address", "account.code": "Verification code", "account.send": "Send code",
+    "account.verify": "Sign in", "account.sent": "Check your email and enter the code here. You can request another code after 60 seconds.",
+    "account.refresh": "Refresh usage", "account.signout": "Sign out", "account.ownkey": "Use my own API key instead of free words",
+    "account.usage": "{used} / {limit} words used · {remaining} remaining", "account.renews": "Renews {date}",
+    "account.unavailable": "Usage is temporarily unavailable",
+    "account.free.details": "Free words renew every Monday at 00:00 UTC. Your last recording is delivered in full, even if it crosses the allowance. AI cleanup and other audio formats require Pro or your own API key.",
+  },
+  es: {
+    "plan.subtitle": "Empieza con 2.000 palabras gratis por semana o usa Pro.",
+    "plan.free.desc": "Transcripción incluida. Inicia sesión con tu correo para empezar.",
+    "plan.free.f1": "2.000 palabras semanales entre todos tus equipos",
+    "plan.free.f2": "Dictado y grabaciones WAV de hasta dos minutos",
+    "plan.free.f3": "Contador de consumo y renovación semanal automática",
+    "account.title": "Cuenta y consumo semanal", "account.desc": "Inicia sesión para activar tus palabras gratis. Sin contraseña.",
+    "account.email": "Tu correo electrónico", "account.code": "Código de verificación", "account.send": "Enviar código",
+    "account.verify": "Iniciar sesión", "account.sent": "Revisa tu correo e introduce el código aquí. Puedes pedir otro después de 60 segundos.",
+    "account.refresh": "Actualizar consumo", "account.signout": "Cerrar sesión", "account.ownkey": "Usar mi propia API key en lugar de las palabras gratis",
+    "account.usage": "{used} / {limit} palabras usadas · {remaining} disponibles", "account.renews": "Se renueva el {date}",
+    "account.unavailable": "No se puede consultar el consumo en este momento",
+    "account.free.details": "Las palabras se renuevan los lunes a las 00:00 UTC. Entregamos completa tu última grabación aunque supere el cupo. La limpieza con IA y otros formatos de audio requieren Pro o tu propia API key.",
+  },
+  pt: {
+    "plan.subtitle": "Comece com 2.000 palavras grátis por semana ou use Pro.", "plan.free.desc": "Transcrição incluída. Entre com seu e-mail.",
+    "plan.free.f1": "2.000 palavras semanais entre seus computadores", "plan.free.f2": "Ditado e WAV de até dois minutos", "plan.free.f3": "Contador de uso e renovação semanal",
+    "account.title": "Conta e uso semanal", "account.desc": "Entre para ativar suas palavras grátis. Sem senha.", "account.email": "Seu e-mail", "account.code": "Código de verificação", "account.send": "Enviar código", "account.verify": "Entrar", "account.sent": "Confira seu e-mail e digite o código. Aguarde 60 segundos para pedir outro.", "account.refresh": "Atualizar uso", "account.signout": "Sair", "account.ownkey": "Usar minha própria chave de API", "account.usage": "{used} / {limit} palavras usadas · {remaining} restantes", "account.renews": "Renova em {date}", "account.unavailable": "Uso indisponível no momento", "account.free.details": "Renova às segundas, 00:00 UTC. A última gravação é entregue completa, mesmo ao ultrapassar a cota. Limpeza com IA e outros formatos exigem Pro ou sua própria chave.",
+  },
+  fr: {
+    "plan.subtitle": "Commencez avec 2 000 mots gratuits par semaine ou passez à Pro.", "plan.free.desc": "Transcription incluse. Connectez-vous par e-mail.", "plan.free.f1": "2 000 mots par semaine sur tous vos appareils", "plan.free.f2": "Dictée et WAV de deux minutes maximum", "plan.free.f3": "Compteur et renouvellement hebdomadaire", "account.title": "Compte et utilisation", "account.desc": "Connectez-vous pour activer vos mots gratuits. Sans mot de passe.", "account.email": "Votre e-mail", "account.code": "Code de vérification", "account.send": "Envoyer le code", "account.verify": "Se connecter", "account.sent": "Consultez votre e-mail et saisissez le code. Attendez 60 secondes pour en demander un autre.", "account.refresh": "Actualiser", "account.signout": "Se déconnecter", "account.ownkey": "Utiliser ma propre clé API", "account.usage": "{used} / {limit} mots utilisés · {remaining} restants", "account.renews": "Renouvellement le {date}", "account.unavailable": "Utilisation temporairement indisponible", "account.free.details": "Renouvellement le lundi à 00:00 UTC. Le dernier enregistrement est livré intégralement, même au-delà du quota. Le nettoyage IA et les autres formats nécessitent Pro ou votre propre clé.",
+  },
+  de: {
+    "plan.subtitle": "Starte mit 2.000 kostenlosen Wörtern pro Woche oder nutze Pro.", "plan.free.desc": "Transkription inklusive. Melde dich per E-Mail an.", "plan.free.f1": "2.000 Wörter pro Woche auf allen Geräten", "plan.free.f2": "Diktate und WAV bis zu zwei Minuten", "plan.free.f3": "Verbrauchsanzeige und wöchentliche Erneuerung", "account.title": "Konto und Wochenverbrauch", "account.desc": "Melde dich für kostenlose Wörter an. Ohne Passwort.", "account.email": "Deine E-Mail", "account.code": "Bestätigungscode", "account.send": "Code senden", "account.verify": "Anmelden", "account.sent": "Prüfe deine E-Mail und gib den Code ein. Nach 60 Sekunden kannst du einen neuen anfordern.", "account.refresh": "Aktualisieren", "account.signout": "Abmelden", "account.ownkey": "Eigenen API-Schlüssel verwenden", "account.usage": "{used} / {limit} Wörter verwendet · {remaining} übrig", "account.renews": "Erneuerung: {date}", "account.unavailable": "Verbrauch vorübergehend nicht verfügbar", "account.free.details": "Erneuerung montags um 00:00 UTC. Die letzte Aufnahme wird auch bei Überschreitung vollständig geliefert. KI-Bereinigung und andere Audioformate benötigen Pro oder deinen API-Schlüssel.",
+  },
+  it: {
+    "plan.subtitle": "Inizia con 2.000 parole gratis a settimana o usa Pro.", "plan.free.desc": "Trascrizione inclusa. Accedi con la tua e-mail.", "plan.free.f1": "2.000 parole settimanali su tutti i computer", "plan.free.f2": "Dettatura e WAV fino a due minuti", "plan.free.f3": "Contatore e rinnovo settimanale", "account.title": "Account e utilizzo settimanale", "account.desc": "Accedi per attivare le parole gratis. Senza password.", "account.email": "La tua e-mail", "account.code": "Codice di verifica", "account.send": "Invia codice", "account.verify": "Accedi", "account.sent": "Controlla la posta e inserisci il codice. Attendi 60 secondi per richiederne un altro.", "account.refresh": "Aggiorna utilizzo", "account.signout": "Esci", "account.ownkey": "Usa la mia chiave API", "account.usage": "{used} / {limit} parole usate · {remaining} disponibili", "account.renews": "Rinnovo: {date}", "account.unavailable": "Utilizzo temporaneamente non disponibile", "account.free.details": "Rinnovo il lunedì alle 00:00 UTC. L'ultima registrazione viene consegnata completa anche oltre la quota. Pulizia IA e altri formati richiedono Pro o una chiave API personale.",
+  },
+};
+for (const [lang, copy] of Object.entries(ACCOUNT_COPY)) Object.assign(window.I18N[lang], copy);
+
+const PLAN_NOTES = {
+  en: ["Pro is activated with a license key. Personal API keys are billed by your provider.", "Up to 20 hours of audio per rolling 30 days", "No API key: activate with your Pro license"],
+  es: ["Pro se activa con una licencia. Las API keys propias se cobran directamente con tu proveedor.", "Hasta 20 horas de audio cada 30 días", "Sin API key: activa tu licencia Pro"],
+  pt: ["Pro é ativado com uma licença. Chaves próprias são cobradas pelo provedor.", "Até 20 horas de áudio a cada 30 dias", "Sem chave de API: ative sua licença Pro"],
+  fr: ["Pro s'active avec une licence. Les clés personnelles sont facturées par le fournisseur.", "Jusqu'à 20 heures d'audio sur 30 jours glissants", "Sans clé API : activez votre licence Pro"],
+  de: ["Pro wird mit einem Lizenzschlüssel aktiviert. Eigene API-Schlüssel werden vom Anbieter abgerechnet.", "Bis zu 20 Stunden Audio in 30 Tagen", "Ohne API-Schlüssel: Pro-Lizenz aktivieren"],
+  it: ["Pro si attiva con una licenza. Le chiavi personali vengono fatturate dal fornitore.", "Fino a 20 ore di audio in 30 giorni", "Senza chiave API: attiva la licenza Pro"],
+};
+for (const [lang, [note, quota, activate]] of Object.entries(PLAN_NOTES)) Object.assign(window.I18N[lang], { "plan.soon": note, "plan.pro.f2": quota, "plan.pro.f1": activate });

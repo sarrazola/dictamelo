@@ -1,7 +1,7 @@
 [package]
 name = "dictamelo"
-version = "0.1.2"
-description = "Dictámelo: dictado por voz. Mantén presionado un atajo, habla y el texto aparece donde estaba el cursor."
+version = "0.2.0"
+description = "Voice dictation for macOS and Windows. Hold a shortcut, speak, and paste text at your cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"
 edition = "2021"

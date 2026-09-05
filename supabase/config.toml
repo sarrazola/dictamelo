@@ -1,9 +1,37 @@
 project_id = "iburiyhhfodndqgmsaot"
 
+[auth]
+site_url = "https://dictamelo.com"
+additional_redirect_urls = []
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+max_frequency = "1m"
+otp_length = 8
+otp_expiry = 600
+
+[auth.email.template.magic_link]
+subject = "Your Dictámelo sign-in code"
+content_path = "./supabase/templates/sign-in.html"
+
+[auth.email.template.confirmation]
+subject = "Your Dictámelo sign-in code"
+content_path = "./supabase/templates/sign-in.html"
+
 # Estas funciones no usan sesiones de Supabase: la credencial es la clave de licencia, que
 # se comprueba dentro de cada función contra Lemon Squeezy.
 [functions.transcribe]
 verify_jwt = false
 
 [functions.cleanup]
+verify_jwt = false
+
+# JWTs are checked against Auth inside the handler; legacy Pro uses a license header.
+[functions.usage]
 verify_jwt = false

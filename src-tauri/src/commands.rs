@@ -385,3 +385,23 @@ pub fn open_url(url: String) -> Result<(), String> {
     }
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
+
+
+#[tauri::command]
+pub async fn get_account_status(app: AppHandle) -> crate::account::AccountStatus {
+    app.state::<AppState>().account.status().await
+}
+#[tauri::command]
+pub async fn send_sign_in_code(app: AppHandle, email: String) -> Result<(), String> {
+    app.state::<AppState>().account.send_code(&email).await
+}
+#[tauri::command]
+pub async fn verify_sign_in_code(app: AppHandle, email: String, code: String) -> Result<crate::account::AccountStatus, String> {
+    let state = app.state::<AppState>();
+    state.account.verify_code(&email, &code).await?;
+    Ok(state.account.status().await)
+}
+#[tauri::command]
+pub async fn sign_out_account(app: AppHandle) -> Result<(), String> {
+    app.state::<AppState>().account.sign_out().await
+}

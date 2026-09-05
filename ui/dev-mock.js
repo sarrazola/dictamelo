@@ -23,9 +23,10 @@ if (!window.__TAURI__) {
       models: [{ id: "gpt-4o-mini-transcribe", name: "GPT-4o mini Transcribe", description: "model.desc.gpt4o_mini" }] },
   ];
   let keyConfigured = true;
+  let signedIn = false;
   const commands = {
     get_app_info: () => ({
-      version: "0.1.0", platform: "macos", defaultHotkey: "Alt+Shift+Space",
+      version: "0.2.0", platform: "macos", defaultHotkey: "Alt+Shift+Space",
       logDir: "~/Library/Logs/com.dictamelo.desktop",
       configDir: "~/Library/Application Support/com.dictamelo.desktop",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",
@@ -61,6 +62,10 @@ if (!window.__TAURI__) {
     open_url: () => null,
     ui_ready: () => null,
     overlay_layout: () => null,
+    get_account_status: () => ({ signedIn, email: signedIn ? "demo@example.com" : null, usedWords: signedIn ? 742 : null, limitWords: 2000, resetsAt: "2026-09-07T00:00:00Z" }),
+    send_sign_in_code: () => null,
+    verify_sign_in_code: () => { signedIn = true; return commands.get_account_status(); },
+    sign_out_account: () => { signedIn = false; },
     get_license_status: () => ({ active: false, keyHint: null, status: null, message: null }),
     activate_license: () => ({ active: true, keyHint: "…MNOP", status: "active", message: null }),
     deactivate_license: () => null, open_checkout: () => null,
