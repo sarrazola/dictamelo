@@ -64,8 +64,28 @@ Publicar una versión nueva es un comando:
 
 El script pone la versión en los tres manifiestos, compila y firma, arma `latest.json`, crea la
 etiqueta y sube a GitHub el `.dmg` (para instalar a mano), el `.app.tar.gz` con su firma (lo que
-consume el actualizador) y el propio `latest.json`. Si dejas los artefactos de Windows en
-`dist/windows/` (el `.exe` del instalador y su `.sig`), entran en el mismo `latest.json`.
+consume el actualizador) y el propio `latest.json`.
+
+### Publicar también para Windows
+
+`latest.json` lleva una entrada por plataforma (`darwin-aarch64`, `windows-aarch64`,
+`windows-x86_64`…). Cada máquina compila lo suyo, así que hay dos formas de juntarlo:
+
+- **Windows después de macOS** (lo normal): en la máquina Windows, con el release ya creado,
+  `powershell -File scripts\release-windows.ps1 0.2.0`. Compila, sube el instalador y el paquete
+  del actualizador, y **añade** su entrada al `latest.json` que ya está publicado, sin borrar la de
+  macOS.
+- **Todo junto desde macOS**: deja los artefactos de Windows (el paquete del actualizador y su
+  `.sig`) en `dist/windows/` antes de correr `release.sh`. La arquitectura se deduce del nombre del
+  archivo.
+
+Mientras Windows no haya subido lo suyo, los Windows instalados simplemente no ven la actualización;
+no se rompe nada, solo esperan.
+
+> **La llave de firma tiene que ser la misma en las dos máquinas.** La app lleva grabada una sola
+> llave pública. Si Windows firmara con una llave propia, sus paquetes serían rechazados y esos
+> usuarios no podrían actualizar nunca. Copia la privada desde el llavero del Mac a la variable
+> `TAURI_SIGNING_PRIVATE_KEY` en Windows, por un canal seguro.
 
 La llave de firma se generó una vez y está en el llavero bajo la cuenta `updater_private_key`.
 **Guarda una copia en un sitio seguro**: si se pierde, las apps ya instaladas dejarían de aceptar

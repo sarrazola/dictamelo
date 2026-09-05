@@ -80,19 +80,29 @@ platforms = {
     "darwin-aarch64": {"signature": mac_sig, "url": f"{base}/Dictamelo_{version}_aarch64.app.tar.gz"},
 }
 # Si alguien dejó los artefactos de Windows en dist/windows, entran en el mismo latest.json.
+# La arquitectura sale del nombre del archivo: el actualizador busca la clave exacta
+# `windows-aarch64` o `windows-x86_64` según en qué máquina corra.
 win_dir = pathlib.Path("dist/windows")
 if win_dir.is_dir():
     for sig in sorted(win_dir.glob("*.sig")):
         payload = sig.with_suffix("")
         if not payload.exists():
             continue
+        name = payload.name.lower()
+        if "arm64" in name or "aarch64" in name:
+            arch = "aarch64"
+        elif "x86" in name or "x64" in name:
+            arch = "x86_64"
+        else:
+            print(f"    AVISO: no se reconoce la arquitectura de {payload.name}; se omite")
+            continue
         target = pathlib.Path(stage) / payload.name
         target.write_bytes(payload.read_bytes())
-        platforms["windows-x86_64"] = {
+        platforms[f"windows-{arch}"] = {
             "signature": sig.read_text().strip(),
             "url": f"{base}/{payload.name}",
         }
-        print(f"    incluido Windows: {payload.name}")
+        print(f"    incluido Windows ({arch}): {payload.name}")
 
 manifest = {
     "version": version,
