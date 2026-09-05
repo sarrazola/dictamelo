@@ -14,6 +14,7 @@ const ui = {
   lang: "es",
   page: "general",
   capturing: false,
+  license: { active: false },
   deleteArmed: false,
 };
 
@@ -324,6 +325,38 @@ async function refreshKeyStatus() {
   $("#btn-delete-key").textContent = t("models.delete");
 }
 
+// ---------- Plan y licencia ----------
+
+function renderPlan() {
+  const active = ui.license.active;
+  $("#plan-free").querySelector(".plan-badge").hidden = active;
+  $("#plan-pro").querySelector(".plan-badge").hidden = !active;
+  $("#plan-free").classList.toggle("featured", !active);
+  $("#plan-pro").classList.toggle("featured", active);
+  $("#btn-get-pro").hidden = active;
+  $("#btn-deactivate-license").hidden = !active;
+  $("#license-key").placeholder = t("plan.license.placeholder");
+  const status = $("#license-status");
+  if (active) {
+    const hint = ui.license.keyHint ? ` (${ui.license.keyHint})` : "";
+    status.textContent = ui.license.message
+      ? `${t("plan.active")}${hint} · ${t("plan.offline")}`
+      : `${t("plan.active")}${hint}`;
+  } else {
+    status.textContent = ui.license.message || t("plan.license.desc");
+  }
+}
+
+async function refreshLicense() {
+  try {
+    ui.license = await invoke("get_license_status");
+  } catch (err) {
+    console.error(err);
+    ui.license = { active: false };
+  }
+  renderPlan();
+}
+
 // ---------- Archivos ----------
 
 function formatSize(bytes) {
@@ -483,6 +516,7 @@ function renderAll() {
   renderModels();
   renderAdvanced();
   renderAbout();
+  renderPlan();
 }
 
 // ---------- Acciones ----------
@@ -696,6 +730,35 @@ function wireEvents() {
       toast(String(err), true);
     }
   });
+  $("#btn-get-pro").addEventListener("click", () =>
+    invoke("open_checkout").catch((e) => toast(String(e), true)));
+  $("#btn-activate-license").addEventListener("click", async () => {
+    const input = $("#license-key");
+    const key = input.value.trim();
+    if (!key) return;
+    try {
+      ui.license = await invoke("activate_license", { key });
+      input.value = "";
+      renderPlan();
+      toast(t("toast.license_on"));
+    } catch (err) {
+      toast(String(err), true);
+    }
+  });
+  $("#license-key").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#btn-activate-license").click();
+  });
+  $("#btn-deactivate-license").addEventListener("click", async () => {
+    try {
+      await invoke("deactivate_license");
+      ui.license = { active: false };
+      renderPlan();
+      toast(t("toast.license_off"));
+    } catch (err) {
+      toast(String(err), true);
+    }
+  });
+
   $("#btn-clear-history").addEventListener("click", () =>
     invoke("clear_history").catch((e) => toast(String(e), true)));
 
@@ -739,12 +802,16 @@ async function init() {
 
   renderAll();
   wireEvents();
-  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs()]);
+  await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs(), refreshLicense()]);
   renderStatus(await invoke("get_status"));
 
   await listen("status", (e) => renderStatus(e.payload));
   await listen("history-changed", refreshHistory);
   await listen("file-jobs-changed", (e) => renderFileJobs(e.payload));
+  await listen("license-changed", (e) => {
+    ui.license = e.payload;
+    renderPlan();
+  });
   const dropzone = $("#dropzone");
   await listen("tauri://drag-enter", () => dropzone.classList.add("over"));
   await listen("tauri://drag-leave", () => dropzone.classList.remove("over"));

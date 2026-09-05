@@ -23,6 +23,12 @@
         </svg>
         <span data-i18n="nav.general"></span>
       </button>
+      <button class="nav-item" data-page="plan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.8l2.6 5.5 6 .9-4.3 4.3 1 6.1-5.3-2.9-5.3 2.9 1-6.1L3.4 9.2l6-.9z"/>
+        </svg>
+        <span data-i18n="nav.plan"></span>
+      </button>
       <button class="nav-item" data-page="models">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
           <rect x="7" y="7" width="10" height="10" rx="2.5"/>
@@ -120,6 +126,52 @@
         <div class="row">
           <div class="label"><strong data-i18n="general.sounds"></strong><span data-i18n="general.sounds.desc"></span></div>
           <div class="actions"><label class="switch"><input type="checkbox" id="play-sounds"><span class="track"></span></label></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Plan -->
+    <section class="page" data-page="plan">
+      <div class="plans">
+        <div class="plan" id="plan-free">
+          <div class="plan-head">
+            <strong data-i18n="plan.free.name"></strong>
+            <span class="plan-badge" data-i18n="plan.current" hidden></span>
+          </div>
+          <div class="plan-price" data-i18n="plan.free.price"></div>
+          <p class="plan-desc" data-i18n="plan.free.desc"></p>
+          <ul class="plan-list">
+            <li data-i18n="plan.free.f1"></li>
+            <li data-i18n="plan.free.f2"></li>
+            <li data-i18n="plan.free.f3"></li>
+          </ul>
+        </div>
+        <div class="plan featured" id="plan-pro">
+          <div class="plan-head">
+            <strong data-i18n="plan.pro.name"></strong>
+            <span class="plan-badge" data-i18n="plan.current" hidden></span>
+          </div>
+          <div class="plan-price" data-i18n="plan.pro.price"></div>
+          <p class="plan-desc" data-i18n="plan.pro.desc"></p>
+          <ul class="plan-list">
+            <li data-i18n="plan.pro.f1"></li>
+            <li data-i18n="plan.pro.f2"></li>
+            <li data-i18n="plan.pro.f3"></li>
+            <li data-i18n="plan.pro.f4"></li>
+          </ul>
+          <button id="btn-get-pro" class="primary" data-i18n="plan.get"></button>
+        </div>
+      </div>
+      <p class="footnote" data-i18n="plan.soon"></p>
+
+      <div class="card">
+        <div class="row stack">
+          <div class="label"><strong data-i18n="plan.license"></strong><span id="license-status"></span></div>
+          <div class="actions full">
+            <input id="license-key" type="text" autocomplete="off" spellcheck="false">
+            <button id="btn-activate-license" class="primary" data-i18n="plan.activate"></button>
+            <button id="btn-deactivate-license" class="ghost danger" hidden data-i18n="plan.deactivate"></button>
+          </div>
         </div>
       </div>
     </section>

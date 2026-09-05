@@ -48,6 +48,26 @@ Más información en [dictamelo.com](https://dictamelo.com).
   claro; API key inválida, límite de uso, micrófono ausente o sin permiso, falta de Accesibilidad
   (el texto queda copiado en el portapapeles) → mensaje en la barra, en el indicador y en la ventana.
 
+## Planes
+
+| | Gratis | Pro |
+| --- | --- | --- |
+| Precio | sin costo | 4,99 USD al mes |
+| Transcripción | tu propia API key de Groq | incluida (pendiente del backend) |
+| Funciones | todas | todas |
+| Equipos | los que quieras | 5 por licencia |
+| Cuenta | no hace falta | no hace falta, solo la clave de licencia |
+
+El plan gratuito no tiene límites: pones tu clave de Groq y pagas tu consumo directamente al
+proveedor. Pro existe para quien no quiere configurar nada; se cobra con Lemon Squeezy y se activa
+pegando la clave en Plan → ¿Ya tienes una licencia?. La clave y el identificador de la instalación
+se guardan en el llavero del sistema. Si la app no puede revalidar por falta de red, conserva el
+acceso en vez de bloquear al usuario.
+
+**Estado actual:** el producto está creado en Lemon Squeezy pero en borrador, porque Pro solo aporta
+valor cuando exista el servidor que ponga nuestra clave de transcripción. Hasta entonces no debe
+publicarse.
+
 ## Estructura
 
 ```
@@ -66,6 +86,7 @@ src-tauri/
     transcription/       Trait TranscriptionProvider, registro, cliente OpenAI-compatible, Groq, OpenAI
     cleanup/             Trait TextCleaner, instrucciones predeterminadas, cliente de chat, Groq (GPT-OSS)
     autostart.rs         Inicio con el sistema
+    license.rs           Licencia Pro con Lemon Squeezy (activar, validar, desactivar)
     file_transcription.rs Cola de archivos: subida directa o conversión local + tramos
     clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
     platform/            TODO lo dependiente del SO: macos/ (AppKit, CoreAudio) y windows/ (Win32, Media Foundation)

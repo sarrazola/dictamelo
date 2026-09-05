@@ -272,6 +272,35 @@ button:disabled { opacity: .45; cursor: default; }
 .model .info strong { font-weight: 570; }
 .model .info span { color: var(--muted); font-size: 12px; }
 
+/* ---------- Planes ---------- */
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.plan {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 4px;
+}
+.plan.featured { outline: 1.5px solid var(--accent); }
+.plan-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-head strong { font-size: 15px; font-weight: 660; }
+.plan-badge {
+  font-size: 10.5px; font-weight: 620; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent);
+  padding: 2px 8px; border-radius: 999px;
+}
+.plan-price { font-size: 22px; font-weight: 700; letter-spacing: -.4px; margin-top: 2px; }
+.plan-desc { margin: 2px 0 8px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.plan-list { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.plan-list li { position: relative; padding-left: 20px; font-size: 12.5px; line-height: 1.4; }
+.plan-list li::before {
+  content: ""; position: absolute; left: 0; top: 4px; width: 12px; height: 12px;
+  border-radius: 50%; background: color-mix(in srgb, var(--ok) 22%, transparent);
+}
+.plan-list li::after {
+  content: ""; position: absolute; left: 3.5px; top: 7.5px; width: 4px; height: 2px;
+  border-left: 1.6px solid var(--ok); border-bottom: 1.6px solid var(--ok);
+  transform: rotate(-45deg);
+}
+.plan button.primary { width: 100%; padding: 8px; font-weight: 600; }
+
 /* ---------- Archivos ---------- */
 .dropzone {
   display: flex; flex-direction: column; align-items: center; gap: 6px;

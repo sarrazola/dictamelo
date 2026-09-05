@@ -61,6 +61,9 @@ if (!window.__TAURI__) {
     open_url: () => null,
     ui_ready: () => null,
     overlay_layout: () => null,
+    get_license_status: () => ({ active: false, keyHint: null, status: null, message: null }),
+    activate_license: () => ({ active: true, keyHint: "…MNOP", status: "active", message: null }),
+    deactivate_license: () => null, open_checkout: () => null,
     get_file_jobs: () => [
       { id: "f1", name: "reunion-lunes.m4a", path: "/Users/yo/reunion-lunes.m4a", sizeBytes: 31_400_000, stage: "transcribing", chunk: 2, chunks: 5, text: "", error: null, durationSecs: 0 },
       { id: "f2", name: "nota-de-voz.mp3", path: "/Users/yo/nota-de-voz.mp3", sizeBytes: 2_100_000, stage: "done", chunk: 1, chunks: 1, text: "Esta es una nota de voz de prueba transcrita desde un archivo.", error: null, durationSecs: 84 },

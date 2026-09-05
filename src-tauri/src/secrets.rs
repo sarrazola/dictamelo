@@ -53,6 +53,28 @@ impl SecretStore for KeyringSecretStore {
     }
 }
 
+/// Almacén en memoria para pruebas que no deben tocar el llavero real.
+#[cfg(test)]
+#[derive(Default)]
+pub struct MemorySecretStore {
+    values: std::sync::Mutex<std::collections::HashMap<String, String>>,
+}
+
+#[cfg(test)]
+impl SecretStore for MemorySecretStore {
+    fn get(&self, id: &str) -> Result<Option<String>, SecretError> {
+        Ok(self.values.lock().unwrap().get(id).cloned())
+    }
+    fn set(&self, id: &str, value: &str) -> Result<(), SecretError> {
+        self.values.lock().unwrap().insert(id.into(), value.into());
+        Ok(())
+    }
+    fn delete(&self, id: &str) -> Result<(), SecretError> {
+        self.values.lock().unwrap().remove(id);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

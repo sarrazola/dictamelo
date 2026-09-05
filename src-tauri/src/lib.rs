@@ -19,6 +19,7 @@ mod file_transcription;
 mod clipboard;
 mod commands;
 mod history;
+mod license;
 mod i18n;
 mod hotkey;
 mod paste;
@@ -74,6 +75,10 @@ pub fn run() {
             commands::get_status,
             commands::get_providers,
             commands::get_cleaners,
+            commands::get_license_status,
+            commands::activate_license,
+            commands::deactivate_license,
+            commands::open_checkout,
             commands::get_api_key_status,
             commands::set_api_key,
             commands::delete_api_key,

@@ -10,7 +10,7 @@ use crate::util::{lock, write};
 use crate::{app_windows, audio, hotkey, paste, pipeline, tray};
 use serde::Serialize;
 use std::sync::atomic::Ordering;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Settings {
@@ -231,6 +231,47 @@ pub fn open_log_dir(state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 pub fn retry_last_transcription(app: AppHandle) {
     tauri::async_runtime::spawn(async move { pipeline::retry_last(&app).await });
+}
+
+// ---------- Licencia Pro ----------
+
+#[tauri::command]
+pub async fn get_license_status(app: AppHandle) -> crate::license::LicenseStatus {
+    let secrets = app.state::<AppState>().secrets.clone();
+    crate::license::validate(secrets).await
+}
+
+#[tauri::command]
+pub async fn activate_license(app: AppHandle, key: String) -> Result<crate::license::LicenseStatus, String> {
+    let secrets = app.state::<AppState>().secrets.clone();
+    // El nombre identifica este equipo en el panel de licencias del proveedor.
+    let status = crate::license::activate(secrets, &key, &device_label()).await?;
+    let _ = app.emit("license-changed", &status);
+    Ok(status)
+}
+
+#[tauri::command]
+pub async fn deactivate_license(app: AppHandle) -> Result<(), String> {
+    let secrets = app.state::<AppState>().secrets.clone();
+    crate::license::deactivate(secrets).await?;
+    let _ = app.emit("license-changed", crate::license::LicenseStatus::default());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_checkout() -> Result<(), String> {
+    tauri_plugin_opener::open_url(crate::license::CHECKOUT_URL, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Nombre legible de este equipo, para distinguir activaciones en el panel de licencias.
+fn device_label() -> String {
+    std::process::Command::new("hostname")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("{} ({})", std::env::consts::OS, std::env::consts::ARCH))
 }
 
 // ---------- Archivos de audio ----------
