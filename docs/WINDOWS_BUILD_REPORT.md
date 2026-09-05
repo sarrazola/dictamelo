@@ -98,11 +98,36 @@ This covers the **installer** half of an upgrade. It is **not** a test of the in
 which needs `latest.json` to advertise 0.2.0; the manifest is deliberately untouched while the
 release is a draft.
 
-### Functional check after upgrade
+### Functional checks
 
-`DICTAMELO_SELFTEST_WAV` on the installed 0.2.0 ARM64 build: audio transcribed through Groq in
-1.0 s (104 characters), pasted with `Ctrl+V`, and the previous clipboard contents restored intact.
-The dictation pipeline still works end to end on Windows in 0.2.0.
+Both architectures were exercised from their **installed** copies, using the existing personal
+Groq credential in Windows Credential Manager. The x64 run used the artifact downloaded from the
+draft with `gh`, that is the one built by the native CI runner, not the copy cross-compiled here.
+
+| | ARM64 (built here) | x86_64 (CI artifact) |
+| --- | --- | --- |
+| Installed executable | PE ARM64, v0.2.0, 11,051,008 B | PE x86-64, v0.2.0, 12,600,320 B |
+| `DICTAMELO_SELFTEST_WAV`, transcription | 104 characters in 1.0 s | 104 characters in 0.9 s |
+| Paste into a real window | not captured | `scripts\paste_target.ps1` logged `Ctrl` down, `V` down, `text len=104` |
+| Clipboard restored | yes | yes, byte-identical to the marker set before the run |
+| `DICTAMELO_SELFTEST_HOTKEY_SECS=6`, microphone | 5.7 s captured | 4.89 s captured |
+| Capture device | `Microphone (High Definition Audio Device)`, 48 kHz, 2 channels, F32 | same |
+
+On the x64 run the global hotkey (`RegisterHotKey`) received its synthetic press and release,
+WASAPI opened the capture stream, the audio was resampled to 16 kHz mono, transcribed and pasted.
+Both architectures log `A buffer underrun or overrun occurred` warnings while the stream starts;
+they are non-fatal by design and the recording continues.
+
+**Limit of the microphone evidence.** This VM has no real audio input: the capture device returns
+silence or low-level noise, so Whisper returns a filler phrase (`Thank you.` on this run) rather
+than a transcript of anything spoken. What the test proves is that the device opens, the stream
+delivers samples for the whole hold, and the pipeline carries them through transcription and
+paste. It does **not** prove audio quality, gain, or that a real voice transcribes correctly on
+x64 hardware.
+
+Recording duration is also shorter than the hold on both builds (4.89 s and 5.7 s of a 6.0 s
+synthetic hold), which is stream start-up latency plus the modifier press/release steps of the
+self-test; single samples on a loaded 2-CPU VM, not a measurement worth drawing conclusions from.
 
 ## Script guards (validated at `df0b29c`)
 
@@ -137,11 +162,13 @@ x64 emulation JIT.
 So, for x64:
 
 - **Verified:** it compiles, links, bundles, signs with the right key, installs, produces an
-  x86-64 executable with the right version, and starts.
+  x86-64 executable with the right version, starts, registers the global hotkey, captures from the
+  microphone through WASAPI, reaches Groq over TLS, pastes into another application with
+  `SendInput`, and restores the previous clipboard.
 - **Not verified:** behaviour on real Intel/AMD silicon. Emulation and native execution differ in
   timing, in CPU feature detection (the crypto crates select code paths from CPUID) and in audio
-  device behaviour. Microphone capture, `SendInput` pasting and Media Foundation conversion were
-  **not** exercised on the x64 build at all here — only startup was.
+  device behaviour, and this VM's microphone produces no real audio. Media Foundation audio-file
+  conversion was not exercised on x64.
 
 The x64 installer in the draft comes from the native CI workflow, which is stronger evidence than
 anything this VM can produce. Testing it on physical Intel/AMD hardware is still pending.
