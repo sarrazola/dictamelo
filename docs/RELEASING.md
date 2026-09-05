@@ -87,6 +87,12 @@ gh release create v0.2.1 --draft --target main --title "Dictámelo 0.2.1" --note
 
 Use `gh release upload` / `gh release download` to transfer files. Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The Windows publishing helper refuses to overwrite public releases and can append a platform to a draft release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
 
+When the x64 release artifact comes from native CI, upload only the ARM64 pair from the VM. The helper otherwise defaults to both targets and could replace the draft's CI artifact with a different cross-built file:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.2.1 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
+```
+
 ## 5. Commit, stage, and publish
 
 Update the testing record with actual results and limitations. Review `git diff` and stage only intended paths. Commit and push the source. Ensure source files did not change after the final build; rebuild affected artifacts if they did.

@@ -2,12 +2,14 @@
 
 ## Version 0.2.0 — September 5, 2026
 
-- Rust: 35 tests passed; `cargo clippy --all-targets -- -D warnings` passed after correcting existing lint warnings.
+- Rust: 35 macOS tests passed; `cargo clippy --all-targets -- -D warnings` passed after correcting existing lint warnings. A separate real Keychain read/write/delete round trip passed.
 - Free backend helpers: 3 Deno tests passed, including multilingual word segmentation, punctuation, actual PCM duration, malformed/truncated WAV, forged byte rate, and the two-minute boundary.
 - Database quota test (`supabase/tests/free_quota.sql`): passed in a rolled-back transaction. Covers new-account usage, concurrent request blocking, full final recording accounting, exhausted allowance, duplicate completion, UTC weekly renewal, failed requests, attempt cap, and server-only SQL permissions.
 - UI: browser preview exercised email entry, code entry, signed-in account, 742/2,000 used words, 1,258 remaining, and local renewal time. This uses mock data; it is not proof of email delivery or native credential persistence.
-- macOS packaging: Apple accepted the app and DMG; both were stapled and Gatekeeper reported `source=Notarized Developer ID`. Final published-download verification is recorded below when publication completes.
-- Windows: see `WINDOWS_BUILD_REPORT.md` for the target-specific build and VM results. ARM emulation does not prove behavior on physical Intel/AMD hardware.
+- macOS packaging: Apple accepted the app and DMG; both were stapled and Gatekeeper reported `source=Notarized Developer ID`. The downloaded draft DMG matched its local checksum, and its contained app passed signature, notarization-ticket, version, and Gatekeeper checks.
+- Native Windows x64: [Actions run 33990373020](https://github.com/sarrazola/dictamelo/actions/runs/33990373020) passed 36 Rust tests and built the NSIS installer. The installed payload is PE `0x8664`. This CI artifact was signed locally with the existing updater key, then installed and launched in the ARM VM.
+- Windows: see [WINDOWS_BUILD_REPORT.md](WINDOWS_BUILD_REPORT.md) for installation, ARM64 upgrade, functional checks, and release-script guard results. ARM emulation does not prove behavior on physical Intel/AMD hardware.
+- Final draft assets: all nine files were downloaded into a fresh directory. Every checksum in `SHA256SUMS.txt` and all three updater signatures passed. The complete manifest contains exactly the three required platforms. Public download and in-app update checks remain for publication.
 
 ## Historical macOS verification — versions 0.1.0–0.1.2
 
