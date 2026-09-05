@@ -1,0 +1,9 @@
+project_id = "iburiyhhfodndqgmsaot"
+
+# Estas funciones no usan sesiones de Supabase: la credencial es la clave de licencia, que
+# se comprueba dentro de cada función contra Lemon Squeezy.
+[functions.transcribe]
+verify_jwt = false
+
+[functions.cleanup]
+verify_jwt = false

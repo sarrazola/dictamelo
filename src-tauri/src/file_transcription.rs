@@ -152,13 +152,19 @@ async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Res
     let lang = settings.ui_lang();
     let (provider, api_key, temp_dir) = {
         let state = app.state::<AppState>();
-        let provider = state
-            .providers
-            .get(&settings.provider)
-            .ok_or_else(|| tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]))?;
-        let api_key = state
-            .api_key_for(&settings.provider)
-            .map_err(|e| tf(&lang, "err.keychain", &[("e", &e.to_string())]))?;
+        // Con Pro el audio va por nuestro servidor y la credencial es la licencia.
+        let (provider, api_key) = if state.is_pro() {
+            (state.backend_provider.clone(), crate::license::stored_key(&state.secrets))
+        } else {
+            let provider = state
+                .providers
+                .get(&settings.provider)
+                .ok_or_else(|| tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]))?;
+            let key = state
+                .api_key_for(&settings.provider)
+                .map_err(|e| tf(&lang, "err.keychain", &[("e", &e.to_string())]))?;
+            (provider, key)
+        };
         (provider, api_key, state.temp_dir.clone())
     };
     let extension = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();

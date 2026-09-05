@@ -89,6 +89,11 @@ async fn call(path: &str, params: &[(&str, &str)]) -> Result<ApiResponse, String
     serde_json::from_str::<ApiResponse>(&body).map_err(|e| format!("respuesta inesperada: {e}"))
 }
 
+/// Clave de licencia guardada, para usarla como credencial con nuestro servidor.
+pub fn stored_key(secrets: &Arc<dyn SecretStore>) -> Option<String> {
+    secrets.get(KEY_NAME).ok().flatten().filter(|k| !k.trim().is_empty())
+}
+
 /// Activa la clave en esta instalación y la guarda si todo va bien.
 pub async fn activate(secrets: Arc<dyn SecretStore>, key: &str, instance_name: &str) -> Result<LicenseStatus, String> {
     let key = key.trim();

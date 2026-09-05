@@ -5,6 +5,7 @@
 //! 2. Registrarlo en `ProviderRegistry::with_defaults`.
 //! Nada más cambia: la UI lista los proveedores/modelos a partir de `ProviderInfo`.
 
+pub mod dictamelo;
 pub mod groq;
 pub mod openai;
 pub mod openai_compatible;

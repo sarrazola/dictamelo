@@ -1,13 +1,14 @@
 //! Estado global de la aplicación (compartido entre comandos, atajo, bandeja y pipeline).
 
 use crate::audio::{self, PreparedAudio, Recorder};
-use crate::cleanup::CleanerRegistry;
+use crate::cleanup::{CleanerRegistry, TextCleaner};
+use crate::license::LicenseStatus;
 use crate::file_transcription::FileJob;
 use crate::history::History;
 use crate::secrets::{KeyringSecretStore, SecretError, SecretStore};
 use crate::settings::Settings;
 use crate::status::Status;
-use crate::transcription::{shared_http_client, ProviderRegistry};
+use crate::transcription::{shared_http_client, ProviderRegistry, TranscriptionProvider};
 use crate::util::read;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -30,6 +31,11 @@ pub struct AppState {
     pub secrets: Arc<dyn SecretStore>,
     pub providers: ProviderRegistry,
     pub cleaners: CleanerRegistry,
+    /// Proveedor y limpiador del plan Pro: van por nuestro servidor y no se eligen a mano.
+    pub backend_provider: Arc<dyn TranscriptionProvider>,
+    pub backend_cleaner: Arc<dyn TextCleaner>,
+    /// Última comprobación de la licencia, para no consultar en cada dictado.
+    pub license: RwLock<LicenseStatus>,
     pub recorder: Recorder,
     pub status: Mutex<Status>,
     /// Se incrementa en cada cambio de estado; permite descartar temporizadores obsoletos.
@@ -72,6 +78,9 @@ impl AppState {
             secrets: Arc::new(KeyringSecretStore::new(KEYCHAIN_SERVICE)),
             providers: ProviderRegistry::with_defaults(),
             cleaners: CleanerRegistry::with_defaults(shared_http_client()),
+            backend_provider: Arc::new(crate::transcription::dictamelo::DictameloProvider::new(shared_http_client())),
+            backend_cleaner: Arc::new(crate::cleanup::dictamelo::DictameloCleaner::new(shared_http_client())),
+            license: RwLock::new(LicenseStatus::default()),
             recorder: Recorder::spawn(),
             status: Mutex::new(Status::Idle),
             status_generation: AtomicU64::new(0),
@@ -86,6 +95,11 @@ impl AppState {
 
     pub fn settings(&self) -> Settings {
         read(&self.settings).clone()
+    }
+
+    /// `true` si esta instalación tiene Pro activo (usa nuestro servidor y no la clave del usuario).
+    pub fn is_pro(&self) -> bool {
+        read(&self.license).active
     }
 
     /// API key del proveedor indicado (`None` si no está configurada).

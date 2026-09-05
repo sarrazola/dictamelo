@@ -238,7 +238,9 @@ pub fn retry_last_transcription(app: AppHandle) {
 #[tauri::command]
 pub async fn get_license_status(app: AppHandle) -> crate::license::LicenseStatus {
     let secrets = app.state::<AppState>().secrets.clone();
-    crate::license::validate(secrets).await
+    let status = crate::license::validate(secrets).await;
+    *write(&app.state::<AppState>().license) = status.clone();
+    status
 }
 
 #[tauri::command]
@@ -246,6 +248,7 @@ pub async fn activate_license(app: AppHandle, key: String) -> Result<crate::lice
     let secrets = app.state::<AppState>().secrets.clone();
     // El nombre identifica este equipo en el panel de licencias del proveedor.
     let status = crate::license::activate(secrets, &key, &device_label()).await?;
+    *write(&app.state::<AppState>().license) = status.clone();
     let _ = app.emit("license-changed", &status);
     Ok(status)
 }
@@ -254,6 +257,7 @@ pub async fn activate_license(app: AppHandle, key: String) -> Result<crate::lice
 pub async fn deactivate_license(app: AppHandle) -> Result<(), String> {
     let secrets = app.state::<AppState>().secrets.clone();
     crate::license::deactivate(secrets).await?;
+    *write(&app.state::<AppState>().license) = crate::license::LicenseStatus::default();
     let _ = app.emit("license-changed", crate::license::LicenseStatus::default());
     Ok(())
 }

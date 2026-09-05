@@ -43,6 +43,30 @@ firma y se instala con el nombre acentuado, la API key migrada al nuevo servicio
 diálogos (`api_key=true`), el historial se copió al nuevo directorio y, como cambia la identidad de la app,
 macOS vuelve a pedir Micrófono y Accesibilidad una sola vez.
 
+## Backend de Pro en Supabase (desplegado y probado)
+
+Funciones `transcribe` y `cleanup` en el proyecto `iburiyhhfodndqgmsaot`, con la clave de Groq como
+secreto del proyecto (nunca en el repositorio ni en la app).
+
+| Prueba | Resultado |
+| --- | --- |
+| Sin licencia, con audio adjunto | HTTP 401 en 0,43 s |
+| Licencia inexistente, con audio | HTTP 403 en 0,61 s, sin llegar al proveedor |
+| `cleanup` sin licencia | HTTP 401 en 0,22 s |
+| Método GET | HTTP 405 |
+| Licencia activa: audio de 6,3 s | HTTP 200 en 0,88 s, texto correcto en español |
+| Licencia activa: limpieza de texto | HTTP 200 en 0,97 s |
+| Consumo registrado | 6,31 s de transcripción y 0,32 s de limpieza en `usage_events` |
+| Clave inválida no ensucia la base | 0 filas tras el intento |
+
+Dos fallos encontrados y corregidos en estas pruebas:
+
+- **Rechazo temprano con cuerpo sin leer.** Responder 401 antes de consumir el audio dejaba la
+  conexión colgada hasta que el proxy la cortaba con un 504 a los 160 s. Cancelar el flujo no
+  bastaba; hay que leerlo y descartarlo. Ahora responde en 0,43 s.
+- **Claves inválidas cacheadas.** Cada intento fallido creaba una fila, así que probando claves al
+  azar se podía llenar la tabla. Ahora solo se guardan las válidas.
+
 ## Transcripción de archivos (app instalada, modo `DICTAMELO_SELFTEST_FILE`)
 
 | Archivo | Ruta seguida | Resultado |

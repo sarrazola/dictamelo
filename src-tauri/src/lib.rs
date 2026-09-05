@@ -121,6 +121,16 @@ pub fn run() {
             tray::create(&handle)?;
             hotkey::apply_from_settings(&handle);
             autostart::sync_with_settings(&handle);
+            // La licencia se comprueba aparte para no retrasar el arranque.
+            let license_handle = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = license_handle.state::<state::AppState>();
+                let status = license::validate(state.secrets.clone()).await;
+                if status.active {
+                    log::info!("Plan Pro activo: la transcripción va por el servidor de Dictámelo");
+                }
+                *util::write(&state.license) = status;
+            });
             let esc_handle = handle.clone();
             platform::install_cancel_key_monitor(std::sync::Arc::new(move || pipeline::cancel_recording(&esc_handle)));
             if selftest::enabled() {

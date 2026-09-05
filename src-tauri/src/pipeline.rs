@@ -116,6 +116,10 @@ async fn start_recording(app: &AppHandle) {
     let settings = state.settings();
 
     let lang = settings.ui_lang();
+    // Con Pro la credencial es la licencia, no una API key del usuario: no hay nada que revisar.
+    if state.is_pro() {
+        return start_stream(app, &state, &settings, &lang).await;
+    }
     let Some(provider) = state.providers.get(&settings.provider) else {
         fail(app, tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]));
         return;
@@ -154,6 +158,17 @@ async fn start_recording(app: &AppHandle) {
         _ => {}
     }
 
+    start_stream(app, &state, &settings, &lang).await
+}
+
+/// Abre el micrófono y pasa a «grabando». Se separa porque el camino Pro se salta las
+/// comprobaciones de API key pero necesita exactamente lo mismo a partir de aquí.
+async fn start_stream(app: &AppHandle, state: &AppState, settings: &Settings, lang: &str) {
+    if platform::permissions_status().microphone == PermissionState::Denied {
+        fail(app, t(lang, "err.mic_denied"));
+        app_windows::show_settings(app);
+        return;
+    }
     match state.recorder.start(settings.input_device.clone()).await {
         Ok(()) => {
             let generation = set_status(app, Status::Recording);
@@ -161,7 +176,7 @@ async fn start_recording(app: &AppHandle) {
             spawn_level_monitor(app.clone(), generation);
             spawn_watchdog(app.clone(), generation, settings.max_recording_secs);
         }
-        Err(e) => fail(app, e.localized(&lang)),
+        Err(e) => fail(app, e.localized(lang)),
     }
 }
 
@@ -222,14 +237,10 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
     let state = app.state::<AppState>();
     let settings = state.settings();
     let lang = settings.ui_lang();
-    let Some(provider) = state.providers.get(&settings.provider) else {
-        fail(app, tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]));
-        return None;
-    };
-    let api_key = match state.api_key_for(&settings.provider) {
-        Ok(key) => key,
+    let (provider, api_key) = match transcription_source(&state, &settings) {
+        Ok(pair) => pair,
         Err(e) => {
-            fail(app, tf(&lang, "err.keychain", &[("e", &e.to_string())]));
+            fail(app, tf(&lang, "err.keychain", &[("e", &e)]));
             return None;
         }
     };
@@ -299,16 +310,37 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
     }
 }
 
+/// Proveedor y credencial que tocan ahora: nuestro servidor si hay Pro, si no el del usuario.
+fn transcription_source(
+    state: &AppState,
+    settings: &Settings,
+) -> Result<(std::sync::Arc<dyn crate::transcription::TranscriptionProvider>, Option<String>), String> {
+    if state.is_pro() {
+        return Ok((state.backend_provider.clone(), crate::license::stored_key(&state.secrets)));
+    }
+    let provider = state
+        .providers
+        .get(&settings.provider)
+        .ok_or_else(|| format!("proveedor desconocido: {}", settings.provider))?;
+    let key = state.api_key_for(&settings.provider).map_err(|e| e.to_string())?;
+    Ok((provider, key))
+}
+
 /// Pasa el texto por el modelo de limpieza configurado.
 async fn clean_text(state: &AppState, settings: &Settings, text: &str) -> Result<String, TranscriptionError> {
-    let cleaner = state
-        .cleaners
-        .get(&settings.cleanup_provider)
-        .ok_or_else(|| TranscriptionError::Rejected(format!("limpiador desconocido: {}", settings.cleanup_provider)))?;
-    let key_provider = cleaner.info().key_provider;
-    let api_key = state
-        .api_key_for(&key_provider)
-        .map_err(|e| TranscriptionError::Rejected(e.to_string()))?;
+    let (cleaner, api_key) = if state.is_pro() {
+        (state.backend_cleaner.clone(), crate::license::stored_key(&state.secrets))
+    } else {
+        let cleaner = state
+            .cleaners
+            .get(&settings.cleanup_provider)
+            .ok_or_else(|| TranscriptionError::Rejected(format!("limpiador desconocido: {}", settings.cleanup_provider)))?;
+        let key_provider = cleaner.info().key_provider;
+        let key = state
+            .api_key_for(&key_provider)
+            .map_err(|e| TranscriptionError::Rejected(e.to_string()))?;
+        (cleaner, key)
+    };
     cleaner
         .clean(api_key.as_deref(), &settings.cleanup_model, &settings.cleanup_system_prompt(), text)
         .await

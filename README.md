@@ -64,9 +64,33 @@ pegando la clave en Plan → ¿Ya tienes una licencia?. La clave y el identifica
 se guardan en el llavero del sistema. Si la app no puede revalidar por falta de red, conserva el
 acceso en vez de bloquear al usuario.
 
-**Estado actual:** el producto está creado en Lemon Squeezy pero en borrador, porque Pro solo aporta
-valor cuando exista el servidor que ponga nuestra clave de transcripción. Hasta entonces no debe
-publicarse.
+### Cómo funciona Pro por dentro
+
+La clave de transcripción no puede vivir en la app: cualquiera abriría el binario y la sacaría. Por
+eso el audio de los usuarios Pro pasa por dos funciones de borde en Supabase (`supabase/functions/`):
+
+1. La app manda el audio con su clave de licencia en la cabecera `x-license-key`.
+2. La función valida la licencia contra Lemon Squeezy y guarda el resultado en caché una hora, para
+   que un dictado no espere a un servicio externo. Solo se guardan licencias válidas, y como hash
+   SHA-256: ni siquiera con la base de datos en la mano se podrían usar las claves de los clientes.
+3. Comprueba el tope de consumo de los últimos 30 días (20 h por licencia, configurable con la
+   variable `MONTHLY_SECONDS`), llama al proveedor con **nuestra** clave y devuelve el texto.
+4. Registra cuántos segundos se procesaron. Nunca se guarda el audio ni el texto.
+
+La validación vive en el servidor y no en la app a propósito: la app se puede modificar, el servidor
+no. `verify_jwt` está desactivado porque la credencial es la licencia, no una sesión de Supabase.
+
+Desplegar cambios del backend:
+
+```bash
+supabase link --project-ref <ref>
+supabase db push                              # aplica supabase/migrations
+supabase secrets set --env-file secrets.env   # GROQ_API_KEY y MONTHLY_SECONDS
+supabase functions deploy transcribe cleanup
+```
+
+**Estado actual:** el backend está desplegado y probado. El producto sigue en borrador en Lemon
+Squeezy hasta que decidas publicarlo.
 
 ## Estructura
 
@@ -87,6 +111,12 @@ src-tauri/
     cleanup/             Trait TextCleaner, instrucciones predeterminadas, cliente de chat, Groq (GPT-OSS)
     autostart.rs         Inicio con el sistema
     license.rs           Licencia Pro con Lemon Squeezy (activar, validar, desactivar)
+    transcription/dictamelo.rs  Transcripción por nuestro servidor cuando hay Pro
+    cleanup/dictamelo.rs        Limpieza por nuestro servidor cuando hay Pro
+supabase/
+  migrations/            Tablas de licencias y consumo (RLS activo, sin políticas)
+  functions/transcribe/  Audio → licencia → proveedor → texto
+  functions/cleanup/     Texto → licencia → proveedor → texto limpio
     file_transcription.rs Cola de archivos: subida directa o conversión local + tramos
     clipboard/, paste.rs Instantánea/restauración del portapapeles y pegado
     platform/            TODO lo dependiente del SO: macos/ (AppKit, CoreAudio) y windows/ (Win32, Media Foundation)

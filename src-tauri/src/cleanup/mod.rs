@@ -1,6 +1,7 @@
 //! Limpieza opcional del texto dictado con un modelo de lenguaje (muletillas, puntuación,
 //! autocorrecciones). Desacoplada igual que la transcripción: la app solo conoce `TextCleaner`.
 
+pub mod dictamelo;
 pub mod groq;
 pub mod openai_compatible_chat;
 
