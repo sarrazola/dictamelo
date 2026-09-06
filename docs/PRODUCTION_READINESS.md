@@ -14,7 +14,7 @@ Last reviewed: September 5, 2026. A working local application, a public installe
 | Email account | Verified sender domain and SMTP; real confirmation and password recovery delivered to an owned mailbox; login and token refresh | Password/Auth API tests passed. Production SMTP is not configured; generated test tokens do not prove delivery. |
 | Pro | Matching store/product/variant, actual purchase or test checkout, immediate license access, cancellation/expiry and quota behavior | Ownership and 60-hour quota service are deployed. A seven-day trial remains disabled until its entitlement lifecycle is proved. |
 | Product information | Matching app, website and checkout limits; privacy and terms describe the actual data flow | `dictamelo.com`, `/privacy` and `/terms` still return a parking redirect. The separate website repository has a landing page but no published legal pages. The existing Lemon product description was updated to the 60-hour allowance, cleanup and five devices. |
-| Public downloads | All architecture links, checksums and signatures re-downloaded and verified | Publish a candidate as a GitHub prerelease while cloud requirements remain open. Promote to stable only after closure and a real update installation check. |
+| Public downloads | All architecture links, checksums and signatures re-downloaded and verified | 0.4.0 is a public GitHub prerelease; all nine downloads, checksums and three updater signatures passed independent verification. Stable remains 0.1.2. Promote only after remaining cloud requirements and a real update installation check. |
 
 ## Data and operational requirements
 

@@ -8,13 +8,15 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 ## Download
 
-**0.4.0 release candidate:** the three installers are being verified. Downloads below will be enabled when the checked artifacts are public. The [current stable release](https://github.com/sarrazola/dictamelo/releases/latest) remains available.
+**[0.4.0 release candidate](https://github.com/sarrazola/dictamelo/releases/tag/v0.4.0):** download the installer for your computer below. This is a public preview; the [current stable release](https://github.com/sarrazola/dictamelo/releases/latest) remains available.
 
 | Your computer | Installer |
 | --- | --- |
-| Apple Silicon Mac — M1, M2, M3, M4 and later | `Dictamelo_0.4.0_aarch64.dmg` — pending verification |
-| Windows — Intel or AMD 64-bit | `Dictamelo_0.4.0_x86_64-setup.exe` — pending verification |
-| Windows 11 — ARM64 | `Dictamelo_0.4.0_aarch64-setup.exe` — pending verification |
+| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/Dictamelo_0.4.0_aarch64.dmg) |
+| Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/Dictamelo_0.4.0_x86_64-setup.exe) |
+| Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/Dictamelo_0.4.0_aarch64-setup.exe) |
+
+[Checksums](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/SHA256SUMS.txt) · [Release notes and signatures](https://github.com/sarrazola/dictamelo/releases/tag/v0.4.0)
 
 On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
@@ -28,7 +30,7 @@ Mac releases require Developer ID signing, Apple notarization and stapling. Wind
 2. With your own keys, choose Groq or OpenAI in **Models** and save the provider key. No Dictámelo account is required.
 3. In an official cloud build, use **Create free account** with email/password, **Sign in**, or **Continue with Google**. Cloud preview restrictions above still apply. Existing Pro licenses can be activated in **Plan**.
 4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release.
-5. Open **Files** to transcribe a recording. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
+5. Open **Files** to transcribe a recording. You can also expand **Import using a local path**. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
 
 ## Three plans
 
