@@ -11,7 +11,7 @@ Application source: `097551f9582fce8c17d6f4a539192d89b80236d8`. Both official-cl
 
 Actions artifact IDs are `9981967895` (x64) and `9981973817` (ARM64). ZIP SHA-256 and byte counts matched the GitHub API. Build metadata matched the exact source, version, target and official-cloud flag. The local EXE header is the x86 NSIS bootstrap, not its payload architecture. Both detached updater signatures were created with the existing signing key and independently verified against the application's public key. There is no Authenticode signature claim.
 
-The local ARM VM was shut down normally after its working tree and downloaded artifacts were saved. VMware now assigns 8,192 MB RAM and four virtual processors. Installed runtime results will be appended after boot and execution; a resource setting or build result alone is not a functional test.
+The local ARM VM was shut down normally before resizing to 8,192 MB RAM and four virtual processors. It was subsequently unlocked and booted; installed runtime results on September 6 are recorded below.
 
 ### Installed runtime verification (Windows 11 ARM64 VM)
 
@@ -55,7 +55,7 @@ The installer's own PE header is the x86 NSIS bootstrap for both architectures, 
 | Update check without downgrade | The updater endpoint currently serves 0.1.2 (platforms `darwin-aarch64`, `windows-aarch64`). On ARM64 0.5.0 the startup check produced no update-available event and no error across a 30-second window, so no downgrade was offered. |
 | x64 installation under ARM emulation | The draft x64 installer installed a PE `0x8664`, 0.5.0 payload byte-identical to the extracted one; the process loads `xtajit64se.dll`. The licensed fixture transcribed (88 characters in 0.9 s), pasted into a separate window, and the previous clipboard was restored. |
 
-#### Observations that need your judgement
+#### Remaining observations
 
 - **x64 update check fails rather than staying quiet.** The emulated x64 build logs `None of the fallback platforms ["windows-x86_64-nsis", "windows-x86_64"] were found in the response platforms object`, because the published 0.1.2 manifest predates x64 support. No downgrade is offered, but users on x64 would see a failed check until a manifest containing `windows-x86_64` is published.
 - **The manual update check lives in About, not the tray.** The tray item is `#[cfg(target_os = "macos")]`, but the About page's **Buscar ahora** button is cross-platform and works on Windows; see the measured result below.
