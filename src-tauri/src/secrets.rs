@@ -481,13 +481,12 @@ mod tests {
     }
 
     /// Use only a unique account in the test service, with cleanup even after a failed assertion.
-    /// Run explicitly with `DICTAMELO_KEYRING_TESTS=1`; normal tests never access the OS store.
+    /// Run: `DICTAMELO_KEYRING_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml roundtrip_in_system_store -- --ignored`.
+    /// Normal tests never access the OS store.
     #[test]
+    #[ignore = "requires explicit live/OS opt-in"]
     fn roundtrip_in_system_store() {
-        if std::env::var("DICTAMELO_KEYRING_TESTS").as_deref() != Ok("1") {
-            eprintln!("skipped: set DICTAMELO_KEYRING_TESTS=1");
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_KEYRING_TESTS").as_deref(), Ok("1"), "explicit opt-in requires DICTAMELO_KEYRING_TESTS=1");
         const SERVICE: &str = "com.dictamelo.desktop.tests";
         struct Cleanup(String);
         impl Drop for Cleanup {

@@ -7,12 +7,20 @@ Reviewed on September 5, 2026. This is a product and architecture recommendation
 | Choice | What the customer receives | Account and payment |
 | --- | --- | --- |
 | Free — your own API keys | Dictation and supported cleanup using the customer's provider account. Dictámelo does not impose a cloud allowance on this mode. | No Dictámelo account required. The provider may charge the customer. |
-| Free Cloud | 2,000 words per week, shared across devices, with a visible usage counter and renewal date. | Create a free account using email/password or Google. No subscription required. |
+| Free Cloud | 2,000 words per week, shared across devices, with included cleanup of those transcriptions, a visible usage counter and renewal date. | Create a free account using email/password or Google. No subscription required. |
 | Pro | Recommended: 60 hours of hosted transcription per rolling 30 days, with text cleanup and the existing five-device license. | $4.99/month. Preserve existing licenses. |
 
 “Free with your keys” describes the application's price, not a promise that Groq, OpenAI, or another provider is free. Explain that directly under its price. Display the active route separately from whether an account exists: a signed-in user can still choose their own keys.
 
 Use 60 hours as an explicit allowance, not “unlimited.” It is three times the previous allowance and averages two hours per day. Keep provider details out of the cloud signup flow; expose them in the personal-key setup where the choice changes the customer's bill.
+
+### Free cleanup update
+
+The subsequent Free Cloud implementation includes cleanup with the hosted GPT-OSS 20B model; it is not restricted to Pro or personal keys. A completed transcription issues a receipt bound to that account and the SHA-256 digest of its exact trimmed text. The receipt expires after 24 hours, allows at most two reserved attempts and cannot be reused after success. Cleanup does not charge the transcription words again, including when the last accepted recording crosses the 2,000-word allowance.
+
+Separate server safeguards cap cleanup at 250,000 input and 250,000 completion tokens per account per original transcription UTC week, with one active cleanup call per account. Completion usage includes reasoning, and uncertain provider outcomes retain their reservation. The receipt/attempt tables retain hashes and accounting metadata, not raw or cleaned transcripts; text is still sent to the provider for processing. A hash is not encrypted text, and receipt expiry is not a metadata-deletion policy.
+
+Migration `20260905030000_free_cleanup` and the handlers are deployed. The live licensed English fixture produced the expected 17-word transcript and real cleanup without an additional word charge; replay, modified-text, cross-account, concurrent-claim and quota-boundary checks also passed using disposable test accounts. See the [current API contract](AUTH_AND_CLOUD.md#free-cloud-transcription-and-cleanup-contract) and [verification record](TESTING.md). The original Pro review findings and test counts below remain historical checkpoints.
 
 ## Why 60 hours can work at $4.99
 

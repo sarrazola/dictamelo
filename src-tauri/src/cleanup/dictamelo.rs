@@ -1,5 +1,5 @@
-//! Limpieza a través de nuestro servidor (plan Pro). Mismo trato que la transcripción:
-//! la credencial es la licencia y la clave del proveedor vive solo en el servidor.
+//! Hosted cleanup. Pro uses a license; Free Cloud uses an account JWT and a receipt
+//! bound to the original transcription. Provider credentials remain on the server.
 
 use super::{wrap_transcript, CleanerInfo, TextCleaner};
 use crate::transcription::openai_compatible::{map_reqwest, map_status};
@@ -19,6 +19,13 @@ struct CleanupRequest<'a> {
     system: &'a str,
     text: String,
     model: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FreeCleanupRequest<'a> {
+    text: &'a str,
+    cleanup_receipt: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -46,6 +53,30 @@ impl DictameloCleaner {
     pub fn new(http: reqwest::Client) -> Self {
         Self { http, endpoint: crate::cloud_config::backend_url().ok().map(|base| format!("{base}/cleanup")) }
     }
+
+    fn request(
+        &self,
+        api_key: Option<&str>,
+        model: &str,
+        system_prompt: &str,
+        text: &str,
+        cleanup_receipt: Option<&str>,
+    ) -> Result<reqwest::RequestBuilder, TranscriptionError> {
+        let endpoint = self.endpoint.as_deref().ok_or_else(|| TranscriptionError::Rejected("Cloud services are not configured in this build. Use your own API key.".into()))?;
+        let credential = api_key.map(str::trim).filter(|key| !key.is_empty()).ok_or(TranscriptionError::MissingApiKey)?;
+        let builder = self.http.post(endpoint).timeout(Duration::from_secs(65));
+        if let Some(token) = credential.strip_prefix("Bearer ") {
+            if token.is_empty() { return Err(TranscriptionError::MissingApiKey); }
+            let receipt = cleanup_receipt.filter(|value| uuid::Uuid::parse_str(value).is_ok())
+                .ok_or_else(|| TranscriptionError::Rejected("Included cleanup is unavailable for this transcription. Your original text was preserved.".into()))?;
+            // Do not trim, wrap or rewrite receipt-bound text, and do not send custom
+            // model/system instructions. The server owns the Free Cloud cleanup policy.
+            Ok(builder.bearer_auth(token).json(&FreeCleanupRequest { text, cleanup_receipt: receipt }))
+        } else {
+            Ok(builder.header("x-license-key", credential)
+                .json(&CleanupRequest { system: system_prompt, text: wrap_transcript(text), model }))
+        }
+    }
 }
 
 #[async_trait]
@@ -53,7 +84,7 @@ impl TextCleaner for DictameloCleaner {
     fn info(&self) -> CleanerInfo {
         CleanerInfo {
             id: Self::ID.into(),
-            name: "Dictámelo Pro".into(),
+            name: "Dictámelo Cloud".into(),
             key_provider: Self::ID.into(),
             default_model: "openai/gpt-oss-20b".into(),
             models: vec![ModelInfo {
@@ -64,22 +95,16 @@ impl TextCleaner for DictameloCleaner {
         }
     }
 
-    /// `api_key` es aquí la clave de licencia del usuario.
+    /// `api_key` contains the captured Pro license or Free Cloud bearer credential.
     async fn clean(
         &self,
         api_key: Option<&str>,
         model: &str,
         system_prompt: &str,
         text: &str,
+        cleanup_receipt: Option<&str>,
     ) -> Result<String, TranscriptionError> {
-        let endpoint = self.endpoint.as_deref().ok_or_else(|| TranscriptionError::Rejected("Cloud services are not configured in this build. Use your own API key.".into()))?;
-        let license = api_key.map(str::trim).filter(|k| !k.is_empty()).ok_or(TranscriptionError::MissingApiKey)?;
-        let response = self
-            .http
-            .post(endpoint)
-            .header("x-license-key", license)
-            .timeout(Duration::from_secs(45))
-            .json(&CleanupRequest { system: system_prompt, text: wrap_transcript(text), model })
+        let response = self.request(api_key, model, system_prompt, text, cleanup_receipt)?
             .send()
             .await
             .map_err(map_reqwest)?;
@@ -97,5 +122,36 @@ impl TextCleaner for DictameloCleaner {
             .map_err(|e| TranscriptionError::InvalidResponse(format!("{e}: {}", truncate(&body, 200))))?;
         let content = parsed.choices.into_iter().next().and_then(|c| c.message.content).unwrap_or_default();
         Ok(super::openai_compatible_chat::tidy(&content))
+    }
+}
+
+#[cfg(test)]
+mod receipt_tests {
+    use super::*;
+
+    fn cleaner() -> DictameloCleaner {
+        DictameloCleaner { http: reqwest::Client::new(), endpoint: Some("https://example.invalid/cleanup".into()) }
+    }
+
+    #[test]
+    fn free_request_uses_bearer_and_exact_text_without_pro_instructions() {
+        let text = "\u{0085}eh send it Thursday no Friday\u{0085}";
+        let receipt = "55740015-ff96-4af8-9323-2d72ce02bc62";
+        let request = cleaner().request(Some("Bearer example-token"), "custom-model", "custom instructions", text, Some(receipt)).unwrap().build().unwrap();
+        assert_eq!(request.headers()["authorization"], "Bearer example-token");
+        assert!(request.headers().get("x-license-key").is_none());
+        let body: serde_json::Value = serde_json::from_slice(request.body().unwrap().as_bytes().unwrap()).unwrap();
+        assert_eq!(body, serde_json::json!({ "text": text, "cleanupReceipt": receipt }));
+    }
+
+    #[test]
+    fn pro_contract_is_unchanged_and_free_receipts_are_required() {
+        let request = cleaner().request(Some("example-license"), "model", "system", " hello ", None).unwrap().build().unwrap();
+        assert_eq!(request.headers()["x-license-key"], "example-license");
+        assert!(request.headers().get("authorization").is_none());
+        let body: serde_json::Value = serde_json::from_slice(request.body().unwrap().as_bytes().unwrap()).unwrap();
+        assert_eq!(body, serde_json::json!({ "model": "model", "system": "system", "text": "<transcript>\nhello\n</transcript>" }));
+        assert!(cleaner().request(Some("Bearer example-token"), "", "", "hello", None).is_err());
+        assert!(cleaner().request(Some("Bearer example-token"), "", "", "hello", Some("not-a-receipt")).is_err());
     }
 }

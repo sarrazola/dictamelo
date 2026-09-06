@@ -158,7 +158,7 @@ pub fn check_on_startup(app: &AppHandle) {
 /// Es la prueba que atrapa los errores de publicación más caros: firmar con otra llave, subir un
 /// archivo corrupto o apuntar `latest.json` a una URL equivocada.
 ///
-/// Requiere red; se ejecuta con `DICTAMELO_LIVE_TESTS=1`.
+/// Requires network access. Run: `DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --ignored`.
 #[cfg(test)]
 mod live_tests {
     /// La misma llave que va en `tauri.conf.json` y que el binario usa para validar.
@@ -169,11 +169,9 @@ mod live_tests {
     }
 
     #[test]
+    #[ignore = "requires explicit live/OS opt-in"]
     fn published_release_signature_is_valid() {
-        if std::env::var("DICTAMELO_LIVE_TESTS").is_err() {
-            eprintln!("omitido: define DICTAMELO_LIVE_TESTS=1");
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_LIVE_TESTS").as_deref(), Ok("1"), "explicit opt-in requires DICTAMELO_LIVE_TESTS=1");
         let endpoint = "https://github.com/sarrazola/dictamelo/releases/latest/download/latest.json";
         let manifest: serde_json::Value = reqwest::blocking::get(endpoint)
             .expect("descargar latest.json")

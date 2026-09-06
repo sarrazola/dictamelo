@@ -175,10 +175,13 @@ function isHostedMode() { return cloudAvailable() && !ui.settings.useOwnKey && (
 function renderCleanup() {
   const hosted = isHostedMode();
   const freeCloud = hosted && !ui.license.active;
-  const enabled = ui.settings.cleanupEnabled && !freeCloud;
-  $("#cleanup-enabled").disabled = freeCloud;
+  const enabled = ui.settings.cleanupEnabled;
+  $("#cleanup-enabled").disabled = false;
   $("#cleanup-enabled").checked = enabled;
   $("#cleanup-options").hidden = !enabled;
+  $("#cleanup-prompt-row").hidden = freeCloud;
+  $("#cleanup-standard-note").hidden = !freeCloud;
+  if (freeCloud) $("#prompt-editor").hidden = true;
   const cleaner = currentCleaner();
   if (!cleaner) return;
   fillSelect($("#cleanup-model"), cleaner.models.map((mm) => [mm.id, mm.name]), ui.settings.cleanupModel);
@@ -216,6 +219,7 @@ function providerLogo(id, name) {
 
 function renderModels() {
   const hosted = isHostedMode();
+  $("#dropzone .formats").textContent = t(hosted && !ui.license.active ? "files.formats.free" : "files.formats");
   $("#models-cloud-notice").hidden = !hosted;
   $("#models-cloud-desc").textContent = t(ui.license.active ? "models.cloud.pro" : "models.cloud.free");
   $$(".byok-models").forEach(el => el.hidden = hosted);
@@ -642,7 +646,7 @@ function renderFileJobs(jobs) {
     meta.textContent = job.durationSecs > 0 ? t("files.minutes", { m: (job.durationSecs / 60).toFixed(1) }) : formatSize(job.sizeBytes);
     const state = document.createElement("span");
     state.className = `state ${job.stage}`;
-    if (job.stage === "converting" || job.stage === "transcribing" || job.stage === "queued") {
+    if (["converting", "transcribing", "cleaning", "queued"].includes(job.stage)) {
       const spin = document.createElement("span");
       spin.className = "spinner";
       state.appendChild(spin);
@@ -665,6 +669,13 @@ function renderFileJobs(jobs) {
       err.className = "error";
       err.textContent = job.error || t("files.failed");
       li.appendChild(err);
+    }
+
+    if (job.cleanupWarning) {
+      const warning = document.createElement("div");
+      warning.className = "cleanup-warning";
+      warning.textContent = job.cleanupWarning;
+      li.appendChild(warning);
     }
 
     const tools = document.createElement("div");
@@ -1195,6 +1206,7 @@ async function init() {
   await listen("status", (e) => renderStatus(e.payload));
   await listen("history-changed", () => { refreshHistory(); refreshAccount(); });
   await listen("file-jobs-changed", (e) => { renderFileJobs(e.payload); if (e.payload?.some(j => j.stage === "done")) refreshAccount(); });
+  await listen("file-cleanup-warning", (e) => toast(String(e.payload), true));
   await listen("update-available", (e) => applyUpdateInfo(e.payload));
   await listen("update-progress", (e) => {
     const { downloaded, total } = e.payload || {};

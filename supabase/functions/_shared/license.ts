@@ -108,6 +108,33 @@ export class Db {
           "This week's free request limit has been reached.",
         );
       }
+      if (text.includes("invalid_cleanup_receipt")) {
+        throw new LicenseError(
+          403,
+          "This cleanup receipt does not belong to this account and transcript.",
+        );
+      }
+      if (text.includes("cleanup_receipt_expired")) {
+        throw new LicenseError(
+          410,
+          "This transcription's cleanup receipt has expired. Keep the original transcript or use your own API key.",
+        );
+      }
+      if (text.includes("cleanup_already_completed")) {
+        throw new LicenseError(
+          409,
+          "This transcription has already been cleaned. Keep the result or the original transcript.",
+        );
+      }
+      if (
+        text.includes("cleanup_retry_limit") ||
+        text.includes("weekly_cleanup_limit")
+      ) {
+        throw new LicenseError(
+          429,
+          "The free cleanup safety limit has been reached. Your original transcript is still available.",
+        );
+      }
       if (text.includes("monthly_audio_limit")) {
         throw new LicenseError(
           429,

@@ -25,6 +25,23 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 
+# Validate the committed speech-upload fixture before toolchain setup or signing.
+# This is offline unless the maintainer explicitly enables the live regression.
+$fixturePython = Get-Command py -ErrorAction SilentlyContinue
+$fixturePythonArgs = @('-3')
+if (-not $fixturePython) {
+    $fixturePython = Get-Command python -ErrorAction SilentlyContinue
+    $fixturePythonArgs = @()
+}
+if (-not $fixturePython) { throw 'Python 3 is required for the offline speech fixture regression.' }
+& $fixturePython.Source @fixturePythonArgs scripts/check-audio-fixture.py
+if ($LASTEXITCODE -ne 0) { throw 'Offline speech fixture regression failed' }
+if ($env:DICTAMELO_LIVE_REGRESSION -eq '1') {
+    if (-not $env:DICTAMELO_TEST_PROJECT_REF) { throw 'Set DICTAMELO_TEST_PROJECT_REF for the explicit live regression target.' }
+    & $fixturePython.Source @fixturePythonArgs scripts/test-free-cleanup-live.py --live --project-ref $env:DICTAMELO_TEST_PROJECT_REF
+    if ($LASTEXITCODE -ne 0) { throw 'Live free-cloud regression failed' }
+}
+
 # ---------------------------------------------------------------------------
 # Target
 # ---------------------------------------------------------------------------
@@ -127,6 +144,12 @@ if (-not (Test-Path 'node_modules\@tauri-apps\cli')) {
     npm ci --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
 }
+
+Write-Host '==> Running native regression tests for the requested target'
+# A target that cannot execute on this machine needs a compatible test runner;
+# compiling it successfully is not sufficient release verification.
+cargo test --locked --manifest-path src-tauri/Cargo.toml --target $Target
+if ($LASTEXITCODE -ne 0) { throw "Rust regression tests failed for $Target" }
 
 Write-Host '==> Building'
 # Windows cannot hold an empty environment variable: `$env:VAR = ''` deletes it instead of leaving

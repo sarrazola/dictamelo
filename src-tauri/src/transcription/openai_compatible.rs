@@ -95,6 +95,7 @@ impl OpenAiCompatibleClient {
             text: parsed.text.trim().to_string(),
             language: parsed.language,
             duration_secs: parsed.duration,
+            cleanup_receipt: None,
         })
     }
 }

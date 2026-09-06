@@ -2,11 +2,11 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current iteration: local 0.3.1 Mac preview
+## Current release candidate: 0.4.0
 
-The final Apple Silicon 0.3.1 app and DMG have been built, notarized, stapled and checked with Gatekeeper. The installed executable matches the read-only DMG, the native application-menu update action passed, and the Google session survived app replacement. Actual results are recorded in [Testing](TESTING.md). Do not run Windows build jobs, overwrite the existing 0.2.0 draft assets, change public 0.1.2, create a 0.3.1 GitHub release, or run `scripts/release.sh` for this iteration. The full publication workflow below is for a later complete release; its example version is 0.3.2.
+This iteration restores macOS and both Windows targets. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
 
-The 0.3.1 source adds noninteractive cached credentials and update actions in the tray and native application menu. Google is configured and tested with a permitted owned account, but the audience remains Testing until real homepage/privacy URLs and branding are completed. SMTP delivery and trial entitlement remain pending. Keep `DICTAMELO_PRO_TRIAL_AVAILABLE=false`. Pro quota deployment and verification from 0.3.0 remain recorded separately. No new Windows result or public updater manifest is part of this preview.
+The first distribution may be a GitHub **prerelease** while the external launch requirements in [Production readiness](PRODUCTION_READINESS.md) remain open. A prerelease provides public installer downloads without changing the stable automatic-update channel. Do not advertise universal cloud signup, verified email delivery or the seven-day trial before those flows actually work. Keep `DICTAMELO_PRO_TRIAL_AVAILABLE=false` until trial entitlement has been verified.
 
 ## 1. Prepare the version
 
@@ -14,10 +14,10 @@ Start from current `main` and preserve any unrelated work. Choose a new version;
 
 ```sh
 git pull --ff-only
-python3 scripts/set-version.py 0.3.2
+python3 scripts/set-version.py 0.4.0
 ```
 
-This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.3.2.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
+This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.4.0.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
 
 ## 2. Validate and deploy backend changes
 
@@ -38,7 +38,7 @@ supabase functions deploy transcribe cleanup usage --project-ref iburiyhhfodndqg
 
 For a repeatable hosted test on macOS with Python `requests` installed, run `python3 scripts/verify-free-backend.py --live`. It creates its own temporary account, redeems an admin-generated email code without sending a message, transcribes one short synthesized recording, verifies quota/auth/refresh behavior, and removes that account. This incurs one small provider request.
 
-For a future cross-platform release, the manually triggered **Windows x64 verification** GitHub Actions workflow runs tests and builds an unsigned installer on a native x64 Windows runner. Its artifact is for verification only; release installers still need the existing Tauri signing key. Trigger it with `gh workflow run windows-check.yml --ref main`.
+The manually triggered **Windows builds and regression checks** GitHub Actions workflow runs the tests on native x64 Windows and builds both explicit targets. ARM64 is cross-compiled, and its payload execution still needs an ARM machine. Unsigned CI artifacts require the existing Tauri signing key and independent verification before distribution. The official-cloud option uses validated public repository variables; ordinary PR builds stay unconfigured. Trigger it with `gh workflow run windows-check.yml --ref main -f official_cloud=true`.
 
 Deploy compatible schema before dependent functions, and functions before distributing clients. Both quota SQL tests roll back their temporary data. Verify invalid authentication, real free transcription, word accounting, quota exhaustion, session refresh, existing Pro licenses, product ownership, concurrency and immediate transcription-to-cleanup. Use temporary test data, never a customer's account. A clean local PostgreSQL database can test the migration/RPC behavior without changing production; record that distinction.
 
@@ -86,9 +86,9 @@ cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_artifact
 
 Check `SHA256SUMS.txt` from that directory, validate the DMG with `xcrun stapler` and Gatekeeper, mount it read-only, and inspect the actual contained app before copying it to Applications. Verify the installed app too. This preview path does not require Windows artifacts and must not create or upload `latest.json`; the complete-release verifier and publisher below serve a different, later release step.
 
-## 4. Build both Windows targets for a future complete release
+## 4. Build both Windows targets
 
-Skip this section for the 0.3.1 Mac preview. When cross-platform work resumes, use the same committed source, version and appropriate explicit public build metadata on Windows. Ensure MSVC x64/ARM64 toolchains, Windows SDK, Clang, and NASM are installed. Set `TAURI_SIGNING_PRIVATE_KEY` securely in the build process, using the same key as macOS. An empty updater-key password needs an actual empty environment entry on Windows; the build script handles this with `ProcessStartInfo`.
+Use the same committed source, version and appropriate explicit public build metadata on Windows. Ensure MSVC x64/ARM64 toolchains, Windows SDK, Clang, and NASM are installed. Set `TAURI_SIGNING_PRIVATE_KEY` securely in the build process, using the same key as macOS. An empty updater-key password needs an actual empty environment entry on Windows; the build script handles this with `ProcessStartInfo`.
 
 Run the Windows build script once per explicit Rust target:
 
@@ -102,16 +102,16 @@ Verify the installed application executable's PE machine type and product versio
 Copy the signed outputs to the Mac's ignored `dist/windows/` folder, named exactly:
 
 ```text
-Dictamelo_0.3.2_x86_64-setup.exe
-Dictamelo_0.3.2_x86_64-setup.exe.sig
-Dictamelo_0.3.2_aarch64-setup.exe
-Dictamelo_0.3.2_aarch64-setup.exe.sig
+Dictamelo_0.4.0_x86_64-setup.exe
+Dictamelo_0.4.0_x86_64-setup.exe.sig
+Dictamelo_0.4.0_aarch64-setup.exe
+Dictamelo_0.4.0_aarch64-setup.exe.sig
 ```
 
 Create a draft to transfer artifacts between machines:
 
 ```sh
-gh release create v0.3.2 --draft --target main --title "Dictámelo 0.3.2" --notes-file docs/releases/0.3.2.md
+gh release create v0.4.0 --draft --target main --title "Dictámelo 0.4.0" --notes-file docs/releases/0.4.0.md
 ```
 
 Use `gh release upload` / `gh release download` to transfer files. Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The Windows publishing helper refuses to overwrite public releases and can append a platform to a draft release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
@@ -119,17 +119,17 @@ Use `gh release upload` / `gh release download` to transfer files. Keep it draft
 When the x64 release artifact comes from native CI, upload only the ARM64 pair from the VM. The helper otherwise defaults to both targets and could replace the draft's CI artifact with a different cross-built file:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.3.2 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
+powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.4.0 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
 ```
 
 ## 5. Commit, stage, and publish a complete release
 
-Do not publish the local 0.3.1 Mac preview through this workflow. For a later complete release, update the testing record with actual results and limitations. Review `git diff` and stage only intended paths. Commit and push the source. Ensure source files did not change after the final build; rebuild affected artifacts if they did.
+Update the testing record with actual results and limitations. Review `git diff` and stage only intended paths. Commit and push the source. Ensure source files did not change after the final build; rebuild affected artifacts if they did.
 
 ```sh
-python3 scripts/stage-release.py 0.3.2
-cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.3.2"
-./scripts/release.sh 0.3.2
+python3 scripts/stage-release.py 0.4.0
+cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.4.0"
+./scripts/release.sh 0.4.0
 ```
 
 The release script requires a clean `main`, the correct macOS bundle version, signed artifacts for all three platforms, valid updater signatures, and stapled Apple artifacts. It creates/pushes only this release's tag, uploads a draft's artifacts, and then publishes it as latest. It does not stage arbitrary source changes or push every local tag.
@@ -138,10 +138,10 @@ The release contains the macOS DMG, macOS updater archive and `.sig`, both Windo
 
 ## 6. Verify the public release
 
-Download the assets again into a fresh directory using `gh release download v0.3.2`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
+Download the assets again into a fresh directory using `gh release download v0.4.0`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
 
 ```sh
-DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --nocapture
+DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --ignored --nocapture
 xcrun stapler validate /path/to/downloaded.dmg
 spctl --assess --type open --context context:primary-signature --verbose=2 /path/to/downloaded.dmg
 ```
@@ -149,3 +149,13 @@ spctl --assess --type open --context context:primary-signature --verbose=2 /path
 Mount the downloaded DMG and check the contained app with `codesign --verify --deep --strict`, `xcrun stapler validate`, and `spctl --assess --type execute`. Confirm `source=Notarized Developer ID`. Verify a real old-version-to-new-version update separately; a valid signature alone is not an installation test.
 
 GitHub's public download URL may cache an earlier manifest briefly. Compare the exact release asset/API response before diagnosing an upload failure, then verify the public URL after it refreshes. Do not overwrite public installer bytes to fix a release: publish the next version.
+
+## Publishing a release candidate
+
+Use this only after staging and verifying the complete set of artifacts above. The installers are immutable once public, including prereleases. A later correction requires a new version.
+
+```sh
+./scripts/release.sh 0.4.0 --prerelease
+```
+
+The script checks that the release is still a draft before uploading, then publishes it as a prerelease without changing the stable channel. Re-download and verify every checksum and updater signature after publication. Keep the README download table linked to the exact version and architecture that was checked. When production requirements are satisfied, promoting this identical candidate to stable is a metadata change; do not replace its bytes. Verify the stable updater endpoint and a real old-version update after promotion.

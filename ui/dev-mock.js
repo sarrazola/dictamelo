@@ -28,7 +28,7 @@ if (!window.__TAURI__) {
   let signedIn = false;
   const commands = {
     get_app_info: () => ({
-      version: "0.3.1", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
+      version: "0.4.0", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
       logDir: "~/Library/Logs/com.dictamelo.desktop",
       configDir: "~/Library/Application Support/com.dictamelo.desktop",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",

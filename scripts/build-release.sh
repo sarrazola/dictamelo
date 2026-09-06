@@ -3,6 +3,13 @@
 # The updater archive is created AFTER stapling, then signed with the existing Tauri key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Fail before reading signing credentials or building if the upload regression asset is invalid.
+python3 scripts/check-audio-fixture.py
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+if [[ "${DICTAMELO_LIVE_REGRESSION:-0}" == "1" ]]; then
+  : "${DICTAMELO_TEST_PROJECT_REF:?Set the explicit Supabase project for the live regression}"
+  python3 scripts/test-free-cleanup-live.py --live --project-ref "$DICTAMELO_TEST_PROJECT_REF"
+fi
 IDENTITY="${APPLE_SIGNING_IDENTITY:-$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)}"
 PROFILE="${NOTARY_KEYCHAIN_PROFILE:-DictameloNotary}"
 [[ -n "$IDENTITY" ]] || { echo 'A Developer ID Application certificate is required.' >&2; exit 1; }

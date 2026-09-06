@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — Release candidate
+
+- Include hosted AI cleanup in Free Cloud without charging transcription words twice.
+- Apply optional cleanup to uploaded audio as well as dictation; preserve the original result when cleanup fails.
+- Add an attributed open speech fixture, transcript comparison and repeatable offline/live regression checks.
+- Prepare macOS, Windows Intel/AMD x64 and Windows ARM64 from the same source on `main`.
+- Add a production-readiness checklist and an explicit prerelease publishing mode that preserves the stable updater channel.
+
+Artifact and hosted test results are recorded in `docs/TESTING.md` as they complete. This entry is not a claim of production cloud availability.
+
 ## 0.3.1 — Mac preview, not published
 
 See [preview notes](docs/releases/0.3.1.md) and the [verification record](docs/TESTING.md).

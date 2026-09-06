@@ -53,8 +53,8 @@ impl TranscriptionProvider for GroqProvider {
     }
 }
 
-/// Pruebas reales contra la API de Groq. Se ejecutan solo con `DICTAMELO_LIVE_TESTS=1`;
-/// leen la API key del Llavero y sintetizan una frase en español con `say` (macOS).
+/// Live Groq tests read the API key from Keychain and synthesize Spanish speech with `say` on macOS.
+/// Run: `DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml transcription::groq::live_tests -- --ignored`.
 #[cfg(all(test, target_os = "macos"))]
 mod live_tests {
     use super::*;
@@ -118,11 +118,9 @@ mod live_tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires explicit live/OS opt-in"]
     async fn transcribes_spanish_tts_audio() {
-        if std::env::var("DICTAMELO_LIVE_TESTS").is_err() {
-            eprintln!("omitido: define DICTAMELO_LIVE_TESTS=1");
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_LIVE_TESTS").as_deref(), Ok("1"), "explicit opt-in requires DICTAMELO_LIVE_TESTS=1");
         let key = keychain_key().expect("API key de Groq en el Llavero");
         let dir = std::env::temp_dir().join(format!("dictado-live-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -151,10 +149,9 @@ mod live_tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires explicit live/OS opt-in"]
     async fn invalid_key_is_reported_as_unauthorized() {
-        if std::env::var("DICTAMELO_LIVE_TESTS").is_err() {
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_LIVE_TESTS").as_deref(), Ok("1"), "explicit opt-in requires DICTAMELO_LIVE_TESTS=1");
         let dir = std::env::temp_dir();
         let wav = crate::audio::wav::new_temp_path(&dir);
         crate::audio::wav::write_wav_mono_i16(&wav, &vec![0i16; 16_000], 16_000).unwrap();

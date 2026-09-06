@@ -80,14 +80,12 @@ impl ClipboardBackend for MacClipboard {
 mod tests {
     use super::*;
 
-    /// Modifica el portapapeles real del usuario (lo deja como estaba). Se ejecuta solo
-    /// con `DICTAMELO_CLIPBOARD_TESTS=1`.
+    /// Temporarily modifies the real clipboard, then restores its original contents.
+    /// Run: `DICTAMELO_CLIPBOARD_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml snapshot_and_restore_roundtrip -- --ignored`.
     #[test]
+    #[ignore = "requires explicit live/OS opt-in"]
     fn snapshot_and_restore_roundtrip() {
-        if std::env::var("DICTAMELO_CLIPBOARD_TESTS").is_err() {
-            eprintln!("omitido: define DICTAMELO_CLIPBOARD_TESTS=1");
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_CLIPBOARD_TESTS").as_deref(), Ok("1"), "explicit opt-in requires DICTAMELO_CLIPBOARD_TESTS=1");
         let cb = MacClipboard;
         let original = cb.snapshot().unwrap();
 

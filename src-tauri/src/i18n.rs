@@ -243,6 +243,14 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Datei konnte nicht gelesen werden: {e}",
             "Impossibile leggere il file: {e}",
         ]),
+        "file.cleanup_failed" => pick(lang, [
+            "No se pudo completar la limpieza con IA. Conservamos la transcripción original.",
+            "AI cleanup could not finish. The original transcript was preserved.",
+            "Não foi possível concluir a limpeza com IA. A transcrição original foi preservada.",
+            "Le nettoyage IA n’a pas pu aboutir. La transcription originale a été conservée.",
+            "Die KI-Bereinigung konnte nicht abgeschlossen werden. Das Originaltranskript wurde beibehalten.",
+            "La pulizia IA non è stata completata. La trascrizione originale è stata conservata.",
+        ]),
         "file.empty" => pick(lang, [
             "El archivo no contiene audio",
             "The file contains no audio",

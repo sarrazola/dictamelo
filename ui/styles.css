@@ -344,6 +344,7 @@ button:disabled { opacity: .45; cursor: default; }
   -webkit-user-select: text; user-select: text;
 }
 .job .error { margin-top: 6px; color: var(--err); font-size: 12px; }
+.job .cleanup-warning { margin-top: 6px; color: var(--muted); font-size: 12px; }
 .job .tools { display: flex; gap: 6px; margin-top: 8px; }
 
 /* ---------- Historial ---------- */

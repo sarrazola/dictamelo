@@ -47,6 +47,7 @@ impl TextCleaner for GroqCleaner {
         model: &str,
         system_prompt: &str,
         text: &str,
+        _cleanup_receipt: Option<&str>,
     ) -> Result<String, TranscriptionError> {
         let key = api_key.map(str::trim).filter(|k| !k.is_empty()).ok_or(TranscriptionError::MissingApiKey)?;
         // Razonamiento al mínimo: el trabajo es mecánico y la latencia importa más.
@@ -54,7 +55,8 @@ impl TextCleaner for GroqCleaner {
     }
 }
 
-/// Prueba real contra Groq (`DICTAMELO_LIVE_TESTS=1`, API key en el Llavero).
+/// Live Groq cleanup test; the API key must be present in Keychain.
+/// Run: `DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml cleans_spanish_dictation -- --ignored`.
 #[cfg(all(test, target_os = "macos"))]
 mod live_tests {
     use super::*;
@@ -71,15 +73,14 @@ mod live_tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires explicit live/OS opt-in"]
     async fn cleans_spanish_dictation() {
-        if std::env::var("DICTAMELO_LIVE_TESTS").is_err() {
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_LIVE_TESTS").as_deref(), Ok("1"), "explicit opt-in requires DICTAMELO_LIVE_TESTS=1");
         let key = keychain_key().expect("API key de Groq en el Llavero");
         let cleaner = GroqCleaner::new(shared_http_client());
         let prompt = build_system_prompt("", "Sarrazola");
         let raw = "eh bueno entonces o sea mándale el correo a sarrasola el jueves no espera el viernes punto y dile que que la reunión es a las tres";
-        let out = cleaner.clean(Some(&key), "openai/gpt-oss-120b", &prompt, raw).await.expect("limpieza");
+        let out = cleaner.clean(Some(&key), "openai/gpt-oss-120b", &prompt, raw, None).await.expect("limpieza");
         eprintln!("limpio: {out:?}");
         let lower = out.to_lowercase();
         assert!(!lower.contains("o sea") && !lower.starts_with("eh"), "quedaron muletillas: {out}");
@@ -88,7 +89,7 @@ mod live_tests {
         assert!(!out.contains("<transcript>") && !out.starts_with('"'));
 
         // Una pregunta se limpia, no se responde.
-        let out = cleaner.clean(Some(&key), "openai/gpt-oss-20b", &prompt, "cuál es la capital de francia").await.unwrap();
+        let out = cleaner.clean(Some(&key), "openai/gpt-oss-20b", &prompt, "cuál es la capital de francia", None).await.unwrap();
         eprintln!("pregunta: {out:?}");
         assert!(!out.to_lowercase().contains("parís"), "respondió en vez de limpiar: {out}");
     }

@@ -17,6 +17,7 @@ import {
   requireUser,
   reserveFree,
 } from "../_shared/free.ts";
+import { transcriptHash } from "../_shared/free_cleanup.ts";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 /** Modelos que aceptamos; evita que alguien pida uno caro por su cuenta. */
@@ -110,12 +111,23 @@ Deno.serve(handler(async (request, db) => {
       }, 502);
     }
     if (freeUser) {
-      await db.rpc("finish_free_usage", {
+      if (result.text.trim().length > 20000) {
+        return jsonResponse({
+          error: "The transcription service returned an oversized transcript.",
+        }, 502);
+      }
+      const cleanupReceipt = await db.rpc("finish_free_transcription", {
         p_user: freeUser.id,
         p_request: requestId,
         p_words: countWords(result.text),
+        p_transcript_hash: await transcriptHash(result.text),
       });
       completed = true;
+      return jsonResponse({
+        ...result,
+        text: result.text.trim(),
+        cleanupReceipt,
+      });
     }
     if (license) {
       if (

@@ -292,7 +292,7 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             if settings.cleanup_enabled {
                 set_status(app, Status::Cleaning);
                 let started = Instant::now();
-                match clean_text(&state, &settings, &source, &text).await {
+                match clean_text(&state, &settings, &source, &result.text, result.cleanup_receipt.as_deref()).await {
                     Ok(cleaned) if !cleaned.trim().is_empty() => {
                         log::info!("Texto limpio en {:.1}s ({} → {} caracteres)", started.elapsed().as_secs_f32(), text.chars().count(), cleaned.chars().count());
                         text = cleaned.trim().to_string();
@@ -379,10 +379,9 @@ pub(crate) async fn transcription_source(
     Ok(TranscriptionSource { provider, api_key, route, model })
 }
 
-/// Cleanup keeps the transcription request's captured route and Pro credential.
-async fn clean_text(state: &AppState, settings: &Settings, source: &TranscriptionSource, text: &str) -> Result<String, TranscriptionError> {
-    if source.route == TranscriptionRoute::FreeCloud { return Ok(text.to_string()); }
-    let (cleaner, api_key, model) = if source.route == TranscriptionRoute::ProCloud {
+/// Cleanup keeps the transcription request's captured route and cloud credential.
+pub(crate) async fn clean_text(state: &AppState, settings: &Settings, source: &TranscriptionSource, text: &str, cleanup_receipt: Option<&str>) -> Result<String, TranscriptionError> {
+    let (cleaner, api_key, model) = if source.route != TranscriptionRoute::OwnKey {
         let cleaner = state.backend_cleaner.clone();
         let model = cleaner.info().default_model;
         (cleaner, source.api_key.clone(), model)
@@ -398,7 +397,7 @@ async fn clean_text(state: &AppState, settings: &Settings, source: &Transcriptio
         (cleaner, key, settings.cleanup_model.clone())
     };
     cleaner
-        .clean(api_key.as_deref(), &model, &settings.cleanup_system_prompt(), text)
+        .clean(api_key.as_deref(), &model, &settings.cleanup_system_prompt(), text, cleanup_receipt)
         .await
 }
 

@@ -77,13 +77,14 @@ pub struct CleanerInfo {
 pub trait TextCleaner: Send + Sync {
     fn info(&self) -> CleanerInfo;
 
-    /// Devuelve el texto limpio. Los errores usan la misma taxonomía HTTP que la transcripción.
+    /// Returns cleaned text. Included hosted cleanup may require a receipt from this exact transcription.
     async fn clean(
         &self,
         api_key: Option<&str>,
         model: &str,
         system_prompt: &str,
         text: &str,
+        cleanup_receipt: Option<&str>,
     ) -> Result<String, TranscriptionError>;
 }
 

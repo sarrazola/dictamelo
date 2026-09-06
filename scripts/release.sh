@@ -3,7 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION="${1:-}"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Usage: scripts/release.sh X.Y.Z'; exit 1; }
+MODE="${2:-stable}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && ( "$MODE" == stable || "$MODE" == --prerelease ) ]] || { echo 'Usage: scripts/release.sh X.Y.Z [--prerelease]'; exit 1; }
 [[ -z "$(git status --porcelain)" ]] || { echo 'Commit the reviewed source changes first.' >&2; exit 1; }
 [[ "$(git branch --show-current)" == main ]] || { echo 'Release from main.' >&2; exit 1; }
 TAG="v$VERSION"
@@ -35,6 +36,10 @@ fi
   echo 'Refusing to replace assets without a confirmed draft release.' >&2; exit 1;
 }
 gh release upload "$TAG" "$STAGE"/* --clobber
-gh release edit "$TAG" --title "Dictámelo $VERSION" --notes-file "$NOTES" --draft=false --latest
-DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --nocapture
+if [[ "$MODE" == --prerelease ]]; then
+  gh release edit "$TAG" --title "Dictámelo $VERSION" --notes-file "$NOTES" --draft=false --prerelease --latest=false
+else
+  gh release edit "$TAG" --title "Dictámelo $VERSION" --notes-file "$NOTES" --draft=false --prerelease=false --latest
+  DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --ignored --nocapture
+fi
 gh release view "$TAG" --json url --jq .url

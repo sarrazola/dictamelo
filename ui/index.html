@@ -147,7 +147,7 @@
           <div class="plan-head"><strong data-i18n="plan.free.name"></strong><span class="plan-badge" data-i18n="plan.current" hidden></span></div>
           <div class="plan-price" data-i18n="plan.free.price"></div>
           <p class="plan-desc" data-i18n="plan.free.desc"></p>
-          <ul class="plan-list"><li data-i18n="plan.free.f1"></li><li data-i18n="plan.free.f2"></li><li data-i18n="plan.free.f3"></li></ul>
+          <ul class="plan-list"><li data-i18n="plan.free.f1"></li><li data-i18n="plan.free.f2"></li><li data-i18n="plan.free.f3"></li><li data-i18n="plan.free.f4"></li></ul>
           <button id="btn-use-cloud" class="ghost" data-i18n="account.create"></button>
         </div>
         <div class="plan" id="plan-pro">
@@ -246,13 +246,14 @@
             <div class="label"><strong data-i18n="models.cleanup.model"></strong><span id="cleanup-model-desc"></span></div>
             <div class="actions"><select id="cleanup-model"></select></div>
           </div>
-          <div class="row">
+          <div class="row" id="cleanup-prompt-row">
             <div class="label"><strong data-i18n="models.cleanup.prompt"></strong><span data-i18n="models.cleanup.prompt.desc"></span></div>
             <div class="actions">
               <button id="btn-toggle-prompt" class="ghost small"></button>
               <button id="btn-reset-prompt" class="ghost small" data-i18n="models.cleanup.reset"></button>
             </div>
           </div>
+          <p id="cleanup-standard-note" class="footnote" data-i18n="models.cleanup.standard" hidden></p>
           <div id="prompt-editor" class="editor" hidden>
             <textarea id="cleanup-prompt" class="mono" rows="16" spellcheck="false"></textarea>
           </div>

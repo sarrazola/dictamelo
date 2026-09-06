@@ -1,19 +1,36 @@
-name: Windows x64 verification
+name: Windows builds and regression checks
 
 on:
   workflow_dispatch:
+    inputs:
+      official_cloud:
+        description: Include official public cloud metadata from repository variables
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'src-tauri/**'
       - 'ui/**'
       - 'package*.json'
+      - 'scripts/**'
+      - 'tests/fixtures/**'
       - '.github/workflows/windows-check.yml'
 
 permissions:
   contents: read
 
 jobs:
-  windows-x64:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x86_64
+            machine: '0x8664'
+          - target: aarch64-pc-windows-msvc
+            arch: aarch64
+            machine: '0xaa64'
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
@@ -26,10 +43,47 @@ jobs:
           choco install nasm --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw 'NASM installation failed' }
           Add-Content $env:GITHUB_PATH 'C:\Program Files\NASM'
-          rustup target add x86_64-pc-windows-msvc
+          rustup target add x86_64-pc-windows-msvc ${{ matrix.target }}
           if ($LASTEXITCODE -ne 0) { throw 'Rust target installation failed' }
+          if ('${{ matrix.arch }}' -eq 'aarch64') {
+            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            $vs = & $vswhere -latest -products * -property installationPath
+            $arm = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
+            if (-not $arm) {
+              $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+              $process = Start-Process $installer -ArgumentList @('modify','--installPath',"`"$vs`"",'--add','Microsoft.VisualStudio.Component.VC.Tools.ARM64','--quiet','--norestart') -Wait -PassThru
+              if ($process.ExitCode -notin @(0,3010)) { throw 'MSVC ARM64 installation failed' }
+            }
+            Add-Content $env:GITHUB_PATH "$vs\VC\Tools\Llvm\x64\bin"
+          }
           npm ci --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+      - name: Validate the committed speech fixture and build configuration
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/tests -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture/configuration tests failed' }
+          node --check ui/main.js
+          if ($LASTEXITCODE -ne 0) { throw 'UI syntax check failed' }
+          node --check ui/i18n.js
+          if ($LASTEXITCODE -ne 0) { throw 'Translation syntax check failed' }
+      - name: Validate optional official build metadata
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.official_cloud }}
+        shell: pwsh
+        env:
+          DICTAMELO_SUPABASE_URL: ${{ vars.DICTAMELO_SUPABASE_URL }}
+          DICTAMELO_SUPABASE_ANON_KEY: ${{ vars.DICTAMELO_SUPABASE_ANON_KEY }}
+          DICTAMELO_LEMON_STORE_ID: ${{ vars.DICTAMELO_LEMON_STORE_ID }}
+          DICTAMELO_LEMON_PRODUCT_ID: ${{ vars.DICTAMELO_LEMON_PRODUCT_ID }}
+          DICTAMELO_LEMON_VARIANT_IDS: ${{ vars.DICTAMELO_LEMON_VARIANT_IDS }}
+          DICTAMELO_CHECKOUT_URL: ${{ vars.DICTAMELO_CHECKOUT_URL }}
+        run: |
+          $names = @('DICTAMELO_SUPABASE_URL','DICTAMELO_SUPABASE_ANON_KEY','DICTAMELO_LEMON_STORE_ID','DICTAMELO_LEMON_PRODUCT_ID','DICTAMELO_LEMON_VARIANT_IDS','DICTAMELO_CHECKOUT_URL')
+          $lines = $names | ForEach-Object { "$_=$([Environment]::GetEnvironmentVariable($_))" }
+          $lines += @('DICTAMELO_PRO_TRIAL_AVAILABLE=false','DICTAMELO_UPDATES_ENABLED=true')
+          [IO.File]::WriteAllLines((Join-Path $pwd '.env.cloud-build'), $lines)
+          python scripts/with-cloud-config.py --config .env.cloud-build -- python -c "print('Official public configuration validated')"
+          if ($LASTEXITCODE -ne 0) { throw 'Invalid official public build configuration' }
       - name: Test on native x64 Windows
         shell: pwsh
         run: |
@@ -39,16 +93,30 @@ jobs:
       - name: Build an unsigned verification installer
         shell: pwsh
         run: |
-          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis --no-sign
+          if (Test-Path '.env.cloud-build') {
+            python scripts/with-cloud-config.py --config .env.cloud-build -- cmd /c npx tauri build --target ${{ matrix.target }} --bundles nsis --no-sign
+          } else {
+            npx tauri build --target ${{ matrix.target }} --bundles nsis --no-sign
+          }
           if ($LASTEXITCODE -ne 0) { throw 'NSIS build failed' }
-          $exe = 'src-tauri/target/x86_64-pc-windows-msvc/release/dictamelo.exe'
+          $exe = 'src-tauri/target/${{ matrix.target }}/release/dictamelo.exe'
           $bytes = [IO.File]::ReadAllBytes((Resolve-Path $exe))
           $offset = [BitConverter]::ToInt32($bytes, 0x3c)
-          if ([BitConverter]::ToUInt16($bytes, $offset + 4) -ne 0x8664) { throw 'App payload is not x64' }
-          Write-Output "Verified x64 PE payload: $exe"
+          if ([BitConverter]::ToUInt16($bytes, $offset + 4) -ne ${{ matrix.machine }}) { throw 'App payload architecture does not match target' }
+          Write-Output "Verified ${{ matrix.arch }} PE payload: $exe"
+          $metadata = @{
+            commit = '${{ github.sha }}'; target = '${{ matrix.target }}'; version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+            payloadMachine = '${{ matrix.machine }}'; payloadSha256 = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+            testsExecutedOn = 'native x64 Windows runner'; targetExecution = '${{ matrix.arch }}' -eq 'x86_64'
+            officialCloud = Test-Path '.env.cloud-build'
+          }
+          $metadata | ConvertTo-Json | Set-Content 'src-tauri/target/${{ matrix.target }}/release/bundle/nsis/build-verification.json'
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: windows-x64-verification-only
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+          name: windows-${{ matrix.arch }}-verification-only
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/build-verification.json
           retention-days: 7
           if-no-files-found: error

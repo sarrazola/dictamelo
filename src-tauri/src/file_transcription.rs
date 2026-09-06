@@ -10,7 +10,7 @@ use crate::platform::{self, PlatformError};
 use crate::pipeline::TranscriptionRoute;
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::transcription::TranscriptionRequest;
+use crate::transcription::{TranscriptionError, TranscriptionRequest, TranscriptionResult};
 use crate::util::lock;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -38,6 +38,7 @@ pub enum Stage {
     Queued,
     Converting,
     Transcribing,
+    Cleaning,
     Done,
     Failed,
 }
@@ -54,6 +55,7 @@ pub struct FileJob {
     pub chunks: u32,
     pub text: String,
     pub error: Option<String>,
+    pub cleanup_warning: Option<String>,
     pub duration_secs: f32,
 }
 
@@ -76,6 +78,7 @@ pub fn enqueue(app: &AppHandle, paths: Vec<PathBuf>) {
                 chunks: 0,
                 text: String::new(),
                 error: None,
+                cleanup_warning: None,
                 duration_secs: 0.0,
             };
             ids.push(job.id.clone());
@@ -98,7 +101,7 @@ pub fn remove(app: &AppHandle, id: &str) {
 }
 
 pub fn clear(app: &AppHandle) {
-    lock(&app.state::<AppState>().file_jobs).retain(|j| matches!(j.stage, Stage::Converting | Stage::Transcribing));
+    lock(&app.state::<AppState>().file_jobs).retain(|j| matches!(j.stage, Stage::Converting | Stage::Transcribing | Stage::Cleaning));
     emit(app);
 }
 
@@ -177,7 +180,8 @@ async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Res
         let result = crate::pipeline::transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request(path.to_path_buf()))
             .await
             .map_err(|e| e.localized(&lang))?;
-        return Ok((result.text.trim().to_string(), result.duration_secs.unwrap_or(0.0) as f32));
+        let text = finish_transcript(app, settings, &source, &result, id).await?;
+        return Ok((text, result.duration_secs.unwrap_or(0.0) as f32));
     }
 
     // 2) Conversión local a WAV 16 kHz mono.
@@ -218,9 +222,49 @@ async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Res
         wav::write_wav_mono_i16(&chunk_path, &samples[range], TARGET_SAMPLE_RATE).map_err(|e| e.to_string())?;
         let result = crate::pipeline::transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request(chunk_path.clone())).await;
         let _ = std::fs::remove_file(&chunk_path);
-        texts.push(result.map_err(|e| e.localized(&lang))?.text.trim().to_string());
+        let result = result.map_err(|e| e.localized(&lang))?;
+        texts.push(finish_transcript(app, settings, &source, &result, id).await?);
     }
     Ok((texts.join(" ").trim().to_string(), duration_secs))
+}
+
+/// Clean each completed upload using the same captured route. Failed cleanup never
+/// retries transcription or removes the transcript that was already produced.
+async fn finish_transcript(
+    app: &AppHandle,
+    settings: &Settings,
+    source: &crate::pipeline::TranscriptionSource,
+    result: &TranscriptionResult,
+    id: &str,
+) -> Result<String, String> {
+    if !settings.cleanup_enabled || result.text.trim().is_empty() {
+        return Ok(result.text.trim().to_string());
+    }
+    if !update(app, id, |job| job.stage = Stage::Cleaning) {
+        return Err("cancelado".into());
+    }
+    let state = app.state::<AppState>();
+    let cleaned = crate::pipeline::clean_text(&state, settings, source, &result.text, result.cleanup_receipt.as_deref()).await;
+    let (text, error) = cleanup_or_original(&result.text, cleaned);
+    if let Some(error) = error {
+        log::warn!("File cleanup failed; original transcript retained: {error}");
+        let warning = t(&settings.ui_lang(), "file.cleanup_failed").to_string();
+        let mut first_warning = false;
+        update(app, id, |job| {
+            first_warning = job.cleanup_warning.is_none();
+            job.cleanup_warning = Some(warning.clone());
+        });
+        if first_warning { let _ = app.emit("file-cleanup-warning", &warning); }
+    }
+    Ok(text)
+}
+
+fn cleanup_or_original(original: &str, result: Result<String, TranscriptionError>) -> (String, Option<TranscriptionError>) {
+    match result {
+        Ok(cleaned) if !cleaned.trim().is_empty() => (cleaned.trim().to_string(), None),
+        Ok(_) => (original.trim().to_string(), None),
+        Err(error) => (original.trim().to_string(), Some(error)),
+    }
 }
 
 /// The original Free Cloud file must already be a small WAV. Do not silently turn
@@ -268,6 +312,27 @@ mod route_tests {
         }
         assert_eq!(direct_upload(TranscriptionRoute::FreeCloud, "wav", FREE_UPLOAD_MAX_BYTES), Ok(true));
         assert!(direct_upload(TranscriptionRoute::FreeCloud, "wav", FREE_UPLOAD_MAX_BYTES + 1).is_err());
+    }
+
+    #[test]
+    fn cleanup_failure_retains_completed_file_transcript() {
+        let raw = " eh send it Thursday no Friday ";
+        let (text, warning) = cleanup_or_original(raw, Err(TranscriptionError::Timeout));
+        assert_eq!(text, raw.trim());
+        assert!(warning.is_some());
+        assert_eq!(cleanup_or_original(raw, Ok(String::new())).0, raw.trim());
+        assert_eq!(cleanup_or_original(raw, Ok(" Send it Friday. ".into())).0, "Send it Friday.");
+    }
+
+    #[test]
+    fn bundled_english_audio_fixture_decodes() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/english-speech.wav");
+        let samples = read_wav_as_16k_mono(&fixture).expect("decode committed speech fixture");
+        assert_eq!(samples.len(), 93_680);
+        assert!(samples.iter().any(|sample| sample.unsigned_abs() > 100));
+        assert_eq!(direct_upload(TranscriptionRoute::FreeCloud, "wav", std::fs::metadata(&fixture).unwrap().len()), Ok(true));
+        let chunks = audio::split_for_upload(&samples, TARGET_SAMPLE_RATE, CHUNK_SECS);
+        assert_eq!(chunks, vec![0..93_680]);
     }
 
     #[test]

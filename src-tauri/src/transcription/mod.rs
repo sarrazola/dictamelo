@@ -34,6 +34,8 @@ pub struct TranscriptionResult {
     pub text: String,
     pub language: Option<String>,
     pub duration_secs: Option<f64>,
+    /// Opaque, account-bound authorization for standard Free Cloud cleanup. Memory only.
+    pub cleanup_receipt: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]

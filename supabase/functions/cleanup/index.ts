@@ -7,12 +7,17 @@ import {
   requireLicense,
   reservePro,
 } from "../_shared/license.ts";
+import { requireUser } from "../_shared/free.ts";
+import { cleanFreeTranscript } from "../_shared/free_cleanup.ts";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "openai/gpt-oss-20b";
 
 Deno.serve(handler(async (request, db) => {
-  const license = await requireLicense(request, db);
+  const freeUser = request.headers.has("x-license-key")
+    ? null
+    : await requireUser(request);
+  const license = freeUser ? null : await requireLicense(request, db);
   const apiKey = Deno.env.get("GROQ_API_KEY");
   if (!apiKey) {
     return jsonResponse(
@@ -30,6 +35,7 @@ Deno.serve(handler(async (request, db) => {
   } catch {
     return jsonResponse({ error: "Invalid cleanup request." }, 400);
   }
+  if (freeUser) return await cleanFreeTranscript(db, freeUser.id, body, apiKey);
   if (
     !body || typeof body.system !== "string" || typeof body.text !== "string"
   ) {
@@ -42,7 +48,7 @@ Deno.serve(handler(async (request, db) => {
   const requestId = crypto.randomUUID();
   await reservePro(
     db,
-    license,
+    license!,
     requestId,
     "cleanup",
     0,
@@ -73,7 +79,7 @@ Deno.serve(handler(async (request, db) => {
     console.error("Cleanup provider HTTP status", response.status);
     // A definite rejection releases money quota, but still counts as an attempt.
     if (response.status >= 400 && response.status < 500) {
-      await finishPro(db, license, requestId);
+      await finishPro(db, license!, requestId);
     }
     return jsonResponse({
       error: "The cleanup service could not complete this request.",
@@ -97,7 +103,7 @@ Deno.serve(handler(async (request, db) => {
     }, 502);
   }
   // completion_tokens includes reasoning tokens; do not add its details twice.
-  await finishPro(db, license, requestId, 0, Number(input), Number(output));
+  await finishPro(db, license!, requestId, 0, Number(input), Number(output));
   if (result.choices?.[0]?.finish_reason === "length") {
     return jsonResponse({
       error:

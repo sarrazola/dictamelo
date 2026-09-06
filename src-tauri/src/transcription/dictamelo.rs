@@ -27,6 +27,8 @@ struct BackendResponse {
     language: Option<String>,
     #[serde(default)]
     duration: Option<f64>,
+    #[serde(default, rename = "cleanupReceipt")]
+    cleanup_receipt: Option<String>,
     /// Mensaje ya listo para mostrar cuando el servidor rechaza la petición.
     #[serde(default)]
     error: Option<String>,
@@ -106,10 +108,40 @@ impl TranscriptionProvider for DictameloProvider {
 
         let parsed: BackendResponse = serde_json::from_str(&body)
             .map_err(|e| TranscriptionError::InvalidResponse(format!("{e}: {}", truncate(&body, 200))))?;
-        Ok(TranscriptionResult {
-            text: parsed.text.unwrap_or_default().trim().to_string(),
-            language: parsed.language,
-            duration_secs: parsed.duration,
-        })
+        Ok(transcription_result(parsed))
+    }
+}
+
+fn transcription_result(parsed: BackendResponse) -> TranscriptionResult {
+    let raw = parsed.text.unwrap_or_default();
+    // Free Cloud returns the canonical text covered by the receipt. Preserve its exact
+    // bytes: Rust and JavaScript disagree on a few Unicode whitespace characters.
+    let text = if parsed.cleanup_receipt.is_some() { raw } else { raw.trim().to_string() };
+    TranscriptionResult {
+        text,
+        language: parsed.language,
+        duration_secs: parsed.duration,
+        cleanup_receipt: parsed.cleanup_receipt,
+    }
+}
+
+#[cfg(test)]
+mod receipt_tests {
+    use super::*;
+
+    #[test]
+    fn free_receipt_preserves_canonical_text_and_remains_optional_for_pro() {
+        let receipt = "55740015-ff96-4af8-9323-2d72ce02bc62";
+        let raw = "\u{0085}Please send it Friday.\u{0085}";
+        let parsed: BackendResponse = serde_json::from_value(serde_json::json!({
+            "text": raw, "cleanupReceipt": receipt, "duration": 5.0
+        })).unwrap();
+        let result = transcription_result(parsed);
+        assert_eq!(result.text, raw);
+        assert_eq!(result.cleanup_receipt.as_deref(), Some(receipt));
+        let pro: BackendResponse = serde_json::from_str(r#"{"text":"  hello  "}"#).unwrap();
+        let result = transcription_result(pro);
+        assert_eq!(result.text, "hello");
+        assert!(result.cleanup_receipt.is_none());
     }
 }
