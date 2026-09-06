@@ -4,7 +4,7 @@
 
 Source and backend checks passed; final installers and native file-picker verification are recorded below as they complete. The cloud service remains a preview until the external production requirements are closed.
 
-- Native regression: 54 Rust tests passed, 6 explicit live/OS tests were reported **ignored**, and all-target Clippy passed. Opt-in tests now require an exact environment value of `1` and `--ignored`; missing authorization no longer returns early as a misleading passing test. The default suite makes no provider call and does not read credentials or alter the real clipboard.
+- Native regression: 57 Rust tests passed, 6 explicit live/OS tests were reported **ignored**, and all-target Clippy passed. Opt-in tests now require an exact environment value of `1` and `--ignored`; missing authorization no longer returns early as a misleading passing test. The default suite makes no provider call and does not read credentials or alter the real clipboard.
 - Separate native credential check: the explicitly enabled synthetic Keychain round-trip passed (one test), including restart-style persistence, replacement, deletion and test-entry cleanup. No provider key was read by this test.
 - Clean source: a fresh staged-tree export passed `cargo check --locked`, with cloud disabled and the credential-store source and speech fixture included.
 - Fixture/build checks: 16 Python tests passed (nine speech-fixture/comparison tests and seven public build-configuration tests). JavaScript syntax, Bash syntax and whitespace checks passed. The real Rust WAV file reader decoded the committed 93,680-sample recording and selected the eligible Free WAV route. Both release scripts run the fixture gate and complete Rust suite before packaging/signing. `npm audit` reported zero known npm vulnerabilities; that is not a full security audit.
@@ -14,6 +14,8 @@ Source and backend checks passed; final installers and native file-picker verifi
 - Real hosted audio: `scripts/test-free-cleanup-live.py --live --project-ref iburiyhhfodndqgmsaot` uploaded the licensed 5.855-second English fixture. Transcription returned 17 words with normalized WER 0.000; real cleanup identified `openai/gpt-oss-20b` and matched the reference. Concurrent cleanup returned 200/409, creating exactly one finished provider attempt. Replays returned 409; altered text and another account returned 403; missing/invalid authentication returned 401; absent receipts returned 400. Client roles could not call privileged quota RPCs.
 - Word accounting: cleanup and rejected repetitions left usage at 17 words. A new synthetic boundary test moved only its test account to 1,999 words; the complete final recording and cleanup were delivered at 2,016/2,000. The next transcription returned 429, and cleanup charged zero additional words. Exactly two newly created synthetic accounts were removed, with account/quota/receipt deletion independently confirmed. No confirmation email was sent by these API tests.
 - History maintenance: comparison prose appeared only in two unpublished preview commits. Their source was preserved while that prose was removed; all earlier published tags and release assets remain unchanged. A complete local Git bundle and remote release/ref metadata were saved before the rewrite. Historical objects retained by clones or GitHub caches are outside branch-history verification.
+- Native dialog regression: the installed first candidate exposed a macOS FileProvider/iCloud panel timeout followed by a nil `NSOpenPanel` panic. The app now catches panel-creation failure before the native event-loop boundary and opens a local-path import option. Reproducing the same system failure with the corrected debug bundle left the app alive and responsive with the translated error. The OS timeout itself remains outside the app; do not claim that iCloud was repaired. Open/save share the guard, and cancellation/error/path handling have regression coverage.
+- Early Windows CI caught a Python process-replacement crash and an incorrectly unconditional live clipboard test. Both were corrected. Run [34000584450](https://github.com/sarrazola/dictamelo/actions/runs/34000584450) passed 16 Python tests and 58 Rust tests (3 ignored) in each native x64 job, and built both x64/ARM64 installers with verified application PE machines. Those artifacts predate the final dialog correction and are not the release artifacts. ARM64 was cross-compiled and was not executed in that run.
 
 Pending at this checkpoint: final Mac signing/notarization/installation, native file upload and cleanup, new Windows CI/build/VM results, and public artifact download checks. Google production branding, real SMTP inbox delivery, paid checkout/trial transitions and physical microphone quality remain separate external checks.
 
@@ -116,9 +118,9 @@ For checks that require the hosted edition's compiled public configuration, pref
 Optional tests that touch real resources must be run deliberately:
 
 ```sh
-DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml live_tests -- --nocapture
-DICTAMELO_CLIPBOARD_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml snapshot_and_restore
-DICTAMELO_KEYRING_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml roundtrip_in_system_store
+DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml live_tests -- --ignored --nocapture
+DICTAMELO_CLIPBOARD_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml snapshot_and_restore -- --ignored
+DICTAMELO_KEYRING_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml roundtrip_in_system_store -- --ignored
 ```
 
 Record exact versions, architectures, and results for future releases. Do not treat a configured workflow, successful compile, UI mock, or valid signature as proof of a real installation or end-to-end user flow.
