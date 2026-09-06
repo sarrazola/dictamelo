@@ -20,6 +20,12 @@ fn ns_window(window: &WebviewWindow) -> Result<&NSWindow, PlatformError> {
     Ok(unsafe { &*(ptr as *const NSWindow) })
 }
 
+/// Settings stay visible when another application becomes active.
+pub fn configure_settings_window(window: &WebviewWindow) -> Result<(), PlatformError> {
+    ns_window(window)?.setHidesOnDeactivate(false);
+    Ok(())
+}
+
 /// El indicador flotante: por encima de todo, en todos los escritorios y sin capturar el ratón.
 pub fn configure_overlay_window(window: &WebviewWindow) -> Result<(), PlatformError> {
     let ns = ns_window(window)?;

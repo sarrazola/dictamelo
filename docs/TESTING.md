@@ -1,5 +1,14 @@
 # Verification record
 
+## Version 0.5.0 — candidate verification in progress
+
+- First launch and models: six Rust settings regressions and eleven offline UI contract/behavior checks passed. Browser checks covered all three wizard steps in six languages at 960 × 680, with visible Skip and no overflow. Six legacy-provider/over-quota states preserved old settings and displayed bounded time meters. Browser mocks do not prove native startup or authentication.
+- Backend: sixteen Deno tests and three endpoint type checks passed. Five migrations, three SQL suites, legacy upgrade preservation and two real concurrent-connection races passed in an isolated PostgreSQL database.
+- Deployment: migration `20260906000000_audio_time_plans` was applied atomically, followed by `transcribe`, `cleanup` and `usage` in the official project. Three production SQL suites passed inside rollback transactions. All seven billing/usage tables have RLS with no anon/authenticated table grants; twelve quota RPCs deny those client roles and preserve service access.
+- Live fixture: the licensed English recording produced 17 words with WER 0 and exactly 5.855 seconds of usage once. Cleanup added no audio time. A concurrent cleanup race and replay produced only one provider attempt. The final accepted recording reached 1804.855/1800 seconds, remained eligible for cleanup, and the next transcription returned 429. Both synthetic accounts and all associated usage/receipts were removed and verified; no email was sent.
+- Security review: the public history at `5e61508` contained 45 commits, 533 blobs and three tag objects; the scanner found no privileged provider, server or signing credentials. The detected historical Supabase JWT was a public anon key. This is a targeted credential/history audit, not a claim of zero vulnerabilities.
+- Native Mac, Windows installation and final distribution results will be recorded against the actual 0.5.0 artifacts below. Earlier-version results are preserved separately.
+
 ## Version 0.4.0 — release candidate, September 5, 2026
 
 All three installers are published as a prerelease, with public downloads and signatures verified. Source/backend checks and installed Mac file transcription passed; native file-dialog and Windows runtime limitations are recorded below. The cloud service remains a preview until the external production requirements are closed.

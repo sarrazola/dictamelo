@@ -128,12 +128,15 @@ pub fn run() {
             commands::save_file_transcript,
         ])
         .setup(|app| {
-            // App de barra de menú: sin ícono en el Dock ni menú de aplicación.
+            // Start in the menu bar; opening settings enables the Dock/app switcher.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             let handle = app.handle().clone();
             let state = state::AppState::init(&handle)?;
+            // Capture before creating webviews: the UI persists onboarding_seen when
+            // it presents setup, which must not race the native window's visibility.
+            let first_run = !state.settings().onboarding_seen;
             app.manage(state);
 
             app_windows::create_windows(&handle)?;
@@ -158,7 +161,7 @@ pub fn run() {
             if selftest::enabled() {
                 selftest::maybe_run(&handle);
             } else {
-                pipeline::startup_checks(&handle);
+                pipeline::startup_checks(&handle, first_run);
             }
             log::info!("Dictámelo {} iniciado", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -168,7 +171,7 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == app_windows::MAIN {
                     api.prevent_close();
-                    let _ = window.hide();
+                    app_windows::hide_settings(window.app_handle());
                 }
             }
         })

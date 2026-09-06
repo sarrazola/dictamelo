@@ -28,12 +28,13 @@ begin
     (u, 'free-cleanup-test-' || u || '@example.invalid'),
     (other_user, 'free-cleanup-test-' || other_user || '@example.invalid'),
     (budget_user, 'free-cleanup-test-' || budget_user || '@example.invalid');
+  insert into public.free_weekly_usage(user_id,week_start,legacy_audio_seconds) values(u,date_trunc('week',now() at time zone 'UTC')::date,1799);
   receipt := pg_temp.make_receipt(u, r, 2001);
   if receipt <> r or (public.free_usage(u)->>'usedWords')::int <> 2001 then raise exception 'receipt word accounting'; end if;
   if public.finish_free_transcription(u, r, 2001, repeat('a', 64)) <> r then raise exception 'completion retry not idempotent'; end if;
   if (public.free_usage(u)->>'usedWords')::int <> 2001 then raise exception 'transcription charged twice'; end if;
   perform pg_temp.expect_error(format('select public.finish_free_transcription(%L,%L,2001,%L)',u,r,repeat('b',64)), 'invalid_cleanup_receipt');
-  perform pg_temp.expect_error(format('select public.reserve_free_usage(%L,%L)',u,gen_random_uuid()), 'weekly_word_limit');
+  perform pg_temp.expect_error(format('select public.reserve_free_usage(%L,%L)',u,gen_random_uuid()), 'weekly_audio_limit');
   perform pg_temp.expect_error(format('select public.reserve_free_cleanup(%L,%L,%L,%L,1000,1024)',other_user,r,a,repeat('a',64)), 'invalid_cleanup_receipt');
   perform pg_temp.expect_error(format('select public.reserve_free_cleanup(%L,%L,%L,%L,1000,1024)',u,r,a,repeat('b',64)), 'invalid_cleanup_receipt');
   -- Cleanup of the final over-limit recording remains available immediately and costs no words.

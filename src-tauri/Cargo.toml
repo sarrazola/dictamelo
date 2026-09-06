@@ -1,6 +1,6 @@
 [package]
 name = "dictamelo"
-version = "0.4.0"
+version = "0.5.0"
 description = "Voice dictation for macOS and Windows. Hold a shortcut, speak, and paste text at your cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"

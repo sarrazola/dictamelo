@@ -35,6 +35,8 @@ pub struct AccountStatus {
     pub email: Option<String>,
     pub used_words: Option<u64>,
     pub limit_words: u64,
+    pub used_seconds: Option<f64>,
+    pub limit_seconds: f64,
     pub resets_at: Option<String>,
     pub error: Option<String>,
 }
@@ -352,7 +354,7 @@ impl Account {
         let _guard = self.gate.lock().await;
         let mut session = self
             .project_session(supabase_url()?)?
-            .ok_or("Sign in to use your free words.")?;
+            .ok_or("Sign in to use your free audio allowance.")?;
         if session.expires_at <= chrono::Utc::now().timestamp() + 60 {
             let data = self
                 .auth(
@@ -392,6 +394,7 @@ impl Account {
     pub async fn status(&self) -> AccountStatus {
         let mut result = AccountStatus {
             limit_words: 2000,
+            limit_seconds: 1800.0,
             ..Default::default()
         };
         match supabase_url().and_then(|url| self.project_session(url)) {
@@ -407,6 +410,8 @@ impl Account {
         }
         match self.usage().await {
             Ok(data) => {
+                result.used_seconds = data["usedSeconds"].as_f64();
+                result.limit_seconds = data["limitSeconds"].as_f64().unwrap_or(1800.0);
                 result.used_words = data["usedWords"].as_u64();
                 result.limit_words = data["limitWords"].as_u64().unwrap_or(2000);
                 result.resets_at = data["resetsAt"].as_str().map(str::to_string);
@@ -677,7 +682,7 @@ mod tests {
             assert!(value.get(field).is_none());
         }
         assert!(
-            value["usedWords"].is_null(),
+            value["usedWords"].is_null() && value["usedSeconds"].is_null(),
             "Unavailable usage must not be shown as zero"
         );
         assert_eq!(

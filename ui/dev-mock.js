@@ -2,7 +2,8 @@
 // Dentro de la app real `window.__TAURI__` ya existe y este archivo no hace nada.
 if (!window.__TAURI__) {
   const settings = {
-    hotkey: "Alt+Shift+Space", provider: "groq", model: "whisper-large-v3-turbo", language: "auto",
+    onboardingSeen: !new URLSearchParams(location.search).has("firstRun"),
+    hotkey: "Alt+Shift+Space", provider: "groq", model: "whisper-large-v3", language: "auto",
     uiLanguage: "auto", autoPaste: true, restoreClipboard: true, showOverlay: true,
     inputDevice: null, maxHistory: 50, maxRecordingSecs: 300,
     useOwnKey: true, launchAtLogin: false, playSounds: true, vocabulary: "",
@@ -14,10 +15,10 @@ if (!window.__TAURI__) {
   ];
   const listeners = {};
   const providers = [
-    { id: "groq", name: "Groq", requiresApiKey: true, keyUrl: "https://console.groq.com/keys", defaultModel: "whisper-large-v3-turbo", verified: true,
+    { id: "groq", name: "Groq", requiresApiKey: true, keyUrl: "https://console.groq.com/keys", defaultModel: "whisper-large-v3", verified: true,
       models: [
-        { id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo", description: "model.desc.whisper_turbo" },
         { id: "whisper-large-v3", name: "Whisper Large v3", description: "model.desc.whisper_v3" },
+        { id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo", description: "model.desc.whisper_turbo" },
       ] },
     { id: "openai", name: "OpenAI", requiresApiKey: true, keyUrl: "https://platform.openai.com/api-keys", defaultModel: "gpt-4o-mini-transcribe", verified: false,
       models: [{ id: "gpt-4o-mini-transcribe", name: "GPT-4o mini Transcribe", description: "model.desc.gpt4o_mini" }] },
@@ -28,7 +29,7 @@ if (!window.__TAURI__) {
   let signedIn = false;
   const commands = {
     get_app_info: () => ({
-      version: "0.4.0", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
+      version: "0.5.0", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
       logDir: "~/Library/Logs/com.dictamelo.desktop",
       configDir: "~/Library/Application Support/com.dictamelo.desktop",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",
@@ -64,7 +65,7 @@ if (!window.__TAURI__) {
     open_url: () => null,
     ui_ready: () => null,
     overlay_layout: () => null,
-    get_account_status: () => ({ signedIn, email: signedIn ? accountEmail : null, usedWords: signedIn ? 742 : null, limitWords: 2000, resetsAt: "2026-09-07T00:00:00Z" }),
+    get_account_status: () => ({ signedIn, email: signedIn ? accountEmail : null, usedSeconds: signedIn ? 742 : null, limitSeconds: 1800, resetsAt: "2026-09-07T00:00:00Z" }),
     sign_up_account: ({email}) => { accountEmail = email; return { status: commands.get_account_status(), confirmationRequired: true }; },
     sign_in_account: ({email,password}) => { if (password === "wrongpassword") throw new Error("Incorrect email or password."); accountEmail = email; signedIn = true; return commands.get_account_status(); },
     confirm_account_email: ({code}) => { if (code !== "12345678") throw new Error("Invalid verification code. Preview code: 12345678."); signedIn = true; return commands.get_account_status(); },

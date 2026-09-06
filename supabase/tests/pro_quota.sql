@@ -36,7 +36,7 @@ begin
   -- Legacy compressed audio can exceed reservation: actual duration is retained.
   r2 := gen_random_uuid();
   perform public.reserve_pro_usage(l, r2, 'transcribe', 600, 0, 0);
-  perform public.finish_pro_usage(l, r2, 216001, 0, 0);
+  perform public.finish_pro_usage(l, r2, 648001, 0, 0);
   update public.pro_usage_requests set finished_at = now() - interval '3 seconds' where license_id = l;
   caught := false;
   begin perform public.reserve_pro_usage(l, gen_random_uuid(), 'transcribe', 10, 0, 0); exception when others then
@@ -48,7 +48,7 @@ begin
   r := gen_random_uuid();
   perform public.reserve_pro_usage(l, r, 'cleanup', 0, 1000, 1024);
   perform public.finish_pro_usage(l, r, 0, 1000, 1024);
-  update public.pro_usage_requests set input_tokens = 3000000, finished_at = now() - interval '3 seconds' where request_id = r;
+  update public.pro_usage_requests set input_tokens = 9000000, finished_at = now() - interval '3 seconds' where request_id = r;
   caught := false;
   begin perform public.reserve_pro_usage(l, gen_random_uuid(), 'cleanup', 0, 1, 1); exception when others then
     if sqlerrm <> 'monthly_cleanup_limit' then raise; end if; caught := true;
@@ -59,7 +59,7 @@ begin
   perform public.reserve_pro_usage(l, r2, 'transcribe', 10, 0, 0);
   perform public.finish_pro_usage(l, r2, 10, 0, 0);
   update public.pro_usage_requests set created_at = now() - interval '31 days', finished_at = now() - interval '3 seconds' where license_id = l;
-  insert into public.usage_events(license_id, seconds, kind) values(l, 216000, 'transcribe');
+  insert into public.usage_events(license_id, seconds, kind) values(l, 648000, 'transcribe');
   caught := false;
   begin perform public.reserve_pro_usage(l, gen_random_uuid(), 'transcribe', 10, 0, 0); exception when others then
     if sqlerrm <> 'monthly_audio_limit' then raise; end if; caught := true;
@@ -67,7 +67,7 @@ begin
   if not caught then raise exception 'legacy audio omitted'; end if;
   delete from public.usage_events where license_id = l;
   insert into public.pro_usage_requests(request_id, license_id, kind, state, finished_at)
-    select gen_random_uuid(), l, 'transcribe', 'finished', now() - interval '3 seconds' from generate_series(1, 12000);
+    select gen_random_uuid(), l, 'transcribe', 'finished', now() - interval '3 seconds' from generate_series(1, 36000);
   caught := false;
   begin perform public.reserve_pro_usage(l, gen_random_uuid(), 'transcribe', 10, 0, 0); exception when others then
     if sqlerrm <> 'monthly_request_limit' then raise; end if; caught := true;
@@ -75,7 +75,9 @@ begin
   if not caught then raise exception 'request quota failed'; end if;
   if has_function_privilege('anon', 'public.pro_usage(uuid)', 'execute')
     or has_function_privilege('authenticated', 'public.reserve_pro_usage(uuid,uuid,text,numeric,bigint,bigint)', 'execute')
-    or has_table_privilege('authenticated', 'public.pro_usage_requests', 'insert') then raise exception 'client quota permission'; end if;
+    or has_table_privilege('authenticated', 'public.pro_usage_requests', 'insert')
+    or has_table_privilege('anon', 'public.licenses', 'select')
+    or has_table_privilege('authenticated', 'public.usage_events', 'insert') then raise exception 'client quota permission'; end if;
   raise notice 'PASS: Pro reservations, concurrency, settlement, duplicates, uncertainty, limits, legacy usage and service-only access';
 end $$;
 rollback;

@@ -64,8 +64,6 @@
       </button>
     </nav>
 
-    <button id="btn-onboarding" class="ghost onboarding-launch" data-i18n="onboarding.open"></button>
-
     <div class="sidebar-foot">
       <span id="foot-dot" class="foot-dot"></span>
       <span id="foot-model" class="foot-model"></span>
@@ -212,8 +210,12 @@
     <section class="page" data-page="models">
       <div id="models-cloud-notice" class="card" hidden><div class="row stack"><div class="label"><strong data-i18n="models.cloud.title"></strong><span id="models-cloud-desc"></span></div><button id="btn-models-own" class="ghost" data-i18n="plan.own.choose"></button></div></div>
       <div class="card byok-models">
-        <div class="card-title" data-i18n="models.provider"></div>
-        <div id="provider-chips" class="chips"></div>
+        <div class="provider-model-row">
+          <label><span data-i18n="models.provider"></span><select id="provider-select"></select></label>
+          <label><span data-i18n="models.model"></span><select id="model-select"></select></label>
+        </div>
+        <p id="model-description" class="desc"></p>
+        <p id="legacy-provider-note" class="footnote" hidden></p>
         <div class="row stack">
           <div class="label"><strong data-i18n="models.apikey"></strong><span id="key-status"></span></div>
           <div class="actions full">
@@ -223,11 +225,6 @@
           </div>
         </div>
         <p class="hint"><button id="link-key" class="link" data-i18n="models.getkey"></button></p>
-      </div>
-
-      <div class="card byok-models">
-        <div class="card-title" data-i18n="models.model"></div>
-        <div id="model-list" class="model-list"></div>
       </div>
 
       <div class="card">
@@ -397,8 +394,10 @@
       </div>
       <div id="onboarding-setup" hidden>
         <form id="onboarding-key-form" class="auth-form" hidden>
-          <label><span data-i18n="models.provider"></span><select id="onboarding-provider"></select></label>
-          <label><span data-i18n="models.model"></span><select id="onboarding-model"></select></label>
+          <div class="provider-model-row">
+            <label><span data-i18n="models.provider"></span><select id="onboarding-provider"></select></label>
+            <label><span data-i18n="models.model"></span><select id="onboarding-model"></select></label>
+          </div>
           <p id="onboarding-key-status" class="footnote" role="status"></p>
           <label><span data-i18n="models.apikey"></span><input id="onboarding-api-key" type="password" autocomplete="off" spellcheck="false"></label>
           <div class="actions"><button type="submit" class="primary" data-i18n="models.save"></button><button id="onboarding-get-key" type="button" class="link" data-i18n="models.getkey"></button></div>

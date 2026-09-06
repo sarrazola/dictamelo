@@ -51,9 +51,18 @@ def main():
                 started = True
                 sql("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; "
                     "CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY, email text);")
+                upgrade_user, upgrade_request = (str(uuid.uuid4()) for _ in range(2))
                 for path in sorted((ROOT / "supabase/migrations").glob("*.sql")):
+                    if path.name == "20260906000000_audio_time_plans.sql":
+                        sql(f"INSERT INTO auth.users VALUES ('{upgrade_user}','upgrade@example.invalid'); "
+                            "INSERT INTO public.free_weekly_usage(user_id,week_start,words,attempts,request_id,reserved_until) VALUES "
+                            f"('{upgrade_user}',date_trunc('week',now() AT TIME ZONE 'UTC')::date,100,7,'{upgrade_request}',now()+interval '1 minute');")
                     run(base + ["-f", str(path)])
                     print(f"PASS migration {path.name}")
+                assert sql(f"SELECT public.free_usage('{upgrade_user}')->>'usedSeconds'").stdout.strip() == "165.00", "Upgrade lost historical audio/active request"
+                assert sql(f"SELECT attempts FROM public.free_weekly_usage WHERE user_id='{upgrade_user}'").stdout.strip() == "7", "Upgrade reset abuse counter"
+                sql(f"SELECT public.finish_free_transcription('{upgrade_user}','{upgrade_request}',1,repeat('a',64)); DELETE FROM auth.users WHERE id='{upgrade_user}';")
+                print("PASS staged upgrade retains historical words, estimated seconds, attempts and in-flight request")
                 for path in sorted((ROOT / "supabase/tests").glob("*.sql")):
                     run(base + ["-f", str(path)])
                     print(f"PASS regression {path.name}")
@@ -79,6 +88,15 @@ def main():
                 assert sum("request_in_progress" in result.stderr for result in results) == 1, "Expected atomic account lock rejection"
                 assert sql(f"SELECT public.free_usage('{user}')->>'usedWords'").stdout.strip() == "1", "Cleanup changed word accounting"
                 print("PASS two-connection cleanup race across different quota weeks: exactly one claim")
+                sql(f"UPDATE public.free_weekly_usage SET reserved_until=now()-interval '1 second' WHERE user_id='{user}';")
+                def audio_claim(_):
+                    request = str(uuid.uuid4())
+                    return sql(f"BEGIN; SELECT public.reserve_free_audio('{user}','{request}',5.855); SELECT pg_sleep(0.25); COMMIT;", False)
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    results = list(pool.map(audio_claim, range(2)))
+                assert sum(result.returncode == 0 for result in results) == 1, "Concurrent audio reservations both succeeded or failed"
+                assert sum("request_in_progress" in result.stderr for result in results) == 1, "Expected atomic audio rejection"
+                print("PASS two-connection audio race: exactly one duration reservation")
             except subprocess.CalledProcessError as error:
                 raise RuntimeError(error.stderr.strip() or "Local PostgreSQL command failed") from None
             finally:

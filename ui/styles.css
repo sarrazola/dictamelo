@@ -237,41 +237,6 @@ button:disabled { opacity: .45; cursor: default; }
 .badge.denied { color: var(--err); background: color-mix(in srgb, var(--err) 13%, transparent); }
 .badge.not_determined { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
 
-/* ---------- Proveedores y modelos ---------- */
-.chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 0 13px; }
-.chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 6px 11px 6px 7px; border-radius: 9px;
-  border: 1px solid var(--border-strong); background: var(--field);
-  font-weight: 550; cursor: pointer; transition: border-color .12s, background .12s;
-}
-.chip:hover { background: var(--hover); }
-.chip.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.chip .logo {
-  width: 20px; height: 20px; border-radius: 5px; flex: none;
-  display: grid; place-items: center; color: #fff;
-  font-size: 11px; font-weight: 700; letter-spacing: -.3px;
-}
-.chip .tag { font-size: 10.5px; font-weight: 500; color: var(--faint); }
-
-.model-list { display: flex; flex-direction: column; gap: 7px; padding: 0 0 14px; }
-.model {
-  display: flex; align-items: center; gap: 10px; text-align: left;
-  padding: 10px 12px; border-radius: 9px;
-  border: 1px solid var(--border-strong); background: var(--field); cursor: pointer;
-}
-.model:hover { background: var(--hover); }
-.model.active { border-color: var(--accent); background: var(--accent-soft); }
-.model .radio {
-  width: 15px; height: 15px; border-radius: 50%; flex: none;
-  border: 1.5px solid var(--border-strong); display: grid; place-items: center;
-}
-.model.active .radio { border-color: var(--accent); }
-.model.active .radio::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-.model .info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.model .info strong { font-weight: 570; }
-.model .info span { color: var(--muted); font-size: 12px; }
-
 /* ---------- Actualizaciones ---------- */
 .update-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
 .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: auto; flex: none; }
@@ -425,7 +390,12 @@ body.overlay { background: transparent; overflow: hidden; }
 .plan-price { font-size: 22px; line-height: 1.25; min-height: 28px; }
 .plan-desc { min-height: 54px; }
 .plan-badge { font-size: 9px; line-height: 15px; }
-.onboarding-launch { text-align: left; margin: 0 5px; }
+/* A single row keeps the provider and model together at the minimum app width. */
+.provider-model-row { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, 2.5fr); gap: 14px; padding: 14px 0 8px; }
+.provider-model-row label { display: grid; gap: 7px; min-width: 0; font-size: 12px; font-weight: 550; }
+.provider-model-row select { width: 100%; min-width: 0; max-width: 100%; font-weight: 400; }
+.auth-form .provider-model-row { padding: 0; }
+#legacy-provider-note { margin-bottom: 14px; }
 .auth-tabs { display: flex; gap: 4px; padding: 4px; background: var(--field); border-radius: 9px; margin: 4px 0 16px; }
 .auth-tabs button { flex: 1; border: 0; background: transparent; padding: 8px; }
 .auth-tabs button[aria-selected="true"] { background: var(--card); box-shadow: var(--shadow); font-weight: 600; }

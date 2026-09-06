@@ -2,7 +2,7 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current release candidate: 0.4.0
+## Current release candidate: 0.5.0
 
 This iteration restores macOS and both Windows targets. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
 
@@ -14,10 +14,10 @@ Start from current `main` and preserve any unrelated work. Choose a new version;
 
 ```sh
 git pull --ff-only
-python3 scripts/set-version.py 0.4.0
+python3 scripts/set-version.py 0.5.0
 ```
 
-This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.4.0.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
+This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.5.0.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
 
 ## 2. Validate and deploy backend changes
 
@@ -36,13 +36,13 @@ supabase db query --linked --file supabase/tests/pro_quota.sql
 supabase functions deploy transcribe cleanup usage --project-ref iburiyhhfodndqgmsaot
 ```
 
-For a repeatable hosted test on macOS with Python `requests` installed, run `python3 scripts/verify-free-backend.py --live`. It creates its own temporary account, redeems an admin-generated email code without sending a message, transcribes one short synthesized recording, verifies quota/auth/refresh behavior, and removes that account. This incurs one small provider request.
+For a repeatable hosted test on macOS with Python `requests` installed, run `python3 scripts/verify-free-backend.py --live`. It creates its own temporary account, redeems an admin-generated email code without sending a message, transcribes the committed licensed English speech fixture, verifies quota/auth/refresh behavior, and removes that account. This incurs one small provider request.
 
 The manually triggered **Windows builds and regression checks** GitHub Actions workflow runs the tests on native x64 Windows and builds both explicit targets. ARM64 is cross-compiled, and its payload execution still needs an ARM machine. Unsigned CI artifacts require the existing Tauri signing key and independent verification before distribution. The official-cloud option uses validated public repository variables; ordinary PR builds stay unconfigured. Trigger it with `gh workflow run windows-check.yml --ref main -f official_cloud=true`.
 
-Deploy compatible schema before dependent functions, and functions before distributing clients. Both quota SQL tests roll back their temporary data. Verify invalid authentication, real free transcription, word accounting, quota exhaustion, session refresh, existing Pro licenses, product ownership, concurrency and immediate transcription-to-cleanup. Use temporary test data, never a customer's account. A clean local PostgreSQL database can test the migration/RPC behavior without changing production; record that distinction.
+Deploy compatible schema before dependent functions, and functions before distributing clients. Both quota SQL tests roll back their temporary data. Verify invalid authentication, real free transcription, audio-time accounting, quota exhaustion, session refresh, existing Pro licenses, product ownership, concurrency and immediate transcription-to-cleanup. Use temporary test data, never a customer's account. A clean local PostgreSQL database can test the migration/RPC behavior without changing production; record that distinction.
 
-The paid service now uses 60 hours, 12,000 provider requests, 3M cleanup input tokens and 2M completion tokens per rolling 30 days. It fixes hosted models to Turbo and GPT-OSS 20B. Current PCM duration is validated before reserving quota. Legacy compressed uploads remain compatible with a conservative reservation and a post-provider duration check; record actual usage even if that result is rejected. Do not describe this legacy route as a strict preflight cost ceiling.
+Free Cloud allows 30 minutes per UTC week, using measured PCM audio time and preserving legacy usage. AI cleanup adds no audio time. The paid service now uses 180 hours, 36,000 provider requests, 9M cleanup input tokens and 6M completion tokens per rolling 30 days. It fixes hosted models to Turbo and GPT-OSS 20B. Current PCM duration is validated before reserving quota. Legacy compressed uploads remain compatible with a conservative reservation and a post-provider duration check; record actual usage even if that result is rejected. Do not describe this legacy route as a strict preflight cost ceiling.
 
 Read [Auth and cloud configuration](AUTH_AND_CLOUD.md) before deploying account changes. The current client creates email/password accounts, signs in with a password or Google, and uses confirmation/recovery codes only for those actions. Keep email confirmations enabled and configure production SMTP delivery. Confirmation/recovery templates must include `{{ .Token }}`. Verify delivery, confirmation, password login and password recovery with an owned mailbox; admin-generated test tokens are not an inbox test.
 
@@ -97,21 +97,21 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Target x86_6
 powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Target aarch64-pc-windows-msvc
 ```
 
-Verify the installed application executable's PE machine type and product version for each target. The NSIS bootstrap itself may be x86, so inspecting only the installer header does not prove payload architecture. Install and run each build, test clipboard restoration, microphone capture, file conversion, credentials, and updating from the previous installed version. Record whether x64 was tested on physical Intel/AMD hardware or under ARM emulation.
+Verify the installed application executable's PE machine type and product version for each target. The NSIS bootstrap itself may be x86, so inspecting only the installer header does not prove payload architecture. Install and run each build, test first-launch setup and Skip, settings-window persistence, clipboard restoration, microphone capture, file conversion, credentials, and updating from the previous installed version. Record whether x64 was tested on physical Intel/AMD hardware or under ARM emulation.
 
 Copy the signed outputs to the Mac's ignored `dist/windows/` folder, named exactly:
 
 ```text
-Dictamelo_0.4.0_x86_64-setup.exe
-Dictamelo_0.4.0_x86_64-setup.exe.sig
-Dictamelo_0.4.0_aarch64-setup.exe
-Dictamelo_0.4.0_aarch64-setup.exe.sig
+Dictamelo_0.5.0_x86_64-setup.exe
+Dictamelo_0.5.0_x86_64-setup.exe.sig
+Dictamelo_0.5.0_aarch64-setup.exe
+Dictamelo_0.5.0_aarch64-setup.exe.sig
 ```
 
 Create a draft to transfer artifacts between machines:
 
 ```sh
-gh release create v0.4.0 --draft --target main --title "Dictámelo 0.4.0" --notes-file docs/releases/0.4.0.md
+gh release create v0.5.0 --draft --target main --title "Dictámelo 0.5.0" --notes-file docs/releases/0.5.0.md
 ```
 
 Use `gh release upload` / `gh release download` to transfer files. Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The Windows publishing helper refuses to overwrite public releases and can append a platform to a draft release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
@@ -119,7 +119,7 @@ Use `gh release upload` / `gh release download` to transfer files. Keep it draft
 When the x64 release artifact comes from native CI, upload only the ARM64 pair from the VM. The helper otherwise defaults to both targets and could replace the draft's CI artifact with a different cross-built file:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.4.0 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
+powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.5.0 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
 ```
 
 ## 5. Commit, stage, and publish a complete release
@@ -127,9 +127,9 @@ powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.4.0 -Targ
 Update the testing record with actual results and limitations. Review `git diff` and stage only intended paths. Commit and push the source. Ensure source files did not change after the final build; rebuild affected artifacts if they did.
 
 ```sh
-python3 scripts/stage-release.py 0.4.0
-cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.4.0"
-./scripts/release.sh 0.4.0
+python3 scripts/stage-release.py 0.5.0
+cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.5.0"
+./scripts/release.sh 0.5.0
 ```
 
 The release script requires a clean `main`, the correct macOS bundle version, signed artifacts for all three platforms, valid updater signatures, and stapled Apple artifacts. It creates/pushes only this release's tag, uploads a draft's artifacts, and then publishes it as latest. It does not stage arbitrary source changes or push every local tag.
@@ -138,7 +138,7 @@ The release contains the macOS DMG, macOS updater archive and `.sig`, both Windo
 
 ## 6. Verify the public release
 
-Download the assets again into a fresh directory using `gh release download v0.4.0`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
+Download the assets again into a fresh directory using `gh release download v0.5.0`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
 
 ```sh
 DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --ignored --nocapture
@@ -155,7 +155,7 @@ GitHub's public download URL may cache an earlier manifest briefly. Compare the 
 Use this only after staging and verifying the complete set of artifacts above. The installers are immutable once public, including prereleases. A later correction requires a new version.
 
 ```sh
-./scripts/release.sh 0.4.0 --prerelease
+./scripts/release.sh 0.5.0 --prerelease
 ```
 
 The script checks that the release is still a draft before uploading, then publishes it as a prerelease without changing the stable channel. Re-download and verify every checksum and updater signature after publication. Keep the README download table linked to the exact version and architecture that was checked. When production requirements are satisfied, promoting this identical candidate to stable is a metadata change; do not replace its bytes. Verify the stable updater endpoint and a real old-version update after promotion.

@@ -11,17 +11,15 @@ import {
   reservePro,
 } from "../_shared/license.ts";
 
+import { requireUser } from "../_shared/free.ts";
 import {
-  countWords,
-  freeWavSeconds,
-  requireUser,
-  reserveFree,
-} from "../_shared/free.ts";
-import { transcriptHash } from "../_shared/free_cleanup.ts";
+  HOSTED_TRANSCRIPTION_MODEL,
+  transcribeFree,
+} from "../_shared/free_transcription.ts";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 /** Modelos que aceptamos; evita que alguien pida uno caro por su cuenta. */
-const DEFAULT_MODEL = "whisper-large-v3-turbo";
+const DEFAULT_MODEL = HOSTED_TRANSCRIPTION_MODEL;
 /** Igual que el límite de Groq. */
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -51,15 +49,9 @@ Deno.serve(handler(async (request, db) => {
   }
 
   if (freeUser) {
-    if (file.size > 4 * 1024 * 1024) {
-      return jsonResponse({
-        error: "Free recordings can be up to two minutes long.",
-      }, 413);
-    }
-    freeWavSeconds(new Uint8Array(await file.arrayBuffer()));
+    return await transcribeFree(db, freeUser.id, file, incoming, apiKey);
   }
   const requestId = crypto.randomUUID();
-  if (freeUser) await reserveFree(db, freeUser.id, requestId);
   if (license) {
     const duration = proWavSeconds(new Uint8Array(await file.arrayBuffer()));
     await reservePro(
@@ -70,8 +62,7 @@ Deno.serve(handler(async (request, db) => {
       Math.max(10, duration ?? PRO_REQUEST_SECONDS),
     );
   }
-  let completed = false;
-  try {
+  {
     const outgoing = new FormData();
     outgoing.set("file", file, file.name || "audio.wav");
     outgoing.set("model", DEFAULT_MODEL);
@@ -110,25 +101,6 @@ Deno.serve(handler(async (request, db) => {
         error: "The transcription service returned an invalid response.",
       }, 502);
     }
-    if (freeUser) {
-      if (result.text.trim().length > 20000) {
-        return jsonResponse({
-          error: "The transcription service returned an oversized transcript.",
-        }, 502);
-      }
-      const cleanupReceipt = await db.rpc("finish_free_transcription", {
-        p_user: freeUser.id,
-        p_request: requestId,
-        p_words: countWords(result.text),
-        p_transcript_hash: await transcriptHash(result.text),
-      });
-      completed = true;
-      return jsonResponse({
-        ...result,
-        text: result.text.trim(),
-        cleanupReceipt,
-      });
-    }
     if (license) {
       if (
         typeof result.duration !== "number" ||
@@ -154,19 +126,5 @@ Deno.serve(handler(async (request, db) => {
         "Access-Control-Allow-Origin": "*",
       },
     });
-  } finally {
-    if (freeUser && !completed) {
-      try {
-        await db.rpc("finish_free_usage", {
-          p_user: freeUser.id,
-          p_request: requestId,
-          p_words: 0,
-        });
-      } catch {
-        console.error(
-          "Could not release free quota reservation; it expires automatically.",
-        );
-      }
-    }
   }
 }));

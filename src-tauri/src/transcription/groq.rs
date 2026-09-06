@@ -26,18 +26,18 @@ impl TranscriptionProvider for GroqProvider {
             name: "Groq".into(),
             requires_api_key: true,
             key_url: "https://console.groq.com/keys".into(),
-            default_model: "whisper-large-v3-turbo".into(),
+            default_model: crate::settings::DEFAULT_MODEL.into(),
             verified: true,
             models: vec![
-                ModelInfo {
-                    id: "whisper-large-v3-turbo".into(),
-                    name: "Whisper Large v3 Turbo".into(),
-                    description: "model.desc.whisper_turbo".into(),
-                },
                 ModelInfo {
                     id: "whisper-large-v3".into(),
                     name: "Whisper Large v3".into(),
                     description: "model.desc.whisper_v3".into(),
+                },
+                ModelInfo {
+                    id: "whisper-large-v3-turbo".into(),
+                    name: "Whisper Large v3 Turbo".into(),
+                    description: "model.desc.whisper_turbo".into(),
                 },
             ],
         }

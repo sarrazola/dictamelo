@@ -1,4 +1,5 @@
-// Offline source contracts: no DOM mock, browser, native command or network access.
+// Offline source contracts and UI state regressions; selected DOM/platform boundaries are stubbed.
+// These checks do not launch a browser, invoke native commands or use the network.
 // Run with `npm run test:ui`. This does not claim to test layout or native interactions.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -79,4 +80,94 @@ test("direct static ID lookups in the UI resolve to a declared control", () => {
   const references = [...main.matchAll(/\$\(\s*(["'])#([\w-]+)\1\s*\)/g)].map((match) => match[2]);
   assert.ok(references.length > 0, "No direct control lookups were discovered");
   for (const id of new Set(references)) assert.ok(ids.includes(id), `UI references missing #${id}`);
+});
+
+// Exercise actual UI state functions with only their platform/DOM boundaries replaced.
+// Browser layout and native permissions still require the separate visual/native checks.
+function loadUiState(invoke = async () => {}) {
+  const calls = { opened: 0, errors: [] };
+  const sandbox = {
+    window: { __TAURI__: { core: { invoke }, event: { listen: async () => {} } }, I18N: dictionaries, PLAN_LIMITS: context.window.PLAN_LIMITS },
+    document: { querySelector: () => null, querySelectorAll: () => [] },
+    console, setTimeout, clearTimeout,
+  };
+  vm.createContext(sandbox);
+  const declarations = main.slice(0, main.lastIndexOf("\ninit().catch("));
+  vm.runInContext(`${declarations}\nthis.state = ui;`, sandbox, { timeout: 1000 });
+  sandbox.openOnboarding = () => { calls.opened++; };
+  sandbox.toast = (message) => { calls.errors.push(message); };
+  sandbox.state.lang = "en";
+  return { sandbox, calls };
+}
+
+test("first-run setup persists its seen flag before opening and never restarts", async () => {
+  let saves = 0;
+  const { sandbox, calls } = loadUiState(async (command, { settings }) => {
+    assert.equal(command, "save_settings");
+    assert.equal(calls.opened, 0, "The wizard opened before persistence completed");
+    assert.equal(settings.onboardingSeen, true);
+    saves++;
+    return { ...settings };
+  });
+  sandbox.state.settings = { onboardingSeen: false, provider: "groq", model: "whisper-large-v3" };
+  await sandbox.showFirstRunOnboarding();
+  await sandbox.showFirstRunOnboarding();
+  assert.equal(saves, 1);
+  assert.equal(calls.opened, 1);
+  assert.equal(sandbox.state.settings.onboardingSeen, true);
+});
+
+test("upgraded installations keep their current provider and skip first-run setup", async () => {
+  const { sandbox, calls } = loadUiState(() => assert.fail("Existing settings should not be rewritten"));
+  for (const onboardingSeen of [undefined, true]) {
+    const settings = { onboardingSeen, provider: "openai", model: "whisper-1", useOwnKey: true };
+    sandbox.state.settings = settings;
+    await sandbox.showFirstRunOnboarding();
+    assert.equal(sandbox.state.settings, settings);
+  }
+  assert.equal(calls.opened, 0);
+});
+
+test("a settings write failure does not open an unpersisted setup wizard", async () => {
+  const { sandbox, calls } = loadUiState(async () => { throw new Error("Settings cannot be saved"); });
+  sandbox.state.settings = { onboardingSeen: false };
+  await sandbox.showFirstRunOnboarding();
+  assert.equal(calls.opened, 0);
+  assert.equal(calls.errors.length, 1);
+  assert.equal(sandbox.state.settings.onboardingSeen, false);
+});
+
+test("Skip closes setup, clears input buffers and retains saved onboarding state", () => {
+  const commands = [];
+  const { sandbox } = loadUiState(async command => { commands.push(command); });
+  const controls = new Map();
+  let closed = 0, focused = 0;
+  sandbox.document.querySelector = selector => {
+    if (!controls.has(selector)) controls.set(selector, {
+      value: "temporary form input", hidden: false,
+      appendChild() {}, close() { closed++; }, focus() { focused++; },
+    });
+    return controls.get(selector);
+  };
+  sandbox.state.settings = { onboardingSeen: true, provider: "groq" };
+  sandbox.state.googlePending = true;
+  sandbox.closeOnboarding();
+  assert.equal(closed, 1);
+  assert.equal(focused, 1);
+  assert.equal(controls.get("#onboarding-api-key").value, "");
+  assert.equal(controls.get("#account-password").value, "");
+  assert.equal(sandbox.state.settings.onboardingSeen, true);
+  assert.deepEqual(commands, ["cancel_google_sign_in"]);
+});
+
+test("new provider choices offer Groq and recommend Large v3 without altering legacy settings", () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.providers = [{ id: "groq" }, { id: "openai" }];
+  sandbox.state.settings = { provider: "openai", model: "whisper-1" };
+  assert.deepEqual(Array.from(sandbox.selectableProviders(), provider => provider.id), ["groq"]);
+  assert.equal(sandbox.currentProvider().id, "openai");
+  assert.equal(sandbox.state.providers.length, 2);
+  assert.match(sandbox.recommendedModelName({ id: "whisper-large-v3", name: "Whisper Large v3" }), /Recommended/);
+  assert.equal(sandbox.recommendedModelName({ id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo" }), "Whisper Large v3 Turbo");
+  assert.equal(ids.includes("btn-onboarding"), false, "The temporary launch button must be removed");
 });

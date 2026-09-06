@@ -15,7 +15,7 @@ const ui = {
   page: "general",
   capturing: false,
   license: { active: false },
-  account: { signedIn: false, limitWords: 2000 },
+  account: { signedIn: false, limitSeconds: 1800 },
   authMode: "signup",
   accountNotice: null,
   googlePending: false,
@@ -36,16 +36,6 @@ const DICTATION_LANGUAGES = [
   ["ro", "Română"], ["hu", "Magyar"], ["id", "Bahasa Indonesia"], ["vi", "Tiếng Việt"],
 ];
 
-/** Color e inicial de cada proveedor para su distintivo. */
-const BRAND = {
-  groq: { bg: "#f55036", mark: "G" },
-  openai: { bg: "#10a37f", mark: "AI" },
-  gemini: { bg: "#3b7ff5", mark: "G" },
-  deepgram: { bg: "#13ef95", mark: "D" },
-  grok: { bg: "#111114", mark: "X" },
-  local: { bg: "#7a7a86", mark: "◍" },
-};
-
 const MODIFIER_CODES = new Set([
   "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight",
   "MetaLeft", "MetaRight", "CapsLock", "Fn", "FnLock",
@@ -63,7 +53,7 @@ function t(key, vars) {
   // Fuera de macOS, una clave con variante «.win» (Administrador de credenciales, nombres de
   // teclas, formatos…) tiene prioridad; si no existe, se usa el texto común.
   const platformKey = !isMac() && `${key}.win` in table ? `${key}.win` : key;
-  vars = { hours: window.PLAN_LIMITS.proHours, ...vars };
+  vars = { hours: window.PLAN_LIMITS.proHours, minutes: window.PLAN_LIMITS.freeMinutes, ...vars };
   let text = table[platformKey] ?? window.I18N.en[platformKey] ?? table[key] ?? window.I18N.en[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, v);
   return text;
@@ -208,13 +198,28 @@ function fillSelect(select, entries, value) {
   select.value = value ?? "";
 }
 
-function providerLogo(id, name) {
-  const brand = BRAND[id] || { bg: "var(--accent)", mark: name.charAt(0).toUpperCase() };
-  const span = document.createElement("span");
-  span.className = "logo";
-  span.style.background = brand.bg;
-  span.textContent = brand.mark;
-  return span;
+// Keep adapters and saved selections available for existing installations. Only Groq is
+// offered for new selections; changing providers is always an explicit user action.
+function selectableProviders() {
+  return ui.providers.filter(provider => provider.id === "groq");
+}
+
+function recommendedModelName(model) {
+  return model.id === "whisper-large-v3"
+    ? `${model.name} · ${t("models.recommended")}`
+    : model.name;
+}
+
+function renderProviderSelection(providerSelect, modelSelect) {
+  const providers = selectableProviders();
+  const selected = providers.find(provider => provider.id === ui.settings.provider);
+  const choices = providers.map(provider => [provider.id, provider.name]);
+  if (!selected) choices.unshift(["", t("models.choose_provider")]);
+  fillSelect(providerSelect, choices, selected?.id || "");
+  if (!selected) providerSelect.options[0].disabled = true;
+  fillSelect(modelSelect, (selected?.models || []).map(model => [model.id, recommendedModelName(model)]), selected ? ui.settings.model : "");
+  modelSelect.disabled = !selected;
+  return selected;
 }
 
 function renderModels() {
@@ -223,43 +228,13 @@ function renderModels() {
   $("#models-cloud-notice").hidden = !hosted;
   $("#models-cloud-desc").textContent = t(ui.license.active ? "models.cloud.pro" : "models.cloud.free");
   $$(".byok-models").forEach(el => el.hidden = hosted);
-  const chips = $("#provider-chips");
-  chips.innerHTML = "";
-  for (const p of ui.providers) {
-    const chip = document.createElement("button");
-    chip.className = `chip${p.id === ui.settings.provider ? " active" : ""}`;
-    chip.dataset.provider = p.id;
-    chip.appendChild(providerLogo(p.id, p.name));
-    const name = document.createElement("span");
-    name.textContent = p.name;
-    chip.appendChild(name);
-    if (!p.verified) {
-      const tag = document.createElement("span");
-      tag.className = "tag";
-      tag.textContent = t("models.unverified");
-      chip.appendChild(tag);
-    }
-    chips.appendChild(chip);
-  }
-
-  const list = $("#model-list");
-  list.innerHTML = "";
-  for (const m of currentProvider()?.models || []) {
-    const card = document.createElement("button");
-    card.className = `model${m.id === ui.settings.model ? " active" : ""}`;
-    card.dataset.model = m.id;
-    const radio = document.createElement("span");
-    radio.className = "radio";
-    const info = document.createElement("span");
-    info.className = "info";
-    const strong = document.createElement("strong");
-    strong.textContent = m.name;
-    const desc = document.createElement("span");
-    desc.textContent = modelDescription(m);
-    info.append(strong, desc);
-    card.append(radio, info);
-    list.appendChild(card);
-  }
+  const selected = renderProviderSelection($("#provider-select"), $("#model-select"));
+  const model = selected?.models.find(item => item.id === ui.settings.model);
+  $("#model-description").textContent = model ? modelDescription(model) : "";
+  $("#legacy-provider-note").hidden = !!selected;
+  $("#legacy-provider-note").textContent = selected ? "" : t("models.saved_provider", {
+    provider: currentProvider()?.name || ui.settings.provider, model: ui.settings.model,
+  });
 
   const vocabulary = $("#vocabulary");
   if (document.activeElement !== vocabulary) vocabulary.value = ui.settings.vocabulary || "";
@@ -480,9 +455,10 @@ function renderAccount() {
   $("#btn-account-submit").textContent = t({ signup: "account.create", signin: "account.signin", confirm: "account.confirm", reset: "account.reset" }[mode]);
   $("#account-status").textContent = a.error || ui.accountNotice || (a.signedIn ? a.email : t("account.desc"));
   $("#account-status").classList.toggle("error", !!a.error);
-  const used = a.usedWords;
-  const limit = a.limitWords || 2000;
-  $("#usage-label").textContent = used == null ? t("account.unavailable") : t("account.usage", { used: used.toLocaleString(ui.lang), limit: limit.toLocaleString(ui.lang), remaining: Math.max(0, limit - used).toLocaleString(ui.lang) });
+  const used = a.usedSeconds;
+  const limit = a.limitSeconds || 1800;
+  const minutes = seconds => (seconds / 60).toLocaleString(ui.lang, { maximumFractionDigits: 1 });
+  $("#usage-label").textContent = used == null ? t("account.unavailable") : t("account.usage", { used: minutes(used), limit: minutes(limit), remaining: minutes(Math.max(0, limit - used)) });
   $("#usage-progress").hidden = used == null;
   $("#usage-progress").max = limit;
   $("#usage-progress").value = Math.min(limit, used || 0);
@@ -492,7 +468,7 @@ function renderAccount() {
 
 async function refreshAccount() {
   try { ui.account = await invoke("get_account_status"); }
-  catch (err) { ui.account = { ...ui.account, usedWords: null, error: String(err) }; }
+  catch (err) { ui.account = { ...ui.account, usedSeconds: null, error: String(err) }; }
   renderPlan();
   renderModels();
 }
@@ -530,12 +506,24 @@ async function finishAccountSignIn(status) {
   renderPlan();
 }
 
-// ---------- Onboarding (manual launch while the new flow is being tested) ----------
+// ---------- First-run onboarding ----------
 
 function restoreOnboardingCards() {
   $("#account-home").appendChild($("#account-card"));
   $("#license-home").appendChild($("#license-card"));
   $("#btn-wizard-checkout").hidden = true;
+}
+
+async function showFirstRunOnboarding() {
+  // Persist before showing: quitting or skipping setup must not restart it next launch.
+  // Missing flags belong to older clients and should never interrupt their setup.
+  if (ui.settings.onboardingSeen !== false) return;
+  try {
+    ui.settings = await invoke("save_settings", { settings: { ...ui.settings, onboardingSeen: true } });
+    openOnboarding();
+  } catch (err) {
+    toast(String(err), true);
+  }
 }
 
 function openOnboarding(mode) {
@@ -550,7 +538,7 @@ function closeOnboarding() {
   $("#onboarding-api-key").value = "";
   $("#account-password").value = "";
   $("#onboarding-dialog").close();
-  $("#btn-onboarding").focus();
+  document.querySelector(`.nav-item[data-page="${ui.page}"]`)?.focus();
 }
 
 function renderOnboardingNext() {
@@ -574,7 +562,7 @@ function renderOnboarding() {
   $("#onboarding-setup").hidden = step !== 2;
   $("#onboarding-ready").hidden = step !== 3;
   $("#btn-onboarding-back").hidden = step === 1;
-  $("#btn-onboarding-later").hidden = step === 3;
+  $("#btn-onboarding-later").hidden = false;
   $$("[data-onboarding-mode]").forEach(el => { el.classList.toggle("selected", el.dataset.onboardingMode === mode); el.setAttribute("aria-pressed", String(el.dataset.onboardingMode === mode)); });
   $("#onboarding-key-form").hidden = mode !== "own";
   if (step === 2 && mode === "free") $("#onboarding-account").appendChild($("#account-card"));
@@ -583,8 +571,7 @@ function renderOnboarding() {
     $("#btn-wizard-checkout").hidden = ui.license.active;
   }
   if (step === 2 && mode === "own") {
-    fillSelect($("#onboarding-provider"), ui.providers.map(p => [p.id, p.verified ? p.name : `${p.name} (${t("models.unverified")})`]), ui.settings.provider);
-    fillSelect($("#onboarding-model"), currentProvider().models.map(m => [m.id, m.name]), ui.settings.model);
+    renderProviderSelection($("#onboarding-provider"), $("#onboarding-model"));
     refreshOnboardingKey();
   }
   $("#onboarding-hotkey").textContent = prettyHotkey(ui.settings.hotkey);
@@ -886,17 +873,13 @@ function wireEvents() {
     if (item) showPage(item.dataset.page);
   });
 
-  $("#provider-chips").addEventListener("click", async (e) => {
-    const chip = e.target.closest("[data-provider]");
-    if (!chip) return;
-    const provider = ui.providers.find((p) => p.id === chip.dataset.provider);
+  $("#provider-select").addEventListener("change", async (e) => {
+    const provider = selectableProviders().find(item => item.id === e.target.value);
+    if (!provider) return;
     await saveSettings({ provider: provider.id, model: provider.defaultModel });
     await refreshKeyStatus();
   });
-  $("#model-list").addEventListener("click", (e) => {
-    const card = e.target.closest("[data-model]");
-    if (card) saveSettings({ model: card.dataset.model });
-  });
+  $("#model-select").addEventListener("change", e => saveSettings({ model: e.target.value }));
 
   $("#language").addEventListener("change", (e) => saveSettings({ language: e.target.value }));
   $("#auto-paste").addEventListener("change", (e) => saveSettings({ autoPaste: e.target.checked }));
@@ -1024,7 +1007,6 @@ function wireEvents() {
   });
   $("#btn-restart").addEventListener("click", () => invoke("restart_app").catch((e) => toast(String(e), true)));
 
-  $("#btn-onboarding").addEventListener("click", () => openOnboarding());
   $("#btn-close-onboarding").addEventListener("click", closeOnboarding);
   $("#btn-onboarding-later").addEventListener("click", closeOnboarding);
   $("#onboarding-dialog").addEventListener("cancel", e => { e.preventDefault(); closeOnboarding(); });
@@ -1041,7 +1023,8 @@ function wireEvents() {
     refreshPermissions();
   });
   $("#onboarding-provider").addEventListener("change", async e => {
-    const provider = ui.providers.find(p => p.id === e.target.value);
+    const provider = selectableProviders().find(p => p.id === e.target.value);
+    if (!provider) return;
     $("#onboarding-api-key").value = "";
     ui.onboarding.keyConfigured = false;
     await saveSettings({ provider: provider.id, model: provider.defaultModel });
@@ -1227,6 +1210,7 @@ async function init() {
 
   renderAll();
   wireEvents();
+  await showFirstRunOnboarding();
   // Register menu navigation before slower account/license refreshes finish.
   await listen("check-for-updates-requested", openUpdateCheck);
   await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs(), refreshLicense(), refreshAccount()]);

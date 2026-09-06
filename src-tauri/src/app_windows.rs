@@ -52,10 +52,38 @@ pub fn create_windows(app: &AppHandle) -> tauri::Result<()> {
 /// Muestra la ventana de configuración y trae la app al frente.
 pub fn show_settings(app: &AppHandle) {
     let Some(window) = app.get_webview_window(MAIN) else { return };
+    #[cfg(target_os = "macos")]
+    let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
+        // An explicitly opened settings window behaves like a normal Mac app:
+        // keep it in the Dock and application switcher until the user closes it.
+        #[cfg(target_os = "macos")]
+        {
+            let _ = handle.set_activation_policy(tauri::ActivationPolicy::Regular);
+            if let Err(error) = platform::configure_settings_window(&window) {
+                log::warn!("Could not configure the settings window: {error}");
+            }
+        }
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
         platform::activate_app();
+    });
+}
+
+/// Closing settings returns to the menu bar without quitting dictation.
+/// Losing focus or minimizing must never call this function.
+pub fn hide_settings(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(MAIN) else { return };
+    #[cfg(target_os = "macos")]
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Err(error) = window.hide() {
+            log::warn!("Could not hide the settings window: {error}");
+            return;
+        }
+        #[cfg(target_os = "macos")]
+        let _ = handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
     });
 }
 

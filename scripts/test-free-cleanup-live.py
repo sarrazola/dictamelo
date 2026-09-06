@@ -9,6 +9,7 @@ Credentials, sessions and OTPs remain in memory; the app Keychain is never acces
 from concurrent.futures import ThreadPoolExecutor
 import argparse
 import hashlib
+import math
 from pathlib import Path
 import re
 import runpy
@@ -52,6 +53,7 @@ def run(project):
     try:
         # Fail before making test identities or provider calls if the migration is absent.
         request(admin, base, "GET", "/rest/v1/free_cleanup_receipts?select=receipt_id&limit=0", "Check cleanup migration")
+        request(admin, base, "GET", "/rest/v1/free_audio_requests?select=request_id&limit=0", "Check audio-time migration")
         _, settings = request(public, base, "GET", "/auth/v1/settings", "Check email confirmations")
         require(settings.get("mailer_autoconfirm") is False, "Email confirmation must remain enabled")
         for _ in range(2):
@@ -71,7 +73,7 @@ def run(project):
             return {"Authorization": "Bearer " + account["token"]}
 
         def usage(account):
-            return request(public, base, "POST", "/functions/v1/usage", "Read weekly words",
+            return request(public, base, "POST", "/functions/v1/usage", "Read weekly audio allowance",
                            headers=user_headers(account), json={})[1]
 
         def attempts(receipt):
@@ -84,7 +86,8 @@ def run(project):
                                expected=expected, headers=user_headers(account), data={"language": "en"},
                                files={"file": (fixture.path.name, audio, "audio/wav")})
 
-        require(usage(first)["usedWords"] == 0 and usage(first)["limitWords"] == 2000, "Initial 2,000-word allowance mismatch")
+        require(usage(first)["usedSeconds"] == 0 and usage(first)["limitSeconds"] == 1800, "Initial 30-minute allowance mismatch")
+        require(usage(first)["usedWords"] == 0 and usage(first)["limitWords"] == 2000, "Legacy usage fields disappeared")
         request(public, base, "POST", "/functions/v1/cleanup", "Reject unauthenticated cleanup", expected=(401,), json={})
         request(public, base, "POST", "/functions/v1/cleanup", "Reject invalid JWT", expected=(401,),
                 headers={"Authorization": "Bearer deliberately-invalid"}, json={})
@@ -101,6 +104,8 @@ def run(project):
         require(receipt_rows[0]["transcript_hash"] == hashlib.sha256(text.encode()).hexdigest(), "Receipt does not bind canonical text")
         charged = receipt_rows[0]["words"]
         require(charged > 0 and usage(first)["usedWords"] == charged, "Transcription was not charged exactly once")
+        require(math.isclose(usage(first)["usedSeconds"], fixture.duration_seconds, abs_tol=0.0001), "PCM duration was not charged exactly once")
+        require(math.isclose(transcription["duration"], fixture.duration_seconds, abs_tol=0.0001), "Response duration differs from validated PCM")
         payload = {"text": text, "cleanupReceipt": receipt}
         request(public, base, "POST", "/functions/v1/cleanup", "Reject changed transcript", expected=(403,),
                 headers=user_headers(first), json={**payload, "text": text + " Changed transcript."})
@@ -135,27 +140,28 @@ def run(project):
                 headers=user_headers(first), json=payload)
         require(len(attempts(receipt)) == 1 and usage(first)["usedWords"] == charged, "Replay consumed tokens or words")
         require(usage(other)["usedWords"] == 0, "Cross-account request changed another account's words")
-        print(f"PASS live cleanup model={cleaned['model']}: race 200/409, replay 409, one provider attempt, words unchanged at {charged}")
+        require(math.isclose(usage(first)["usedSeconds"], fixture.duration_seconds, abs_tol=0.0001), "Cleanup changed audio allowance")
+        print(f"PASS live cleanup model={cleaned['model']}: race 200/409, replay 409, one provider attempt; {charged} words and {fixture.duration_seconds}s counted once")
 
         # Move only this new synthetic account to the public boundary. Real account rows are never edited.
         _, weeks = request(admin, base, "GET", "/rest/v1/free_weekly_usage?user_id=eq." + first["id"] +
                            "&select=week_start", "Read synthetic quota week")
         require(len(weeks) == 1, "Synthetic account has unexpected quota weeks")
         request(admin, base, "PATCH", "/rest/v1/free_weekly_usage?user_id=eq." + first["id"] +
-                "&week_start=eq." + weeks[0]["week_start"], "Prepare synthetic 2,000-word boundary", expected=(204,),
-                json={"words": 1999, "reserved_until": "2000-01-01T00:00:00Z"})
+                "&week_start=eq." + weeks[0]["week_start"], "Prepare synthetic 30-minute boundary", expected=(204,),
+                json={"legacy_audio_seconds": 1799 - fixture.duration_seconds, "reserved_until": "2000-01-01T00:00:00Z"})
         _, final = transcribe(first)
         assert_transcript(final["text"], fixture.transcript)
-        before_cleanup = usage(first)["usedWords"]
-        require(before_cleanup > 2000, "Final complete recording did not cross the expected boundary")
+        before_cleanup = usage(first)["usedSeconds"]
+        require(math.isclose(before_cleanup, 1799 + fixture.duration_seconds, abs_tol=0.0001), "Final complete recording did not cross the expected boundary")
         _, final_cleaned = request(public, base, "POST", "/functions/v1/cleanup", "Clean final over-limit recording",
                                    headers=user_headers(first), json={"text": final["text"], "cleanupReceipt": final["cleanupReceipt"]})
         require(final_cleaned.get("model") == "openai/gpt-oss-20b", "Final cleanup model mismatch")
         assert_transcript(final_cleaned["choices"][0]["message"]["content"], fixture.transcript)
-        require(usage(first)["usedWords"] == before_cleanup, "Final cleanup double-counted words")
+        require(usage(first)["usedSeconds"] == before_cleanup, "Final cleanup double-counted audio")
         transcribe(first, expected=(429,))
-        require(usage(first)["usedWords"] == before_cleanup, "Rejected exhausted recording changed words")
-        print(f"PASS weekly boundary: final recording delivered and cleaned at {before_cleanup}/2000; next transcription 429; cleanup adds zero words")
+        require(usage(first)["usedSeconds"] == before_cleanup, "Rejected exhausted recording changed audio")
+        print(f"PASS weekly boundary: final recording delivered and cleaned at {before_cleanup}/1800 seconds; next transcription 429; cleanup adds zero audio time")
     finally:
         cleanup_failed = False
         for account in reversed(created):
@@ -165,7 +171,7 @@ def run(project):
                         "Refused cleanup of mismatching identity")
                 request(admin, base, "DELETE", "/auth/v1/admin/users/" + account["id"], "Delete synthetic account", expected=(200, 204))
                 request(admin, base, "GET", "/auth/v1/admin/users/" + account["id"], "Verify synthetic deletion", expected=(404,))
-                for table in ("free_weekly_usage", "free_cleanup_receipts"):
+                for table in ("free_weekly_usage", "free_cleanup_receipts", "free_audio_requests"):
                     _, rows = request(admin, base, "GET", "/rest/v1/" + table + "?user_id=eq." + account["id"], "Verify cascade cleanup")
                     require(rows == [], "Synthetic quota records remained after deletion")
             except Exception:

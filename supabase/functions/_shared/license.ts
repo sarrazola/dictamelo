@@ -10,7 +10,7 @@
 /** Cada cuánto se revalida una licencia contra Lemon Squeezy. */
 const REVALIDATE_AFTER_MS = 60 * 60 * 1000; // 1 hora
 /** Server-enforced rolling allowance; source of truth is reserve_pro_usage. */
-export const PRO_AUDIO_SECONDS = 60 * 60 * 60;
+export const PRO_AUDIO_SECONDS = 180 * 60 * 60;
 export const PRO_REQUEST_SECONDS = 600;
 
 export class LicenseError extends Error {
@@ -96,10 +96,10 @@ export class Db {
     });
     const text = await response.text();
     if (!response.ok) {
-      if (text.includes("weekly_word_limit")) {
+      if (text.includes("weekly_audio_limit") || text.includes("weekly_word_limit")) {
         throw new LicenseError(
           429,
-          "You have used your 2,000 free words this week. Your allowance renews on Monday at 00:00 UTC. Upgrade to Pro or use your own API key.",
+          "You have used your 30 free minutes this week. Your allowance renews on Monday at 00:00 UTC. Upgrade to Pro or use your own API key.",
         );
       }
       if (text.includes("weekly_request_limit")) {
@@ -138,7 +138,7 @@ export class Db {
       if (text.includes("monthly_audio_limit")) {
         throw new LicenseError(
           429,
-          "You have used your 60 hours of Pro audio in the last 30 days, or this recording exceeds your remaining allowance. Use your own API key or wait for earlier usage to leave the rolling window.",
+          "You have used your 180 hours of Pro audio in the last 30 days, or this recording exceeds your remaining allowance. Use your own API key or wait for earlier usage to leave the rolling window.",
         );
       }
       if (text.includes("monthly_cleanup_limit")) {
@@ -150,7 +150,7 @@ export class Db {
       if (text.includes("monthly_request_limit")) {
         throw new LicenseError(
           429,
-          "Your 12,000 Pro requests in the last 30 days have been used. Use your own API key or try later.",
+          "Your 36,000 Pro requests in the last 30 days have been used. Use your own API key or try later.",
         );
       }
       if (text.includes("request_in_progress")) {

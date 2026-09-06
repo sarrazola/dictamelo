@@ -5,11 +5,18 @@ use std::path::Path;
 
 pub const DEFAULT_HOTKEY: &str = "Alt+Shift+Space";
 pub const DEFAULT_PROVIDER: &str = "groq";
-pub const DEFAULT_MODEL: &str = "whisper-large-v3-turbo";
+pub const DEFAULT_MODEL: &str = "whisper-large-v3";
+
+fn existing_installation_has_seen_onboarding() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    /// Show setup once for a new installation; older settings skip the new wizard.
+    #[serde(default = "existing_installation_has_seen_onboarding")]
+    pub onboarding_seen: bool,
     /// Atajo global en el formato del plugin (p. ej. "Alt+Shift+Space").
     pub hotkey: String,
     /// Identificador del proveedor de transcripción ("groq", "openai", ...).
@@ -53,6 +60,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            onboarding_seen: false,
             hotkey: DEFAULT_HOTKEY.to_string(),
             provider: DEFAULT_PROVIDER.to_string(),
             use_own_key: false,
@@ -84,7 +92,7 @@ impl Settings {
                 Ok(settings) => settings.sanitized(),
                 Err(e) => {
                     log::warn!("settings.json inválido ({e}); se usan valores por defecto");
-                    Settings::default()
+                    Settings { onboarding_seen: true, ..Settings::default() }
                 }
             },
             Err(_) => Settings::default(),
@@ -178,8 +186,34 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("settings.json");
         std::fs::write(&path, "{ esto no es json").unwrap();
-        assert_eq!(Settings::load(&path), Settings::default());
+        assert_eq!(Settings::load(&path), Settings { onboarding_seen: true, ..Settings::default() });
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn onboarding_runs_only_for_a_new_installation() {
+        let dir = std::env::temp_dir().join(format!("dictamelo-onboarding-{}", uuid::Uuid::new_v4()));
+        let path = dir.join("settings.json");
+        let mut fresh = Settings::load(&path);
+        assert!(!fresh.onboarding_seen);
+        assert_eq!(fresh.model, "whisper-large-v3");
+        fresh.save(&path).unwrap();
+        assert!(!Settings::load(&path).onboarding_seen);
+        fresh.onboarding_seen = true;
+        fresh.save(&path).unwrap();
+        assert!(Settings::load(&path).onboarding_seen);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn legacy_settings_skip_onboarding_and_preserve_the_selected_provider() {
+        let legacy: Settings = serde_json::from_str(r#"{"provider":"openai","model":"whisper-1","useOwnKey":true}"#).unwrap();
+        assert!(legacy.onboarding_seen);
+        assert_eq!(legacy.provider, "openai");
+        assert_eq!(legacy.model, "whisper-1");
+        assert!(legacy.use_own_key);
+        let serialized = serde_json::to_value(legacy).unwrap();
+        assert_eq!(serialized["onboardingSeen"], true);
     }
 
     #[test]

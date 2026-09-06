@@ -500,22 +500,18 @@ pub async fn retry_last(app: &AppHandle) {
     }
 }
 
-/// Al arrancar: si falta la API key o algún permiso, abre la ventana de configuración.
-pub fn startup_checks(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let settings = state.settings();
-    let key_ok = state
-        .api_key_for(&settings.provider)
-        .ok()
-        .flatten()
-        .is_some_and(|k| !k.trim().is_empty());
+/// Only first-run setup opens a window automatically. Credential and permission
+/// problems are handled when the user starts dictation, including cloud accounts
+/// that intentionally have no personal API key.
+pub fn startup_checks(app: &AppHandle, first_run: bool) {
     let permissions = platform::permissions_status();
     log::info!(
-        "Arranque: api_key={key_ok} micrófono={:?} accesibilidad={:?}",
+        "Startup: first_run={first_run} permissions_ready={} microphone={:?} accessibility={:?}",
+        permissions.all_granted(),
         permissions.microphone,
         permissions.accessibility
     );
-    if !key_ok || !permissions.all_granted() {
+    if first_run {
         app_windows::show_settings(app);
     }
 }

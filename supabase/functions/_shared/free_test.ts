@@ -273,3 +273,20 @@ Deno.test("truncated or empty cleanup results settle spent tokens but do not con
     );
   }
 });
+
+Deno.test("reject RIFF size mismatches, duplicate data and partial samples", () => {
+  const wrongSize = wav(1);
+  new DataView(wrongSize.buffer).setUint32(4, 44, true);
+  rejects(wrongSize);
+  const partial = wav(1).slice(0, -1);
+  const view = new DataView(partial.buffer);
+  view.setUint32(4, partial.length - 8, true);
+  view.setUint32(40, partial.length - 44, true);
+  rejects(partial);
+  const duplicate = new Uint8Array(44 + 32000 + 8 + 2);
+  duplicate.set(wav(1));
+  new DataView(duplicate.buffer).setUint32(4, duplicate.length - 8, true);
+  duplicate.set(new TextEncoder().encode("data"), 32044);
+  new DataView(duplicate.buffer).setUint32(32048, 2, true);
+  rejects(duplicate);
+});

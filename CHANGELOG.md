@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — Release candidate
+
+- Show setup only on first launch, with Skip on every step; retain existing settings.
+- Present Groq provider and model together and recommend Whisper Large v3 for personal keys.
+- Keep Mac Settings open across application switching; closing Settings returns to the menu bar.
+- Meter Free Cloud as 30 minutes per week and Pro as 180 hours per rolling 30 days.
+- Keep AI cleanup included without consuming additional audio time and preserve existing licenses and usage.
+- Enforce measured Free audio reservations and harden client access to billing tables.
+- Add first-launch, quota-upgrade, audio-boundary and provider-failure regressions.
+
+See `docs/TESTING.md` for verified artifacts and platform results. Cloud access remains a preview.
+
 ## 0.4.0 — Release candidate
 
 - Include hosted AI cleanup in Free Cloud without charging transcription words twice.
