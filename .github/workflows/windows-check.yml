@@ -70,6 +70,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'UI syntax check failed' }
           node --check ui/i18n.js
           if ($LASTEXITCODE -ne 0) { throw 'Translation syntax check failed' }
+          npm run test:ui
+          if ($LASTEXITCODE -ne 0) { throw 'UI translation/control contract tests failed' }
       - name: Validate optional official build metadata
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.official_cloud }}
         shell: pwsh

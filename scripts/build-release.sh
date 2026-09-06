@@ -3,7 +3,10 @@
 # The updater archive is created AFTER stapling, then signed with the existing Tauri key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-# Fail before reading signing credentials or building if the upload regression asset is invalid.
+# Fail before reading signing credentials or building if an offline regression fails.
+node --check ui/main.js
+node --check ui/i18n.js
+npm run test:ui
 python3 scripts/check-audio-fixture.py
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 if [[ "${DICTAMELO_LIVE_REGRESSION:-0}" == "1" ]]; then

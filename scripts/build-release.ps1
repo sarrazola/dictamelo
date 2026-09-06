@@ -25,6 +25,14 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 
+# Check UI source contracts without browser dependencies or account access.
+node --check ui/main.js
+if ($LASTEXITCODE -ne 0) { throw 'UI syntax check failed' }
+node --check ui/i18n.js
+if ($LASTEXITCODE -ne 0) { throw 'Translation syntax check failed' }
+npm run test:ui
+if ($LASTEXITCODE -ne 0) { throw 'UI translation/control contract tests failed' }
+
 # Validate the committed speech-upload fixture before toolchain setup or signing.
 # This is offline unless the maintainer explicitly enables the live regression.
 $fixturePython = Get-Command py -ErrorAction SilentlyContinue
