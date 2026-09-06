@@ -37,6 +37,18 @@ class WindowsPayloadTests(unittest.TestCase):
                 self.assertEqual(result["bundleTypeTransformation"]["offset"], 400)
                 self.assertTrue(result["bundleTypeTransformation"]["onlyDifferenceVerified"])
 
+    def test_preexisting_nss_marker_remains_unchanged(self):
+        compiled = bytearray(payload())
+        compiled[350:350 + len(PACKAGED_MARKER)] = PACKAGED_MARKER
+        packaged = bytearray(compiled)
+        packaged[400:400 + len(COMPILED_MARKER)] = PACKAGED_MARKER
+        result = verify_payloads(bytes(compiled), bytes(packaged), "0x8664")
+        self.assertEqual(result["bundleTypeTransformation"]["preexistingNssMarkers"], 1)
+        self.assertEqual(result["bundleTypeTransformation"]["offset"], 400)
+        packaged[350] ^= 1
+        with self.assertRaisesRegex(ValueError, "differs beyond"):
+            verify_payloads(bytes(compiled), bytes(packaged), "0x8664")
+
     def test_wrong_machine_in_either_binary_is_rejected(self):
         for compiled_machine, packaged_machine in ((0xAA64, 0x8664), (0x8664, 0xAA64)):
             with self.subTest(compiled=compiled_machine, packaged=packaged_machine):
@@ -56,7 +68,8 @@ class WindowsPayloadTests(unittest.TestCase):
             marker = COMPILED_MARKER if change_compiled else PACKAGED_MARKER
             destination[450:450 + len(marker)] = marker
             with self.subTest(compiled=change_compiled):
-                with self.assertRaisesRegex(ValueError, "exactly one"):
+                message = "exactly one" if change_compiled else "differs beyond"
+                with self.assertRaisesRegex(ValueError, message):
                     verify_payloads(bytes(compiled), bytes(packaged), "0x8664")
 
     def test_missing_or_unexpected_marker_is_rejected(self):
@@ -66,14 +79,14 @@ class WindowsPayloadTests(unittest.TestCase):
             (PACKAGED_MARKER, PACKAGED_MARKER),
         ):
             with self.subTest(compiled=compiled_marker, packaged=packaged_marker):
-                with self.assertRaisesRegex(ValueError, "exactly one"):
+                with self.assertRaisesRegex(ValueError, "exactly one|missing the NSS marker"):
                     verify_payloads(payload(marker=compiled_marker), payload(marker=packaged_marker), "0x8664")
 
     def test_marker_at_different_offset_is_rejected(self):
         packaged = bytearray(payload(marker=PACKAGED_MARKER))
         packaged[400:400 + len(PACKAGED_MARKER)] = bytes(len(PACKAGED_MARKER))
         packaged[450:450 + len(PACKAGED_MARKER)] = PACKAGED_MARKER
-        with self.assertRaisesRegex(ValueError, "different offset"):
+        with self.assertRaisesRegex(ValueError, "missing the NSS marker"):
             verify_payloads(payload(), bytes(packaged), "0x8664")
 
     def test_added_or_truncated_bytes_are_rejected(self):

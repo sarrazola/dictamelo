@@ -1,7 +1,8 @@
 """Verify unsigned NSIS payload bytes against Tauri's restored compiler output.
 
 Tauri CLI 2.11.4 patches UNK to NSS before packaging, then restores the original
-executable. Only that exact, unique, same-offset marker change is accepted here.
+executable. Only that unique UNK marker's same-offset change is accepted here;
+any pre-existing NSS strings must remain byte-identical.
 See docs/RELEASING.md for the pinned upstream implementation and version checks.
 This helper reads files only; it never normalizes or rewrites an artifact.
 """
@@ -42,13 +43,11 @@ def verify_payloads(compiled, packaged, expected_machine):
         raise ValueError("Compiler output or packaged payload has the wrong PE machine")
     if len(compiled) != len(packaged):
         raise ValueError("Compiler output and packaged payload differ in length")
-    if compiled.count(COMPILED_MARKER) != 1 or compiled.count(PACKAGED_MARKER) != 0:
-        raise ValueError("Compiler output must contain exactly one UNK marker and no NSS marker")
-    if packaged.count(PACKAGED_MARKER) != 1 or packaged.count(COMPILED_MARKER) != 0:
-        raise ValueError("Packaged payload must contain exactly one NSS marker and no UNK marker")
+    if compiled.count(COMPILED_MARKER) != 1:
+        raise ValueError("Compiler output must contain exactly one UNK marker")
     offset = compiled.index(COMPILED_MARKER)
-    if packaged.index(PACKAGED_MARKER) != offset:
-        raise ValueError("The packaged bundle marker moved to a different offset")
+    if packaged[offset:offset + len(PACKAGED_MARKER)] != PACKAGED_MARKER:
+        raise ValueError("Packaged payload is missing the NSS marker at the compiler's UNK offset")
     expected = compiled[:offset] + PACKAGED_MARKER + compiled[offset + len(COMPILED_MARKER):]
     if packaged != expected:
         raise ValueError("Packaged payload differs beyond Tauri's documented UNK-to-NSS marker")
@@ -67,6 +66,7 @@ def verify_payloads(compiled, packaged, expected_machine):
             "from": COMPILED_MARKER.decode("ascii"),
             "to": PACKAGED_MARKER.decode("ascii"),
             "offset": offset,
+            "preexistingNssMarkers": compiled.count(PACKAGED_MARKER),
             "onlyDifferenceVerified": True,
         },
     }
