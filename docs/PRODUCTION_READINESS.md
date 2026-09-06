@@ -1,40 +1,68 @@
 # Production readiness
 
-Last reviewed: September 5, 2026. A working local application, a public installer and a production cloud service are separate delivery milestones. Keep release evidence in [TESTING.md](TESTING.md).
+Last reviewed: September 5, 2026, for the 0.5.0 source and deployed audio-time backend. A working local application, a public installer and a production cloud service are separate delivery milestones. Keep exact commit, artifact and native execution evidence in [Testing](TESTING.md).
 
 ## Release requirements
 
 | Area | Required evidence before stable cloud launch | Current boundary |
 | --- | --- | --- |
-| Desktop | Same reviewed source on `main`; Mac, Windows x64 and Windows ARM64 builds; real file upload and cleanup; settings survive installation | 0.4.0 installed Mac retained the account/settings and passed real Free Cloud file transcription plus cleanup. This Mac's system file-provider blockage remains a separate limitation; see the verification record. |
-| macOS distribution | Developer ID signature, Apple Accepted notarization, stapled app/DMG, Gatekeeper, independently verified updater archive | Final 0.4.0 app and DMG passed signing, notarization, stapling and Gatekeeper. Installed executable matches the verified DMG. |
-| Windows distribution | Both installed payload architectures/version verified; native x64 CI; ARM64 and x64 VM functional checks; updater signatures | Existing installers have no Microsoft Authenticode certificate. Tauri update signing does not suppress SmartScreen. Record emulation separately from physical hardware. |
-| Free Cloud | 2,000 words/week; cleanup for the accepted transcript; user isolation, exact transcript binding, concurrent/replayed request protection, failures and quota boundary | SQL, handler, live hosted regression and installed Mac file-transcription/cleanup checks passed. The installed app counted 17 words once. |
+| Desktop | Same reviewed source; installed Mac, Windows x64 and ARM64; first-run/Skip behavior; real file upload and cleanup; settings survive installation | 0.5.0 source and browser checks passed. Browser mocks do not establish native startup, Cmd-Tab behavior, permissions or dictation. Record new installed-artifact results in Testing; 0.4.0 retained the account/settings and passed real Free file transcription/cleanup. |
+| macOS distribution | Developer ID signature, Apple Accepted notarization, stapled app/DMG, Gatekeeper and independently verified updater archive | Historical 0.4.0 distribution checks passed. Each 0.5.0 artifact requires its own record; an accepted submission alone does not prove installation or the complete distribution flow. |
+| Windows distribution | Both installed payload architectures/version verified; native x64 CI; ARM64 and x64 VM functional checks; updater signatures | Existing installers have no Microsoft Authenticode certificate. Tauri update signing does not suppress SmartScreen. Build, emulated execution and physical hardware checks must remain distinct. |
+| Free Cloud | 30 minutes per UTC week, included receipt-bound cleanup, exact time metering, user isolation, concurrency/replay protection and quota boundary | Audio-time migration and handlers are deployed. Real fixture used 5.855 seconds once with zero additional cleanup audio; last accepted recording reached 1804.855/1800 seconds and the next request returned 429. Temporary accounts and dependent records were removed. |
 | Google account | Verified homepage/privacy/terms on the owned domain; configured audience; browser-to-installed-app sign-in and restart persistence | Megacubos Google project and Supabase provider are configured. Owned test-user login passed in 0.3.1; Google audience remains Testing. |
-| Email account | Verified sender domain and SMTP; real confirmation and password recovery delivered to an owned mailbox; login and token refresh | Password/Auth API tests passed. Production SMTP is not configured; generated test tokens do not prove delivery. |
-| Pro | Matching store/product/variant, actual purchase or test checkout, immediate license access, cancellation/expiry and quota behavior | Ownership and 60-hour quota service are deployed. A seven-day trial remains disabled until its entitlement lifecycle is proved. |
-| Product information | Matching app, website and checkout limits; privacy and terms describe the actual data flow | `dictamelo.com`, `/privacy` and `/terms` still return a parking redirect. The separate website repository has a landing page but no published legal pages. The existing Lemon product description was updated to the 60-hour allowance, cleanup and five devices. |
-| Public downloads | All architecture links, checksums and signatures re-downloaded and verified | 0.4.0 is a public GitHub prerelease; all nine downloads, checksums and three updater signatures passed independent verification. Stable remains 0.1.2. Promote only after remaining cloud requirements and a real update installation check. |
+| Email account and signup abuse | Verified sender domain/SMTP; real confirmation and recovery delivered to an owned mailbox; login/refresh; tested signup abuse controls | Password/Auth API tests passed. Confirmations remain enabled, but SMTP has no configured host and CAPTCHA is off. Synthetic tokens do not prove email delivery; per-account quotas do not prevent multiple-account abuse. |
+| Pro | Correct store/product/variant, actual purchase or test checkout, immediate access, cancellation/expiry, compatible device enforcement and quota behavior | Ownership and 180-hour rolling quota service are deployed. Existing licenses remain supported. A fresh paid provider/lifecycle test remains outstanding. Normal activation limits five devices, but legacy key-only API requests do not enforce the instance/device cap against modified clients. |
+| Product information | App, website and checkout display 30 minutes/week and 180 hours/rolling 30 days; policies match actual data flow | Last verified homepage, privacy and terms URLs redirect to parking content. The last recorded Lemon description showed the previous 60-hour allowance; verify and synchronize public copy before claiming consistency. Price remains $4.99/month. |
+| Trial | Verified immediate entitlement and the complete seven-day trial lifecycle | Checkout and desktop trial flag remain false. No trial availability is claimed. |
+| Public downloads | All architecture links, checksums and signatures re-downloaded and verified; actual update installation | The last recorded public preview is 0.4.0, with nine downloads verified; stable remained 0.1.2. A 0.5.0 build is not evidence of publication or update installation. Record new results in Testing. |
+
+## Cost of the 180-hour allowance
+
+The selected allowance remains **180 hours per rolling 30 days at $4.99/month**. It has a negative margin at full usage even before hosting, email, support or Free Cloud users. Keep this explicit when assessing launch readiness; do not describe the earlier 60-hour planning scenario as current economics.
+
+Official rates checked on September 5, 2026: Groq Whisper Large v3 Turbo costs $0.04/hour and Large v3 costs $0.111/hour, with a ten-second minimum billed per request. Hosted transcription remains Turbo; the personal-key wizard recommends Large v3 and does not change the hosted model. [Groq speech pricing](https://console.groq.com/docs/speech-to-text).
+
+Lemon Squeezy's standard fee is 5% + $0.50 plus 0.5% for subscriptions. This simplified calculation excludes international, payout, PayPal, affiliate and other possible fees, and assumes no added sales tax in the fee base. [Lemon Squeezy fees](https://docs.lemonsqueezy.com/help/getting-started/fees).
+
+| Monthly full-allowance scenario | USD |
+| --- | ---: |
+| Selling price | 4.99000 |
+| Basic platform and subscription fee: $0.50 + 5.5% × $4.99 | -0.77445 |
+| Available before other fees and operating costs | 4.21555 |
+| 180 billable hours of hosted Turbo | -7.20000 |
+| Margin before cleanup and other costs | **-2.98445** |
+| Maximum 9M input + 6M output cleanup tokens | -2.47500 |
+| Margin with the full cleanup allowance, before other costs | **-5.45945** |
+
+Cleanup uses GPT-OSS 20B at $0.075/million input and $0.30/million output tokens; output accounting includes reasoning. The token calculation is an allowance scenario, not measured customer consumption. [Groq model pricing](https://console.groq.com/docs/models). At the same 180-hour allowance, Large v3 transcription alone would cost $19.98. No hosted model or selling-price change is implied by this calculation.
+
+The public Free meter uses actual validated PCM duration; its 1,000-attempt weekly safeguard separately bounds request overhead. Provider billing still has its minimum, so thirty minutes of displayed audio is not a strict thirty-minute provider-cost ceiling. Pro retains ten-second minimum time accounting. Compatible compressed Pro uploads cannot be reliably timed before inference; an oversized legacy upload can exceed its reservation before being rejected and recorded. These limits and uncertain provider failures mean the table is not an absolute bound on every possible provider charge.
+
+Operate the chosen price/allowance as a subsidy that depends on actual average usage and a funded spend budget. Review per-plan provider cost, retries, active-account growth and alerts before expanding public acquisition. Do not silently remove existing entitlements to repair the economics.
 
 ## Data and operational requirements
 
-The public repository is the source used for official builds. Public endpoint and client identifiers are build configuration. Provider, Google-client, SMTP, service-role, Lemon management and signing secrets stay in the service's secret storage or the OS credential store. A private wrapper may pin this repository as a submodule; it must not become a second application implementation.
+The MIT public repository remains the real application and reusable backend source. Public endpoints, client identifiers and the Supabase anon/publishable key are build configuration. Provider, Google-client, SMTP, service-role, Lemon management and signing secrets stay in server or OS secure storage. An optional private operations wrapper may pin this repository as a submodule; it is not required for credential security and must not become a second editable application. See [Auth and cloud configuration](AUTH_AND_CLOUD.md#public-source-and-private-credentials).
 
-Free cleanup is tied to a server-issued receipt for the authenticated user's actual transcription. Only transcription charges the weekly word counter. The receipt and transcript hash are usage metadata, not a saved transcript. Document receipt expiry and request/token safeguards in the cloud guide. Never accept an arbitrary unmetered cleanup prompt from a free account.
+Free cleanup requires a server-issued receipt bound to the authenticated user's completed transcript. Cleanup adds no audio charge. Receipts expire after 24 hours, allow at most two reserved attempts and reject reuse after success. Separate weekly safeguards allow 250,000 input and 250,000 completion tokens. The final accepted recording is delivered whole, with at most one two-minute recording of overage; its receipt remains eligible for cleanup. Tables retain hashes and accounting metadata, not transcripts. A hash is not encrypted transcript storage, and receipt expiry is not a retention/deletion policy.
 
-Before inviting public customers, assign an operator for provider errors, quota/cost alerts, account deletion requests and billing support. Record how to disable a failing hosted route and deploy a compatible fix without breaking personal-key mode. Keep provider response bodies, account tokens, user audio and transcript content out of routine logs. Maintain database recovery access and test a restore separately; a successful deployment is not a backup test.
+Live checks found all seven billing/usage tables protected by RLS with no anon/authenticated grants, and all twelve quota RPCs restricted to service access. The public-history scan found no detected privileged provider, server or signing credentials in the reviewed history; the historical anon JWT was expected public configuration. This targeted result is not a claim of zero vulnerabilities. A modified authorized client can use its server-enforced allowance; keeping client source private would not make bundled configuration secret.
 
-The privacy policy must describe Google identity fields (name/email/profile image as supplied), account and usage records, local history, microphone/audio processing, Supabase, Groq, personal-key providers, Lemon Squeezy, retention and deletion/contact procedures. Google login requests identity scopes; it does not request Gmail mailbox access. Publish policies that match verified behavior and the business's actual practices.
+Before public signup, verify an account-creation abuse control with its desktop flow and provider spend alerts. CAPTCHA is currently off; enabling it without client support can break authentication. Close the Pro instance-header gap through a compatible client/server transition and test released clients before requiring the header. See [Pro activation compatibility](AUTH_AND_CLOUD.md#pro-activation-compatibility-boundary).
+
+Assign operators for provider failures, quota/cost alerts, deletion requests and billing support. Keep user audio/transcript content, provider error bodies and credentials out of routine logs. Maintain database recovery access and test restoration separately. Publish a privacy policy that describes actual identity fields, account/usage records, local history, microphone processing, Supabase, Groq, personal-key providers, Lemon Squeezy, retention, deletion and contact procedures. Google identity scopes do not grant Gmail inbox access.
 
 ## Repeatable checks
 
-The committed speech fixture and offline regression gate are required by both platform release build scripts. Local checks must be possible without accounts, provider keys, network-dependent downloads or billable requests. Run the explicit live audio test before a release against a disposable test account, then verify the installed application's file picker/queue as well. A mocked response does not prove a working provider; a live backend request alone does not prove the desktop file interface.
+Use the committed licensed speech fixture and offline regression gate required by both release scripts. Run the explicit live test using disposable identities and verify their removal, then test the actual installed app's file picker/queue and dictation. Offline tests, browser mocks, hosted API calls, native UI actions, VM emulation and physical hardware are separate evidence categories.
 
-Keep failures visible. Do not mark unavailable live credentials, an inaccessible VM, a skipped email inbox check or untested payment transitions as passing. Record the exact commit/artifact, command and result. Publish a new version if released installer bytes need to change.
+Do not mark unavailable credentials, a skipped mailbox check, an inaccessible VM or untested payment transitions as passing. Follow [Releasing](RELEASING.md), preserve existing updater platform entries, upload immutable artifacts before the complete manifest, and publish a new version whenever released installer bytes change.
 
 ## External documentation
 
 - [Google OAuth branding requirements](https://support.google.com/cloud/answer/15549049?hl=en)
 - [Supabase production SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 - [Supabase Google login configuration](https://supabase.com/docs/guides/auth/social-login/auth-google)
+- [Supabase CAPTCHA integration](https://supabase.com/docs/guides/auth/auth-captcha)
 - [Lemon Squeezy trial setup](https://docs.lemonsqueezy.com/help/products/free-trials)

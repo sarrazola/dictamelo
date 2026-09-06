@@ -1,123 +1,79 @@
 # Initial release review
 
-Reviewed on September 5, 2026. This is a product and architecture recommendation, not a claim that every proposed provider, trial, or safeguard has been deployed. The application under review started at `d4a613abee9c79855648e8328fab9f933f61663b`. No Windows changes or tests form part of this review.
+Updated on September 5, 2026 for application source `097551f9582fce8c17d6f4a539192d89b80236d8` (0.5.0) and the deployed audio-time backend. This review records the current product decision and remaining production work. Historical test counts and release evidence remain in [Testing](TESTING.md); they are not new verification of a 0.5.0 native installation or public release.
 
 ## Three understandable choices
 
 | Choice | What the customer receives | Account and payment |
 | --- | --- | --- |
-| Free — your own API keys | Dictation and supported cleanup using the customer's provider account. Dictámelo does not impose a cloud allowance on this mode. | No Dictámelo account required. The provider may charge the customer. |
-| Free Cloud | 2,000 words per week, shared across devices, with included cleanup of those transcriptions, a visible usage counter and renewal date. | Create a free account using email/password or Google. No subscription required. |
-| Pro | Recommended: 60 hours of hosted transcription per rolling 30 days, with text cleanup and the existing five-device license. | $4.99/month. Preserve existing licenses. |
+| Free — your own API keys | Dictation and supported cleanup billed directly to the customer's provider account, with no Dictámelo-hosted allowance. | No Dictámelo account required. The provider may charge the customer. |
+| Free Cloud | 30 minutes per UTC week, shared across devices, with included cleanup of those transcriptions and a visible time/renewal counter. | Confirmed email/password account or Google account; no subscription required. |
+| Pro | 180 hours of hosted transcription per rolling 30 days with cleanup, preserving existing licenses and normal five-device activation. | $4.99/month. Seven-day trial remains disabled. |
 
-“Free with your keys” describes the application's price, not a promise that Groq, OpenAI, or another provider is free. Explain that directly under its price. Display the active route separately from whether an account exists: a signed-in user can still choose their own keys.
+Describe provider costs alongside personal-key setup. A signed-in customer can still choose personal keys; account presence and the active transcription route are separate. The public cloud allowance is time, not the previous 2,000-word limit, and Pro is not unlimited.
 
-Use 60 hours as an explicit allowance, not “unlimited.” It is three times the previous allowance and averages two hours per day. Keep provider details out of the cloud signup flow; expose them in the personal-key setup where the choice changes the customer's bill.
+New users receive the short first-run wizard with a visible **Skip** action. Existing settings skip automatic onboarding and preserve provider choices. The new personal-key selector shows Groq, recommends Whisper Large v3 and offers Turbo; existing provider adapters/settings remain compatible. Hosted transcription continues to use Turbo. Keep the six interface languages and the small dictation-focused scope.
 
-### Free cleanup update
+The Mac source keeps the main window available while switching apps with Cmd-Tab; closing it returns the app to tray operation. Browser and source regressions cannot establish that native behavior. Verify the installed signed artifact and permissions separately, including real dictation and file transcription.
 
-The subsequent Free Cloud implementation includes cleanup with the hosted GPT-OSS 20B model; it is not restricted to Pro or personal keys. A completed transcription issues a receipt bound to that account and the SHA-256 digest of its exact trimmed text. The receipt expires after 24 hours, allows at most two reserved attempts and cannot be reused after success. Cleanup does not charge the transcription words again, including when the last accepted recording crosses the 2,000-word allowance.
+## Deployed allowance and cleanup contract
 
-Separate server safeguards cap cleanup at 250,000 input and 250,000 completion tokens per account per original transcription UTC week, with one active cleanup call per account. Completion usage includes reasoning, and uncertain provider outcomes retain their reservation. The receipt/attempt tables retain hashes and accounting metadata, not raw or cleaned transcripts; text is still sent to the provider for processing. A hash is not encrypted text, and receipt expiry is not a metadata-deletion policy.
+Migration `20260906000000_audio_time_plans` and the compatible `transcribe`, `cleanup` and `usage` handlers are deployed to official Supabase project `iburiyhhfodndqgmsaot`.
 
-Migration `20260905030000_free_cleanup` and the handlers are deployed. The live licensed English fixture produced the expected 17-word transcript and real cleanup without an additional word charge; replay, modified-text, cross-account, concurrent-claim and quota-boundary checks also passed using disposable test accounts. See the [current API contract](AUTH_AND_CLOUD.md#free-cloud-transcription-and-cleanup-contract) and [verification record](TESTING.md). The original Pro review findings and test counts below remain historical checkpoints.
-
-## Why 60 hours can work at $4.99
-
-Current official prices are $0.04/hour for Groq Whisper Large v3 Turbo and $0.111/hour for Large v3. Groq bills at least ten seconds per request. Its listed GPT-OSS 20B rates are $0.075/million input tokens and $0.30/million output tokens; GPT-OSS 120B costs twice those rates. These are provider prices checked on the review date, not permanent guarantees. [Groq speech pricing and billing minimum](https://console.groq.com/docs/speech-to-text), [Groq model pricing](https://console.groq.com/docs/models).
-
-Lemon Squeezy's standard fee is 5% + $0.50, with another 0.5% for subscriptions and 1.5% for international transactions. Some payment methods, marketing features, taxes and payouts change the result. The example below includes a 1% non-US bank payout fee and excludes sales tax, PayPal and affiliate fees. [Lemon Squeezy fees](https://docs.lemonsqueezy.com/help/getting-started/fees).
-
-| Example per fully used monthly subscription | USD |
-| --- | ---: |
-| Selling price | 4.9900 |
-| Platform/subscription/international fee: $0.50 + 7% × $4.99 | -0.8493 |
-| Example non-US bank payout: 1% of remaining amount | -0.0414 |
-| Available before service costs | 4.0993 |
-| 60 billable hours of Turbo | -2.4000 |
-| Example bounded cleanup budget: 3M input + 2M output tokens with GPT-OSS 20B | -0.8250 |
-| Remaining before hosting, email, support, free users, refunds and tax | 0.8743 |
-
-The cleanup budget above is a proposed enforceable ceiling, not measured customer usage. Completion accounting must include billable reasoning tokens. A representative, less demanding estimate is 150 words/minute, two tokens/word, one cleanup pass, and 3,600 calls with 150 extra prompt tokens each: 1.62M input + 1.08M output tokens cost approximately $0.4455 with 20B. Languages, prompts, reasoning and retry behavior can change this materially. Backward-compatible compressed uploads cannot be sized reliably before inference by the current service; one oversized legacy upload can exceed the reservation before being rejected and recorded. Therefore the table is a planning scenario, not a strict total-spend guarantee for legacy clients.
-
-The maximum-use margin is modest. Typical usage below the allowance provides the room to operate; monitor real costs before promising larger limits. Sixty hours of Large v3 would cost $6.66 before cleanup or payment fees, so that model cannot share this flat allowance at this price. Recommended hosted defaults are Turbo and GPT-OSS 20B. Keep expensive alternatives available with personal keys; do not silently substitute an expensive provider during an outage.
-
-For a defensible allowance:
-
-- Count at least ten billable seconds per provider request; otherwise many tiny recordings defeat the cost estimate. Explain the minimum in detailed plan terms.
-- Reserve quota atomically before calling the provider and settle with provider-reported duration. Reject new work if quota cannot be read. Serialize requests per license/account and bound stale reservations.
-- Recommend a ten-minute recording/request limit and 12,000 requests per rolling 30 days. A request limit also bounds repeated failures and overhead; it is not extra audio entitlement.
-- Limit input length, instructions, output tokens and cleanup requests. A hard monthly token budget gives a real cost ceiling; per-request limits alone do not establish the $0.825 monthly bound.
-- Check the purchased Lemon Squeezy store/product/variant on the server, not only `valid: true`. An unrelated valid license must not unlock hosted inference. [License API validation guidance](https://docs.lemonsqueezy.com/guides/tutorials/license-keys).
-
-At the starting revision, Pro transcription used Groq's returned duration, which is better than trusting an incoming duration field. Its quota read and later usage write were separate, quota failures could allow work, cleanup had no completion-token limit, and server license validation did not check product identity. These were review findings to address before relying on the larger allowance; they are not statements about the final implementation of this iteration.
-
-The backend changes prepared in this iteration add atomic reservations, fail-closed quota checks, a single active call per license, the rolling audio/request/token allowances above, product ownership checks, fixed hosted Turbo/20B models and bounded cleanup requests. Completed transcription can immediately proceed to cleanup. Uncertain failures retain their reservation instead of assuming the provider billed nothing. Current PCM uploads are sized before inference; compressed legacy uploads reserve ten minutes, then their actual duration is recorded even when an oversized result is rejected. This preserves compatibility but leaves the oversized-legacy-request limitation described above.
-
-Local validation passed six Deno tests, type checks for all three Edge Functions, all migrations and free/Pro quota assertions on an isolated PostgreSQL 14 database, and a real two-connection reservation race where exactly one caller obtained a reservation. Subsequently, the Pro migration and updated handlers were deployed to the official project. Independent live rollback quota assertions, RPC/table access checks, client-role RLS tests and invalid-auth HTTP checks passed. No new valid-license provider call was made during those checks. Verified ownership IDs are store `447162`, product `1340872` and variant `2094776`; the public checkout reports $4.99/month with no trial. See [the current configuration](AUTH_AND_CLOUD.md) and [verification record](TESTING.md).
-
-## Onboarding scope
-
-For Dictámelo, keep a shorter, repeatable wizard behind the requested visible **Onboarding** button: choose one of the three modes; configure an account or a provider key as appropriate; select language/shortcut and review microphone/accessibility permissions; try a short dictation. Preserve settings when reopening or cancelling. Do not add meeting recording, notes, assistants, calendars or a large local-model download system to imitate a larger product.
-
-## Small provider inventory
-
-| Priority | Provider/models | Recommendation for this initial version |
+| Safeguard | Free Cloud | Pro |
 | --- | --- | --- |
-| Keep | Groq: Whisper Large v3 Turbo; Large v3 with personal keys | Already the validated transcription path. Use Turbo for predictable hosted costs. |
-| First alternative | OpenAI: `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`; retain `whisper-1` compatibility | These already exist in `src-tauri/src/transcription/openai.rs`, initially marked unverified. Make the option discoverable and verify real transcription before marking it tested. No new provider architecture is needed. |
-| Next small addition | Mistral: `voxtral-mini-latest` / Voxtral Mini Transcribe 2 | A useful independent multilingual engine. Add only a small dedicated adapter and real provider tests when its key is available. |
-| Later | Local Whisper or Parakeet | Valuable for privacy/offline operation, but entails model downloads, storage, hardware behavior and runtime packaging. Defer to a separate scoped iteration. |
+| Audio | 1,800 measured seconds per UTC week; Monday 00:00 renewal | 648,000 seconds across the rolling last 30 days |
+| Request budget | 1,000 transcription attempts/week | 36,000 transcription/cleanup requests per rolling 30 days |
+| Cleanup input/output | 250,000 / 250,000 tokens per original transcription week | 9M / 6M tokens per rolling 30 days |
+| Recording boundary | At most two minutes; last accepted recording delivered whole, then subsequent audio rejected until renewal | Ten-minute request bound; existing ten-second minimum charge per transcription retained |
 
-OpenAI estimates $0.003/minute for Mini Transcribe and $0.006/minute for full Transcribe, equivalent to about $0.18/$0.36 per hour. Keep these as personal-key options under the proposed hosted pricing. [OpenAI transcription pricing](https://developers.openai.com/api/docs/pricing).
+Free time is measured from validated PCM bytes. Historical word usage is preserved once at 0.45 seconds/word; old 2,000-word usage becomes 15 minutes, while all new work uses measured audio. Successful silence also consumes audio time. One active transcription reservation prevents concurrent callers from multiplying Free's last-recording overage.
 
-Mistral's transcription endpoint accepts multipart audio and supports Spanish among its thirteen listed languages. It has its own parameters, including `context_bias`; it is not a guaranteed drop-in replacement for every OpenAI request field. [Mistral speech overview](https://docs.mistral.ai/studio/audio/speech_to_text), [transcription endpoint usage](https://docs.mistral.ai/studio/audio/speech_to_text/offline_transcription).
+Both plans include cleanup without a second audio charge. Free cleanup uses GPT-OSS 20B and a server receipt bound to the account and exact trimmed transcript hash. Receipts expire after 24 hours, permit at most two reserved attempts and reject reuse after success. Cleanup remains available for the final accepted transcript even after audio exceeds 30 minutes. Token/output, body-size and single-active-request limits prevent the endpoint becoming an unrestricted text-generation service. The receipt tables retain hashes and accounting metadata, not raw or cleaned transcripts; provider processing and retention still apply.
+
+Database reservations are atomic and fail closed. Explicit provider rejection can release reserved usage; uncertain failures retain conservative reservations because a timeout does not establish zero cost. Current PCM is timed before inference. Legacy compressed Pro uploads reserve ten minutes because the server cannot reliably determine their duration in advance; an oversized result is rejected and its actual usage recorded after inference. This compatibility path leaves a possible provider-cost overrun from one oversized upload.
+
+The new live fixture returned the expected 17 words with WER 0 and exactly 5.855 seconds charged once. Cleanup added no audio. A concurrent cleanup race plus replay created one provider attempt. The final accepted recording reached 1804.855/1800 seconds; its cleanup succeeded and the next transcription returned 429. Both synthetic accounts and dependent records were removed, with no email sent. Local and production rollback SQL checks, real database races and service-only access checks passed. See [Testing](TESTING.md) for exact commands/counts and [the API contract](AUTH_AND_CLOUD.md#free-cloud-transcription-and-cleanup-contract).
+
+## The selected Pro price requires a subsidy at full usage
+
+The selected 180-hour allowance remains in place at $4.99/month. It is not profitable at full use under the verified provider prices. Groq lists Turbo at $0.04/hour and Large v3 at $0.111/hour, making 180 hours cost **$7.20** or **$19.98** for transcription alone. Hosted transcription stays on Turbo; recommending Large v3 for personal keys does not change that cost. [Groq speech pricing](https://console.groq.com/docs/speech-to-text).
+
+After Lemon Squeezy's standard 5% + $0.50 and 0.5% subscription fee, a simplified $4.99 subscription yields **$4.21555 before other fees and operating costs**. Full Turbo usage therefore loses $2.98445 before cleanup. International transactions, payouts, taxes in the fee base and other applicable charges can reduce receipts further. [Lemon Squeezy fees](https://docs.lemonsqueezy.com/help/getting-started/fees).
+
+At GPT-OSS 20B's $0.075/million input and $0.30/million output, the full 9M/6M cleanup allowance adds **$2.475**, taking that scenario to **-$5.45945** before hosting, email, support, Free users and other costs. Completion accounting includes reasoning. These are allowance scenarios, not observed average customer usage or a guarantee against legacy-upload overruns. [Groq model pricing](https://console.groq.com/docs/models).
+
+The operational recommendation is to measure actual usage and fund the subsidy, with provider spend alerts and tested account-creation abuse controls before broad acquisition. Do not label the plan profitable by reusing the earlier 60-hour estimate. The calculation does not authorize changing the selected price, model or existing paid entitlement. See [Production readiness](PRODUCTION_READINESS.md#cost-of-the-180-hour-allowance) for the complete calculation and Free billing-minimum caveat.
 
 ## Public application, private credentials
 
-Supabase Auth can support email/password and Google in an open-source desktop app. Public client code is expected. The Supabase URL and publishable/legacy anon key identify the service; a user's verified token and database permissions authorize access. Service-role/secret keys bypass normal client restrictions and must remain on the server. Supabase recommends publishable keys for new client integrations; legacy-key migration should preserve released clients. [Supabase key types](https://supabase.com/docs/guides/getting-started/api-keys).
+Keep one real MIT-licensed public application and its reusable backend source. The license permits reuse, modification, distribution and sale with the required copyright/license notice. Preserve third-party notices. Public source includes login, migrations, permission rules and `src-tauri/src/secrets.rs`; that filename describes credential-storage code, not embedded credential values.
 
-The Google client ID is public configuration. The Google client secret belongs in Supabase's provider configuration, never in the shipped app. Use an external browser and PKCE for desktop OAuth, restrict callback URLs and request only identity scopes. [Supabase Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google).
-
-The native implementation in this iteration starts OAuth through Supabase, so it does not need a Google client ID or secret in the executable. The Google Web client's authorized callback is the Supabase `/auth/v1/callback` URL. Supabase's desktop redirect allowlist must match `http://127.0.0.1:*/auth/callback/**` for the app's ephemeral loopback port and nonce path. Email tokens remain for account confirmation and password recovery; ordinary email login uses the password.
-
-| Safe to make public | Must remain outside source and app bundles |
+| Safe public configuration/source | Keep outside source and app bundles |
 | --- | --- |
-| Login UI, auth client, backend source, migrations, permission rules | Provider account secrets and SMTP passwords |
-| Supabase URL and publishable/anon key | Supabase service-role/secret keys and Management API tokens |
-| Google client ID and registered public callback URL | Google client secret |
-| Checkout URL/product ID and updater public verification key | Lemon Squeezy management/webhook secrets and updater private signing key |
-| Configurable endpoint names and example configuration | Apple credentials and individual users' passwords/session tokens |
+| Supabase URL and publishable/legacy anon key | Supabase service-role/secret keys and Management API tokens |
+| Google client ID, callback and login UI | Google client secret, passwords and session/refresh tokens |
+| Checkout/store/product identifiers and updater public verification key | Lemon management/webhook secrets and updater private key |
+| Backend source and database access rules | Provider keys, SMTP passwords and Apple credentials |
 
-Private repositories do not make bundled secrets private: binaries can be inspected too. Protection comes from keeping privileged credentials on the server and enforcing identity, quotas and permissions there.
+A Supabase public key identifies the project; verified identity, license ownership and database rules authorize operations. Privileged keys bypass client restrictions and stay server-side. [Supabase key types](https://supabase.com/docs/guides/getting-started/api-keys). Live readback found seven billing/usage tables with RLS and zero anon/authenticated grants, plus twelve quota RPCs restricted to service access. A targeted public-history scan at `5e61508` found no detected privileged provider/server/signing credentials; the historical anon JWT was public configuration. This is a bounded audit result, not a promise of zero vulnerabilities.
 
-The recommended initial arrangement is one real public Dictámelo application with optional, configurable cloud endpoints. The reusable server functions can also remain public while Supabase stores their deployment secrets. Forks should configure their own service or use personal keys; their default build should not accidentally inherit the official cloud, checkout, signing identity or update channel.
+Installed binaries and modified clients can reveal public service configuration. A private cloud wrapper is not required for security and would not protect embedded secrets. An optional private operations repository may pin this public source as a submodule for builds/deployment; retain one editable app and keep actual secrets in server, CI or OS secure storage. Default public builds use personal keys with hosted services/updates disabled; forks should configure their own service and updater identity.
 
-The user-requested OpenLivery comparison does demonstrate a valid optional wrapper: its private cloud repository consumes the public application through a pinned `core/` Git submodule. Read-only inspection confirmed that the submodule referenced the same public commit as the public repository's head on the review date, and its container build used that core. The pattern preserves one source of truth; it does not require a second editable copy of the app. No private operational implementation is reproduced here.
+Local provider keys, sessions and runtime license credentials remain in the OS secure store with the existing release/debug namespace isolation, noninteractive macOS lookups and cache. Do not move them into ordinary SQLite or settings JSON. See [Local credentials](LOCAL_CREDENTIALS.md) for migration, tombstones and verification boundaries.
 
-If a private `dictamelo_cloud` operations repository becomes useful, keep it this small:
+## Pro device compatibility and billing verification
 
-```text
-dictamelo_cloud/          private operations repository
-  core/                  pinned submodule → public sarrazola/dictamelo
-  deploy/                environment wiring and deployment commands
-  docs/                  operator runbooks; no secret values
-```
+Normal desktop activation obtains a Lemon instance and applies the existing five-device activation limit. The hosted API also accepts legacy `x-license-key` requests without `x-license-instance`, which current released clients omit. Key-only validation does not enforce the instance/device cap against every modified client; total audio/request/token allowances remain shared by the license.
 
-The official build runs against the pinned public `core/` commit with official public configuration injected at build time. Core fixes go to the public repository first; advance the submodule after tests. Secrets stay in Supabase/Keychain/CI secret storage, not in the private Git repository. Avoid copying, patching or overlaying a separate login UI. A private wrapper is an organization choice, not an OAuth requirement.
+Resolve this with a compatible client/server transition that sends and validates the instance, preserves existing licenses and tests old-client behavior. Do not suddenly make the header mandatory for every released client. A fresh valid-license provider call and complete paid lifecycle were not part of the new Free fixture checks. Test activation, deactivation, multiple devices, cancellation and expiry before claiming the complete commercial flow verified. See [the compatibility boundary](AUTH_AND_CLOUD.md#pro-activation-compatibility-boundary).
 
-## Seven-day Pro trial
+The verified checkout has `has_free_trial=false` and the desktop flag remains false. A seven-day trial must prove immediate access, any license issuance, cancellation, expiry, successful first payment and failed first payment before being advertised. Preserve existing key-based licenses during any account/webhook entitlement addition. A configured trial flag or success screen is not entitlement evidence. [Lemon Squeezy trial setup](https://docs.lemonsqueezy.com/help/products/free-trials).
 
-Lemon Squeezy supports a seven-day trial on subscription products. Its native trial collects payment details and automatically charges when the trial ends unless cancelled. A no-card trial is different: the application's server must track the trial itself and send the customer to checkout later. [Free trial configuration](https://docs.lemonsqueezy.com/help/products/free-trials), [trial integration guide](https://docs.lemonsqueezy.com/guides/tutorials/saas-free-trials).
+## Remaining production work
 
-For account-based entitlement, verify signed subscription webhooks, bind checkout to the authenticated user on the server, and store the subscription's status and trial end. `on_trial` must grant trial access; cancellation can retain access until `ends_at`; expiry must stop it. Keep the existing license route compatible. Show the exact first-charge date and price next to the trial action. [Subscription states](https://docs.lemonsqueezy.com/api/subscriptions/the-subscription-object).
+Google uses the configured Web application client in Megacubos and Supabase's callback, with the desktop external browser/PKCE flow and restricted loopback redirect. An owned test-user sign-in and restart passed on 0.3.1. Google's audience remains Testing. The last verified homepage, privacy and terms URLs on `dictamelo.com` redirect to parking content; publish real product/legal pages and complete production branding before claiming general Google availability.
 
-License objects use `inactive`, `active`, `expired` and `disabled`; there is no `on_trial` license status. Published documentation explains that subscription licenses follow subscription expiry, but does not establish exactly when a key is issued for the initial zero-charge trial checkout. Do not assume a key-only integration grants access immediately, and do not claim it cannot without testing. [License object](https://docs.lemonsqueezy.com/api/license-keys/the-license-key-object), [subscription-linked licenses](https://docs.lemonsqueezy.com/help/licensing/license-keys-subscriptions).
+Email/password uses Supabase Auth. Confirmations are enabled, but production SMTP has no host configured. Admin-generated confirmation/recovery tokens verify API behavior, not inbox delivery. Configure a transactional sender and verify confirmation and password recovery with an owned mailbox. CAPTCHA is off, and per-account quotas do not prevent many-account abuse; any signup control must be integrated and tested with the native flow.
 
-Before advertising the trial, run a test-mode checkout and verify immediate entitlement, any license issuance/activation, cancellation during the trial, expiry, successful first payment and failed first payment. If relying only on existing license keys, prove those exact transitions first. Otherwise use the account webhook entitlement route. This research did not change the product or create a paid transaction.
-
-## What “email setup” and “publishing” mean
-
-Supabase remains the identity system. A transactional mail sender is a delivery service used by Supabase for confirmation and password-reset messages. Switching from email codes to email/password does not remove those email needs. Google sign-in avoids an app-sent login code, but it requires the Google provider and callback configuration to work end to end.
-
-Publishing a GitHub release makes its installers and updater manifest available to everyone. It is separate from deploying an Auth configuration or opening a locally installed test build. A locally working login screen is not proof that a new customer can confirm their email, recover a password or return from Google to the desktop app. Verify those paths before declaring the cloud onboarding ready for public release.
+Align app, website and checkout copy with 30 minutes/week and 180 hours/rolling 30 days. Complete privacy/retention, support, deletion and incident procedures. A backend deployment, a signed local candidate, a public GitHub prerelease, Google production status, native Windows execution and a successful updater installation are separate milestones. Keep their status and remaining limitations explicit in [Production readiness](PRODUCTION_READINESS.md) and [Testing](TESTING.md).

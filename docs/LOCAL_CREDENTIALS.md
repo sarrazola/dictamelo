@@ -1,12 +1,16 @@
 # Local credential storage
 
-Reviewed on September 5, 2026. This document explains the 0.3.1 macOS credential change and the alternatives considered. It does not describe a new public release. Native API tests, installed-candidate login checks and final installed-artifact verification are distinguished below.
+Reviewed on September 5, 2026 for the 0.5.0 source. The credential design introduced in 0.3.1 remains in place. Historical native API tests, installed-candidate login checks and verification of each new artifact are distinguished below; this document does not claim that 0.5.0 has been published or tested on Windows.
 
 ## Decision
 
 Keep API keys, account sessions, and Pro license credentials in the operating system's secure store. On macOS, use a separate runtime namespace, suppress interactive Keychain access for the application process, and cache each lookup. An inaccessible credential produces an actionable error instead of a password dialog. Do not move credentials into an ordinary SQLite database or settings JSON file.
 
 This is the smaller change for the current app. A file vault encrypted with one Keychain-backed master key remains a possible future design for a larger credential collection; it is **not implemented** by this change.
+
+The storage implementation is public source and must remain tracked. A file named `secrets.rs` is not itself a secret. It contains the interface and access controls, while actual provider keys, account tokens and license credentials are stored at runtime. The [MIT license](../LICENSE) allows others to reuse that implementation; it does not give them the local user's stored credentials.
+
+Keep hosted provider keys, the Google client secret, SMTP credentials and Supabase service credentials exclusively in server secret storage. Keep Apple credentials and the updater private key in release tooling's secure storage. Only public endpoints, the Supabase anon/publishable key and updater verification key may be compiled into the official app. A private wrapper would not protect secrets embedded in a binary and is not needed for this design. See [Auth and cloud configuration](AUTH_AND_CLOUD.md#public-source-and-private-credentials).
 
 ## Why the previous implementation could prompt repeatedly
 
@@ -43,3 +47,5 @@ For this version, the native store plus noninteractive access, caching, and migr
 The 0.3.1 Rust suite passed 55 tests with `DICTAMELO_KEYRING_TESTS=1`, including eight credential tests; strict Clippy also passed. The native synthetic test checked the noninteractive flag before and after operations, persistence through a fresh store instance, updates, deletion, debug isolation from an accessible legacy test entry, and cleanup of both test namespaces. It used dedicated synthetic credentials. Concurrent reads, silent migration, denied legacy access, failed writes and tombstone behavior also have in-memory regression coverage; a mocked ACL denial is not a real denied-item migration test.
 
 In the signed installed 0.3.1 candidate, real Google sign-in and quit/reopen session persistence succeeded without a Keychain prompt. The app also detected the existing personal Groq key as stored without prompting. The session remained loaded after replacing the app with the final verified artifact. These observations do not prove every provider's save/delete path, physical dictation, or recovery from every legacy ACL condition. See [Testing](TESTING.md) for the final installed-artifact and native application-menu results. No new Windows verification is claimed.
+
+The installed 0.4.0 artifact subsequently retained its account and settings. For 0.5.0, record fresh installed-app startup, key save/status/delete and restart behavior against the actual signed artifact; do not infer a pass from the unchanged storage source. Windows credential-store behavior requires its own installed-app checks. Native synthetic-store tests, mocked permission failures, macOS Keychain behavior and Windows VM results are different evidence categories.
