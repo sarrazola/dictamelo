@@ -1158,7 +1158,36 @@ function wireEvents() {
     invoke("clear_history").catch((e) => toast(String(e), true)));
 
   // Archivos: arrastrar a cualquier parte de la ventana, o elegir con el diálogo.
-  $("#btn-pick-file").addEventListener("click", () => invoke("pick_audio_files").catch((e) => toast(String(e), true)));
+  $("#btn-pick-file").addEventListener("click", async () => {
+    const button = $("#btn-pick-file");
+    button.disabled = true;
+    try { await invoke("pick_audio_files"); }
+    catch (err) {
+      toast(String(err), true);
+      $("#file-path-option").open = true;
+      $("#file-path-status").textContent = String(err);
+      $("#file-path-status").hidden = false;
+    } finally { button.disabled = false; }
+  });
+  $("#file-path-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const path = $("#file-path").value.trim();
+    if (!path) return;
+    const button = $("#btn-import-path");
+    button.disabled = true;
+    try {
+      await invoke("transcribe_files", { paths: [path] });
+      $("#file-path-status").textContent = t("files.path.queued");
+      $("#file-path").value = "";
+      await refreshFileJobs();
+    } catch (err) {
+      $("#file-path-status").textContent = String(err);
+      toast(String(err), true);
+    } finally {
+      $("#file-path-status").hidden = false;
+      button.disabled = false;
+    }
+  });
   $("#btn-clear-files").addEventListener("click", () => invoke("clear_file_jobs").catch(console.error));
   $("#file-jobs").addEventListener("click", async (e) => {
     const copy = e.target.closest("[data-file-copy]");

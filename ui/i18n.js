@@ -1017,7 +1017,13 @@ const ACCOUNT_COPY = {
     "models.cleanup.standard": "La nube gratis usa instrucciones de limpieza estándar. Para personalizarlas, usa Pro o tus propias API keys.",
     "models.cleanup.desc": "Mejora la puntuación y elimina muletillas en tus dictados y archivos. Puedes desactivarlo cuando quieras.",
     "files.cleaning": "Limpiando con IA…",
-    "files.formats.free": "Gratis nube: archivos WAV de hasta 2 minutos y 4 MB. Limpieza con IA opcional incluida."
+    "files.formats.free": "Gratis nube: archivos WAV de hasta 2 minutos y 4 MB. Limpieza con IA opcional incluida.",
+    "files.path.option": "Importar usando una ruta local",
+    "files.path.label": "Ruta del archivo de audio",
+    "files.path.import": "Importar",
+    "files.path.hint": "Pega la ruta completa del archivo. También puedes arrastrarlo desde Finder.",
+    "files.path.queued": "Archivo añadido a la cola.",
+    "files.path.hint.win": "Pega la ruta completa del archivo. También puedes arrastrarlo desde el Explorador."
   },
   "en": {
     "plan.subtitle": "Three ways to dictate. Choose how you get transcription.",
@@ -1092,7 +1098,13 @@ const ACCOUNT_COPY = {
     "models.cleanup.standard": "Free cloud uses standard cleanup instructions. For custom instructions, use Pro or your own API keys.",
     "models.cleanup.desc": "Improve punctuation and remove filler words in dictations and files. You can turn it off anytime.",
     "files.cleaning": "Cleaning with AI…",
-    "files.formats.free": "Free cloud: WAV files up to 2 minutes and 4 MB. Optional AI cleanup included."
+    "files.formats.free": "Free cloud: WAV files up to 2 minutes and 4 MB. Optional AI cleanup included.",
+    "files.path.option": "Import using a local path",
+    "files.path.label": "Audio file path",
+    "files.path.import": "Import",
+    "files.path.hint": "Paste the full file path. You can also drag the file from Finder.",
+    "files.path.queued": "File added to the queue.",
+    "files.path.hint.win": "Paste the full file path. You can also drag the file from File Explorer."
   },
   "pt": {
     "plan.subtitle": "Três formas de ditar. Escolha como obter a transcrição.",
@@ -1167,7 +1179,13 @@ const ACCOUNT_COPY = {
     "models.cleanup.standard": "A nuvem grátis usa instruções de limpeza padrão. Para personalizar, use Pro ou suas próprias chaves.",
     "models.cleanup.desc": "Melhore a pontuação e remova vícios de linguagem nos ditados e arquivos. Desative quando quiser.",
     "files.cleaning": "Limpando com IA…",
-    "files.formats.free": "Nuvem grátis: arquivos WAV de até 2 minutos e 4 MB. Limpeza opcional com IA incluída."
+    "files.formats.free": "Nuvem grátis: arquivos WAV de até 2 minutos e 4 MB. Limpeza opcional com IA incluída.",
+    "files.path.option": "Importar usando um caminho local",
+    "files.path.label": "Caminho do arquivo de áudio",
+    "files.path.import": "Importar",
+    "files.path.hint": "Cole o caminho completo do arquivo. Você também pode arrastá-lo do Finder.",
+    "files.path.queued": "Arquivo adicionado à fila.",
+    "files.path.hint.win": "Cole o caminho completo do arquivo. Você também pode arrastá-lo do Explorador."
   },
   "fr": {
     "plan.subtitle": "Trois façons de dicter. Choisissez votre transcription.",
@@ -1242,7 +1260,13 @@ const ACCOUNT_COPY = {
     "models.cleanup.standard": "Le cloud gratuit utilise des instructions de nettoyage standard. Pour les personnaliser, utilisez Pro ou vos propres clés API.",
     "models.cleanup.desc": "Améliorez la ponctuation et supprimez les mots de remplissage des dictées et fichiers. Désactivable à tout moment.",
     "files.cleaning": "Nettoyage IA…",
-    "files.formats.free": "Cloud gratuit : fichiers WAV de 2 minutes et 4 Mo maximum. Nettoyage IA facultatif inclus."
+    "files.formats.free": "Cloud gratuit : fichiers WAV de 2 minutes et 4 Mo maximum. Nettoyage IA facultatif inclus.",
+    "files.path.option": "Importer depuis un chemin local",
+    "files.path.label": "Chemin du fichier audio",
+    "files.path.import": "Importer",
+    "files.path.hint": "Collez le chemin complet du fichier. Vous pouvez aussi le glisser depuis le Finder.",
+    "files.path.queued": "Fichier ajouté à la file.",
+    "files.path.hint.win": "Collez le chemin complet du fichier. Vous pouvez aussi le glisser depuis l’Explorateur."
   },
   "de": {
     "plan.subtitle": "Drei Wege zum Diktat. Wähle deine Transkription.",
@@ -1317,7 +1341,13 @@ const ACCOUNT_COPY = {
     "models.cleanup.standard": "Die kostenlose Cloud nutzt Standardanweisungen zur Bereinigung. Eigene Anweisungen sind mit Pro oder eigenen API-Keys möglich.",
     "models.cleanup.desc": "Verbessere die Zeichensetzung und entferne Füllwörter aus Diktaten und Dateien. Jederzeit ausschaltbar.",
     "files.cleaning": "KI-Bereinigung…",
-    "files.formats.free": "Kostenlose Cloud: WAV-Dateien bis 2 Minuten und 4 MB. Optionale KI-Bereinigung inklusive."
+    "files.formats.free": "Kostenlose Cloud: WAV-Dateien bis 2 Minuten und 4 MB. Optionale KI-Bereinigung inklusive.",
+    "files.path.option": "Über einen lokalen Pfad importieren",
+    "files.path.label": "Pfad zur Audiodatei",
+    "files.path.import": "Importieren",
+    "files.path.hint": "Füge den vollständigen Dateipfad ein. Du kannst die Datei auch aus dem Finder ziehen.",
+    "files.path.queued": "Datei zur Warteschlange hinzugefügt.",
+    "files.path.hint.win": "Füge den vollständigen Dateipfad ein. Du kannst die Datei auch aus dem Explorer ziehen."
   },
   "it": {
     "plan.subtitle": "Tre modi di dettare. Scegli la tua trascrizione.",
@@ -1392,7 +1422,13 @@ const ACCOUNT_COPY = {
     "models.cleanup.standard": "Il cloud gratuito usa istruzioni di pulizia standard. Per personalizzarle, usa Pro o le tue API key.",
     "models.cleanup.desc": "Migliora la punteggiatura e rimuovi gli intercalari da dettati e file. Puoi disattivarlo quando vuoi.",
     "files.cleaning": "Pulizia IA…",
-    "files.formats.free": "Cloud gratuito: file WAV fino a 2 minuti e 4 MB. Pulizia IA opzionale inclusa."
+    "files.formats.free": "Cloud gratuito: file WAV fino a 2 minuti e 4 MB. Pulizia IA opzionale inclusa.",
+    "files.path.option": "Importa da un percorso locale",
+    "files.path.label": "Percorso del file audio",
+    "files.path.import": "Importa",
+    "files.path.hint": "Incolla il percorso completo del file. Puoi anche trascinarlo dal Finder.",
+    "files.path.queued": "File aggiunto alla coda.",
+    "files.path.hint.win": "Incolla il percorso completo del file. Puoi anche trascinarlo da Esplora file."
   }
 };
 for (const [lang, copy] of Object.entries(ACCOUNT_COPY)) Object.assign(window.I18N[lang], copy);

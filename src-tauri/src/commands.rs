@@ -309,10 +309,26 @@ fn device_label() -> String {
 // ---------- Archivos de audio ----------
 
 #[tauri::command]
-pub fn transcribe_files(app: AppHandle, paths: Vec<String>) {
-    let paths: Vec<std::path::PathBuf> = paths.into_iter().map(std::path::PathBuf::from).filter(|p| p.is_file()).collect();
-    if !paths.is_empty() {
-        crate::file_transcription::enqueue(&app, paths);
+pub fn transcribe_files(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    let home = app.path().home_dir().ok();
+    let paths: Vec<std::path::PathBuf> = paths.into_iter()
+        .map(|path| local_audio_path(&path, home.as_deref()))
+        .filter(|path| path.is_file()).collect();
+    if paths.is_empty() {
+        return Err(crate::i18n::t(&app.state::<AppState>().settings().ui_lang(), "file.path_not_found").into());
+    }
+    crate::file_transcription::enqueue(&app, paths);
+    Ok(())
+}
+
+fn local_audio_path(input: &str, home: Option<&std::path::Path>) -> std::path::PathBuf {
+    let input = input.trim();
+    let input = input.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
+        .or_else(|| input.strip_prefix('\'').and_then(|s| s.strip_suffix('\''))).unwrap_or(input);
+    if let (Some(relative), Some(home)) = (input.strip_prefix("~/"), home) {
+        home.join(relative)
+    } else {
+        input.into()
     }
 }
 
@@ -321,15 +337,9 @@ pub fn transcribe_files(app: AppHandle, paths: Vec<String>) {
 #[tauri::command]
 pub async fn pick_audio_files(app: AppHandle, window: tauri::Window) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_parent(&window)
-        .add_filter("Audio", &crate::file_transcription::PICKER_EXTENSIONS)
-        .pick_files(move |picked| {
-            let _ = sender.send(picked);
-        });
-    let picked = receiver.await.map_err(|_| "The file picker closed unexpectedly. Please try again.".to_string())?;
+    let dialog = app.dialog().file().set_parent(&window)
+        .add_filter("Audio", &crate::file_transcription::PICKER_EXTENSIONS);
+    let picked = native_file_dialog(&app, move |callback| dialog.pick_files(callback)).await?;
     let paths = picked_audio_paths(picked);
     if !paths.is_empty() {
         crate::file_transcription::enqueue(&app, paths);
@@ -373,21 +383,67 @@ pub async fn save_file_transcript(app: AppHandle, window: tauri::Window, state: 
         .map(|j| (j.name.clone(), j.text.clone()))
         .ok_or("")?;
     let suggested = format!("{}.txt", std::path::Path::new(&name).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or(name));
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    app.dialog().file().set_parent(&window).set_file_name(suggested).add_filter("Texto", &["txt"]).save_file(move |target| {
-        let _ = sender.send(target);
-    });
-    if let Some(target) = receiver.await.map_err(|_| "The save dialog closed unexpectedly. Please try again.".to_string())? {
+    let dialog = app.dialog().file().set_parent(&window).set_file_name(suggested).add_filter("Texto", &["txt"]);
+    if let Some(target) = native_file_dialog(&app, move |callback| dialog.save_file(callback)).await? {
         let path = target.into_path().map_err(|error| error.to_string())?;
         std::fs::write(&path, text).map_err(|error| format!("Could not save the transcript: {error}"))?;
     }
     Ok(())
 }
 
+/// The plugin dispatches synchronously when already on the main thread. Catch a
+/// nil-panel panic here, before it can unwind across the event loop's FFI boundary.
+async fn native_file_dialog<T: Send + 'static>(
+    app: &AppHandle,
+    show: impl FnOnce(Box<dyn FnOnce(T) + Send>) + Send + 'static,
+) -> Result<T, String> {
+    let error = crate::i18n::t(&app.state::<AppState>().settings().ui_lang(), "file.dialog_unavailable").to_string();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let failure = error.clone();
+    app.run_on_main_thread(move || guarded_dialog_creation(show, sender, failure)).map_err(|_| error.clone())?;
+    receiver.await.map_err(|_| error)?
+}
+
+fn guarded_dialog_creation<T: Send + 'static>(
+    show: impl FnOnce(Box<dyn FnOnce(T) + Send>),
+    sender: tokio::sync::oneshot::Sender<Result<T, String>>,
+    error: String,
+) {
+    let sender = std::sync::Arc::new(std::sync::Mutex::new(Some(sender)));
+    let callback_sender = sender.clone();
+    let creation = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        show(Box::new(move |value| {
+            if let Some(sender) = lock(&callback_sender).take() { let _ = sender.send(Ok(value)); }
+        }));
+    }));
+    if creation.is_err() {
+        if let Some(sender) = lock(&sender).take() { let _ = sender.send(Err(error)); }
+    }
+}
+
 #[cfg(test)]
 mod file_dialog_tests {
-    use super::picked_audio_paths;
+    use super::{guarded_dialog_creation, local_audio_path, picked_audio_paths};
     use std::path::PathBuf;
+
+    #[tokio::test]
+    async fn native_dialog_creation_failure_returns_error_and_cancel_is_successful() {
+        let (sender, receiver) = tokio::sync::oneshot::channel::<Result<Option<String>, String>>();
+        guarded_dialog_creation(|_| panic!("synthetic nil panel"), sender, "picker unavailable".into());
+        assert_eq!(receiver.await.unwrap(), Err("picker unavailable".into()));
+        let (sender, receiver) = tokio::sync::oneshot::channel::<Result<Option<String>, String>>();
+        guarded_dialog_creation(|callback| callback(None), sender, "picker unavailable".into());
+        assert_eq!(receiver.await.unwrap(), Ok(None));
+    }
+
+    #[test]
+    fn pasted_paths_preserve_spaces_and_support_home_and_surrounding_quotes() {
+        let home = std::path::Path::new("/Users/example");
+        assert_eq!(local_audio_path("  \"~/Downloads/voice note.wav\"  ", Some(home)), home.join("Downloads/voice note.wav"));
+        assert_eq!(local_audio_path("'/tmp/voice note.wav'", None), PathBuf::from("/tmp/voice note.wav"));
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/english-speech.wav");
+        assert!(local_audio_path(&fixture.to_string_lossy(), None).is_file());
+    }
 
     #[test]
     fn cancelled_or_empty_picker_never_produces_queued_paths() {

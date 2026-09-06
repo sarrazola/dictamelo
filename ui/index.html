@@ -274,6 +274,18 @@
         <button id="btn-pick-file" class="primary" data-i18n="files.pick"></button>
         <span class="formats" data-i18n="files.formats"></span>
       </div>
+      <details id="file-path-option" class="file-path-option">
+        <summary data-i18n="files.path.option"></summary>
+        <form id="file-path-form">
+          <label for="file-path" data-i18n="files.path.label"></label>
+          <div class="file-path-fields">
+            <input id="file-path" type="text" required spellcheck="false" autocomplete="off" placeholder="/Users/…/audio.wav">
+            <button id="btn-import-path" type="submit" class="ghost" data-i18n="files.path.import"></button>
+          </div>
+          <p class="footnote" data-i18n="files.path.hint"></p>
+          <p id="file-path-status" class="footnote" role="status" hidden></p>
+        </form>
+      </details>
       <div class="card">
         <div class="card-head">
           <span class="card-title" data-i18n="files.title"></span>

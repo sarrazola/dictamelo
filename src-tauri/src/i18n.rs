@@ -243,6 +243,22 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Datei konnte nicht gelesen werden: {e}",
             "Impossibile leggere il file: {e}",
         ]),
+        "file.dialog_unavailable" => pick(lang, [
+            "El selector de archivos del sistema no responde. Puedes importar por ruta o copiar la transcripción.",
+            "The system file dialog is unavailable. You can import by path or copy the transcript.",
+            "O seletor de arquivos do sistema não responde. Você pode importar pelo caminho ou copiar a transcrição.",
+            "Le sélecteur de fichiers du système ne répond pas. Importez depuis un chemin ou copiez la transcription.",
+            "Der Dateidialog des Systems antwortet nicht. Du kannst einen Pfad importieren oder die Transkription kopieren.",
+            "Il selettore file del sistema non risponde. Puoi importare da un percorso o copiare la trascrizione.",
+        ]),
+        "file.path_not_found" => pick(lang, [
+            "No encontramos un archivo en esa ruta. Pega la ruta completa de un archivo de audio.",
+            "No file was found at that path. Paste the full path of an audio file.",
+            "Nenhum arquivo foi encontrado nesse caminho. Cole o caminho completo de um arquivo de áudio.",
+            "Aucun fichier trouvé à cet emplacement. Collez le chemin complet d’un fichier audio.",
+            "Unter diesem Pfad wurde keine Datei gefunden. Füge den vollständigen Pfad einer Audiodatei ein.",
+            "Nessun file trovato in quel percorso. Incolla il percorso completo di un file audio.",
+        ]),
         "file.cleanup_failed" => pick(lang, [
             "No se pudo completar la limpieza con IA. Conservamos la transcripción original.",
             "AI cleanup could not finish. The original transcript was preserved.",
