@@ -316,21 +316,29 @@ pub fn transcribe_files(app: AppHandle, paths: Vec<String>) {
     }
 }
 
-/// Abre el selector de archivos del sistema y encola lo elegido.
+/// Keep native dialog creation outside the synchronous WebKit IPC callback and
+/// attach it to the invoking window, matching the dialog plugin's own commands.
 #[tauri::command]
-pub fn pick_audio_files(app: AppHandle) {
+pub async fn pick_audio_files(app: AppHandle, window: tauri::Window) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
-    let handle = app.clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
+        .set_parent(&window)
         .add_filter("Audio", &crate::file_transcription::PICKER_EXTENSIONS)
         .pick_files(move |picked| {
-            let paths: Vec<std::path::PathBuf> =
-                picked.unwrap_or_default().into_iter().filter_map(|p| p.into_path().ok()).collect();
-            if !paths.is_empty() {
-                crate::file_transcription::enqueue(&handle, paths);
-            }
+            let _ = sender.send(picked);
         });
+    let picked = receiver.await.map_err(|_| "The file picker closed unexpectedly. Please try again.".to_string())?;
+    let paths = picked_audio_paths(picked);
+    if !paths.is_empty() {
+        crate::file_transcription::enqueue(&app, paths);
+    }
+    Ok(())
+}
+
+fn picked_audio_paths(picked: Option<Vec<tauri_plugin_dialog::FilePath>>) -> Vec<std::path::PathBuf> {
+    picked.unwrap_or_default().into_iter().filter_map(|path| path.into_path().ok()).collect()
 }
 
 #[tauri::command]
@@ -354,9 +362,10 @@ pub fn copy_file_transcript(state: State<'_, AppState>, id: String) -> Result<()
     paste::copy_text(&text).map_err(|e| e.to_string())
 }
 
-/// Guarda la transcripción como .txt donde el usuario elija.
+/// Await the native save dialog off the IPC thread so cancellation is a no-op
+/// and write failures return to the existing UI error toast.
 #[tauri::command]
-pub fn save_file_transcript(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn save_file_transcript(app: AppHandle, window: tauri::Window, state: State<'_, AppState>, id: String) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
     let (name, text) = lock(&state.file_jobs)
         .iter()
@@ -364,14 +373,30 @@ pub fn save_file_transcript(app: AppHandle, state: State<'_, AppState>, id: Stri
         .map(|j| (j.name.clone(), j.text.clone()))
         .ok_or("")?;
     let suggested = format!("{}.txt", std::path::Path::new(&name).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or(name));
-    app.dialog().file().set_file_name(suggested).add_filter("Texto", &["txt"]).save_file(move |target| {
-        if let Some(path) = target.and_then(|p| p.into_path().ok()) {
-            if let Err(e) = std::fs::write(&path, text) {
-                log::warn!("No se pudo guardar la transcripción en {}: {e}", path.display());
-            }
-        }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog().file().set_parent(&window).set_file_name(suggested).add_filter("Texto", &["txt"]).save_file(move |target| {
+        let _ = sender.send(target);
     });
+    if let Some(target) = receiver.await.map_err(|_| "The save dialog closed unexpectedly. Please try again.".to_string())? {
+        let path = target.into_path().map_err(|error| error.to_string())?;
+        std::fs::write(&path, text).map_err(|error| format!("Could not save the transcript: {error}"))?;
+    }
     Ok(())
+}
+
+#[cfg(test)]
+mod file_dialog_tests {
+    use super::picked_audio_paths;
+    use std::path::PathBuf;
+
+    #[test]
+    fn cancelled_or_empty_picker_never_produces_queued_paths() {
+        assert!(picked_audio_paths(None).is_empty());
+        assert!(picked_audio_paths(Some(Vec::new())).is_empty());
+        let paths = vec![PathBuf::from("first.wav"), PathBuf::from("second.wav")];
+        let picked = paths.iter().cloned().map(tauri_plugin_dialog::FilePath::Path).collect();
+        assert_eq!(picked_audio_paths(Some(picked)), paths);
+    }
 }
 
 /// El indicador flotante informa el tamaño de su contenido para ajustar la ventana.
