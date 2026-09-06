@@ -13,6 +13,8 @@ Last reviewed: September 6, 2026, for the 0.5.0 source and deployed audio-time b
 
 The seven-day trial can stay disabled for the initial launch. Additional model providers, a private wrapper repository and a repository-history reset are not prerequisites. Windows Authenticode and physical Intel/AMD microphone tests remain separate trust and hardware-validation improvements; updater signatures and VM emulation do not replace them.
 
+Small UI follow-up found during native testing: the Free usage progress control still has the accessible label `Weekly words used`, although its value now measures audio seconds. Visible minute totals are correct; update and translate the accessible label in the next UI build.
+
 ## Release requirements
 
 | Area | Required evidence before stable cloud launch | Current boundary |
