@@ -105,17 +105,53 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { throw 'NSIS build failed' }
           $exe = 'src-tauri/target/${{ matrix.target }}/release/dictamelo.exe'
-          $bytes = [IO.File]::ReadAllBytes((Resolve-Path $exe))
-          $offset = [BitConverter]::ToInt32($bytes, 0x3c)
-          if ([BitConverter]::ToUInt16($bytes, $offset + 4) -ne ${{ matrix.machine }}) { throw 'App payload architecture does not match target' }
-          Write-Output "Verified ${{ matrix.arch }} PE payload: $exe"
-          $metadata = @{
-            commit = '${{ github.sha }}'; target = '${{ matrix.target }}'; version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-            payloadMachine = '${{ matrix.machine }}'; payloadSha256 = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-            testsExecutedOn = 'native x64 Windows runner'; targetExecution = '${{ matrix.arch }}' -eq 'x86_64'
-            officialCloud = Test-Path '.env.cloud-build'
+          $bundleDir = 'src-tauri/target/${{ matrix.target }}/release/bundle/nsis'
+          $installers = @(Get-ChildItem $bundleDir -Filter '*-setup.exe' -File)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one NSIS installer for this target' }
+          $installer = $installers[0]
+          # Use the runner's existing tool; never install another extractor or run the payload.
+          $sevenZip = Join-Path $env:ProgramFiles '7-Zip/7z.exe'
+          if (-not (Test-Path $sevenZip -PathType Leaf)) { throw 'The Windows runner must provide 7-Zip' }
+          $extracted = Join-Path $env:RUNNER_TEMP ('dictamelo-nsis-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $extracted | Out-Null
+          & $sevenZip x -y "-o$extracted" $installer.FullName | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS payload extraction failed' }
+          $payloads = @(Get-ChildItem $extracted -Recurse -File -Filter 'dictamelo.exe')
+          if ($payloads.Count -ne 1) { throw 'Expected exactly one packaged dictamelo.exe' }
+          $packaged = $payloads[0].FullName
+
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a three-part numeric release version' }
+          $expectedVersion = "$version.0"
+          $compiledInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $exe).Path)
+          $packagedInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($packaged)
+          foreach ($info in @($compiledInfo, $packagedInfo)) {
+            $fileVersion = '{0}.{1}.{2}.{3}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart
+            $productVersion = '{0}.{1}.{2}.{3}' -f $info.ProductMajorPart, $info.ProductMinorPart, $info.ProductBuildPart, $info.ProductPrivatePart
+            if (-not $info.FileVersion -or -not $info.ProductVersion -or $fileVersion -ne $expectedVersion -or $productVersion -ne $expectedVersion) {
+              throw 'Compiler output or packaged payload version does not match the release manifest'
+            }
           }
-          $metadata | ConvertTo-Json | Set-Content 'src-tauri/target/${{ matrix.target }}/release/bundle/nsis/build-verification.json'
+          # The output exe is restored by Tauri after packaging; only its UNK-to-NSS
+          # marker may differ from the extracted payload. The helper never edits either file.
+          $payloadJson = python scripts/windows_payload.py --compiled $exe --packaged $packaged --machine '${{ matrix.machine }}'
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS packaged payload verification failed' }
+          $metadata = $payloadJson | ConvertFrom-Json -AsHashtable
+          $metadata.commit = '${{ github.sha }}'
+          $metadata.target = '${{ matrix.target }}'
+          $metadata.version = $version
+          $metadata.compiledFileVersion = $compiledInfo.FileVersion
+          $metadata.compiledProductVersion = $compiledInfo.ProductVersion
+          $metadata.packagedFileVersion = $packagedInfo.FileVersion
+          $metadata.packagedProductVersion = $packagedInfo.ProductVersion
+          $metadata.installerFilename = $installer.Name
+          $metadata.installerBytes = $installer.Length
+          $metadata.installerSha256 = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $metadata.testsExecutedOn = 'native x64 Windows runner'
+          $metadata.targetExecution = '${{ matrix.arch }}' -eq 'x86_64'
+          $metadata.officialCloud = Test-Path '.env.cloud-build'
+          $metadata | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $bundleDir 'build-verification.json')
+          Write-Output "Verified ${{ matrix.arch }} compiled and NSIS-packaged payloads, versions and exact bundle-marker transformation"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
