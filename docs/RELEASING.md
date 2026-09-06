@@ -2,11 +2,11 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current release candidate: 0.5.0
+## Current release: 0.5.0
 
 This iteration restores macOS and both Windows targets. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
 
-The first distribution may be a GitHub **prerelease** while the external launch requirements in [Production readiness](PRODUCTION_READINESS.md) remain open. A prerelease provides public installer downloads without changing the stable automatic-update channel. Do not advertise universal cloud signup, verified email delivery or the seven-day trial before those flows actually work. Keep `DICTAMELO_PRO_TRIAL_AVAILABLE=false` until trial entitlement has been verified.
+Publish one official release as GitHub Latest, with one set of architecture-specific README links and the complete updater manifest. Do not create a separate prerelease channel unless the maintainer explicitly requests one. Track remaining external service work in [Production readiness](PRODUCTION_READINESS.md); do not advertise verified email delivery or the seven-day trial before those flows actually work. Keep `DICTAMELO_PRO_TRIAL_AVAILABLE=false` until trial entitlement has been verified.
 
 ## 1. Prepare the version
 
@@ -152,12 +152,12 @@ Mount the downloaded DMG and check the contained app with `codesign --verify --d
 
 GitHub's public download URL may cache an earlier manifest briefly. Compare the exact release asset/API response before diagnosing an upload failure, then verify the public URL after it refreshes. Do not overwrite public installer bytes to fix a release: publish the next version.
 
-## Publishing a release candidate
+## Promoting an already-public release
 
-Use this only after staging and verifying the complete set of artifacts above. The installers are immutable once public, including prereleases. A later correction requires a new version.
+Ordinary releases use the complete-release procedure above. If a version was already published as a prerelease, promote its verified installers through GitHub release metadata; do not rerun a script that uploads every artifact. Never rebuild or replace a public installer, updater archive or detached signature under the same version. A binary correction requires a new version.
 
 ```sh
-./scripts/release.sh 0.5.0 --prerelease
+gh release edit v0.5.0 --prerelease=false --latest --notes-file docs/releases/0.5.0.md
 ```
 
-The script checks that the release is still a draft before uploading, then publishes it as a prerelease without changing the stable channel. Re-download and verify every checksum and updater signature after publication. Keep the README download table linked to the exact version and architecture that was checked. When production requirements are satisfied, promoting this identical candidate to stable is a metadata change; do not replace its bytes. Verify the stable updater endpoint and a real old-version update after promotion.
+If embedded manifest notes describe a superseded publication status, update only those notes and the corresponding `SHA256SUMS.txt` entry. Preserve version, publication timestamp, every platform URL/signature and all immutable artifact bytes. Upload the checksum metadata before the complete manifest, then verify public downloads and the Latest endpoint again. Verify a real installed old-version update and keep the README linked to the same official release.

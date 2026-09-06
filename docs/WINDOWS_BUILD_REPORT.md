@@ -1,6 +1,6 @@
 # Windows build report
 
-## 0.5.0 release candidate
+## 0.5.0 release
 
 Application source: `097551f9582fce8c17d6f4a539192d89b80236d8`. Both official-cloud installers came from [Actions run 34008710129](https://github.com/sarrazola/dictamelo/actions/runs/34008710129). Each matrix job passed 63 native x64 Rust tests (three explicit opt-in tests ignored), sixteen Python checks and eleven UI contract/behavior checks. ARM64 was cross-compiled on x64.
 
@@ -57,7 +57,7 @@ The installer's own PE header is the x86 NSIS bootstrap for both architectures, 
 
 #### Remaining observations
 
-- **x64 update check fails rather than staying quiet.** The emulated x64 build logs `None of the fallback platforms ["windows-x86_64-nsis", "windows-x86_64"] were found in the response platforms object`, because the published 0.1.2 manifest predates x64 support. No downgrade is offered, but users on x64 would see a failed check until a manifest containing `windows-x86_64` is published.
+- **Former manifest omitted x64.** During the initial emulated x64 test, the build logged `None of the fallback platforms ["windows-x86_64-nsis", "windows-x86_64"] were found in the response platforms object` against the old 0.1.2 manifest, with no downgrade offered. The final official 0.5.0 Latest manifest now includes `windows-x86_64` and both other platforms, verified through public HTTPS. This resolves the missing metadata; it is not a new x64 installed-updater execution test.
 - **The manual update check lives in About, not the tray.** The tray item is `#[cfg(target_os = "macos")]`, but the About page's **Buscar ahora** button is cross-platform and works on Windows; see the measured result below.
 - **No single-instance guard.** Launching a second copy while one runs leaves the second unable to register the shortcut; it reports the conflict and falls back to `Alt+Shift+Space`, which is graceful, but two instances can run at once.
 - **A second credential entry appears.** 0.5.0 writes `groq.com.dictamelo.desktop.runtime.v1` and keeps the legacy `groq.com.dictamelo.desktop` as a silent migration source, as `secrets.rs` documents. Nothing was deleted.

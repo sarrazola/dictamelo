@@ -8,27 +8,27 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 ## Download
 
-**[0.4.0 release candidate](https://github.com/sarrazola/dictamelo/releases/tag/v0.4.0):** download the installer for your computer below. This is a public preview; the [current stable release](https://github.com/sarrazola/dictamelo/releases/latest) remains available.
+**[Download Dictámelo 0.5.0](https://github.com/sarrazola/dictamelo/releases/latest):** choose the installer for your computer below.
 
 | Your computer | Installer |
 | --- | --- |
-| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/Dictamelo_0.4.0_aarch64.dmg) |
-| Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/Dictamelo_0.4.0_x86_64-setup.exe) |
-| Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/Dictamelo_0.4.0_aarch64-setup.exe) |
+| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v0.5.0/Dictamelo_0.5.0_aarch64.dmg) |
+| Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.5.0/Dictamelo_0.5.0_x86_64-setup.exe) |
+| Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.5.0/Dictamelo_0.5.0_aarch64-setup.exe) |
 
-[Checksums](https://github.com/sarrazola/dictamelo/releases/download/v0.4.0/SHA256SUMS.txt) · [Release notes and signatures](https://github.com/sarrazola/dictamelo/releases/tag/v0.4.0)
+[Checksums](https://github.com/sarrazola/dictamelo/releases/download/v0.5.0/SHA256SUMS.txt) · [Release notes and signatures](https://github.com/sarrazola/dictamelo/releases/tag/v0.5.0)
 
 On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
 Mac releases require Developer ID signing, Apple notarization and stapling. Windows installers are signed for the Tauri updater, but do not currently have a Microsoft Authenticode certificate; SmartScreen may display a warning. See [the actual verification record](docs/TESTING.md).
 
-**Cloud preview:** Installed-app Google sign-in has been verified; public branding and production email confirmation/recovery delivery remain pending. The proposed seven-day Pro trial is disabled. Personal-key mode works without a Dictámelo account. A GitHub prerelease does not change the stable automatic-update channel.
+**Cloud account setup:** Installed-app Google sign-in has been verified. Public branding and production email confirmation/recovery delivery remain pending; the proposed seven-day Pro trial is disabled. Personal-key mode works without a Dictámelo account.
 
 ## Get started
 
 1. On the first launch, choose your own keys, Free Cloud or Pro in the setup assistant. **Skip** is available on every step; you can configure everything later in Settings.
 2. With your own keys, choose a Groq model in **Models** and save the provider key. **Whisper Large v3** is recommended. No Dictámelo account is required. Existing provider configurations remain supported.
-3. In an official cloud build, use **Create free account** with email/password, **Sign in**, or **Continue with Google**. Cloud preview restrictions above still apply. Existing Pro licenses can be activated in **Plan**.
+3. Use **Continue with Google** for Free Cloud, or **Create free account** and **Sign in** with email/password once the email setup noted above is complete. Existing Pro licenses can be activated in **Plan**.
 4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release.
 5. Open **Files** to transcribe a recording. You can also expand **Import using a local path**. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
 

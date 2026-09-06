@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 — Release candidate
+## 0.5.0 — September 6, 2026
 
 - Show setup only on first launch, with Skip on every step; retain existing settings.
 - Present Groq provider and model together and recommend Whisper Large v3 for personal keys.
@@ -10,7 +10,7 @@
 - Enforce measured Free audio reservations and harden client access to billing tables.
 - Add first-launch, quota-upgrade, audio-boundary and provider-failure regressions.
 
-See `docs/TESTING.md` for verified artifacts and platform results. Cloud access remains a preview.
+This is the current official release for all three supported targets. See `docs/TESTING.md` for verified artifacts, native runtime results and the real Mac updater installation; `docs/PRODUCTION_READINESS.md` records remaining cloud service work.
 
 ## 0.4.0 — Release candidate
 
