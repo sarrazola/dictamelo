@@ -4,8 +4,8 @@ Last reviewed: September 6, 2026, for the 0.5.0 source and deployed audio-time b
 
 ## Remaining launch inventory
 
-1. Finish installed Windows ARM64 and x64-under-emulation checks against the final 0.5.0 payloads. The VM is now unlocked; that alone does not establish a passing runtime test.
-2. Publish the verified 0.5.0 candidate and update the README's architecture-specific download links. Before stable promotion, verify the complete three-platform update manifest and an actual version-to-version update.
+1. Complete distribution verification and publish the 0.5.0 candidate with architecture-specific README links. Installed Windows ARM64 and x64-under-emulation checks now passed, including files, cleanup, paste and restored settings. See the [Windows report](WINDOWS_BUILD_REPORT.md) for exact boundaries.
+2. Before stable promotion, publish the complete three-platform update manifest and verify an actual version-to-version update. The old stable 0.1.2 manifest lacks x64, causing the x64 update check to fail; it does not offer a downgrade.
 3. Restore the public homepage, privacy and terms pages and finish Google branding. The installed 0.5.0 owned-account Google login, restart persistence and Free Cloud audio flow passed on September 6.
 4. Configure production SMTP and verify real confirmation and password-recovery delivery. Add tested signup abuse controls and provider spend alerts before broad signup.
 5. Test purchase, activation, cancellation/expiry and existing-license compatibility. Bind new hosted Pro requests to their activated device instance through a compatible client/server transition.
@@ -15,11 +15,13 @@ The seven-day trial can stay disabled for the initial launch. Additional model p
 
 Small UI follow-up found during native testing: the Free usage progress control still has the accessible label `Weekly words used`, although its value now measures audio seconds. Visible minute totals are correct; update and translate the accessible label in the next UI build.
 
+Windows follow-up: launching a second copy currently permits two processes, with a reported shortcut conflict and fallback. Add a single-instance guard that focuses the existing Settings window. The normal one-instance startup/restart checks passed.
+
 ## Release requirements
 
 | Area | Required evidence before stable cloud launch | Current boundary |
 | --- | --- | --- |
-| Desktop | Same reviewed source; installed Mac, Windows x64 and ARM64; first-run/Skip behavior; real file upload and cleanup; settings survive installation | The installed Mac 0.5.0 passed the licensed file transcription/cleanup/copy flow and retained settings and its existing Groq key. Its fresh-settings launch showed setup automatically, Skip worked and a full restart did not repeat setup; the original settings were restored. Installed Windows results and physical dictation remain separate. See Testing for exact evidence and credential/permission boundaries. |
+| Desktop | Same reviewed source; installed Mac, Windows x64 and ARM64; first-run/Skip behavior; real file upload and cleanup; settings survive installation | Installed Mac and Windows ARM64 passed file/cleanup/copy, fresh-settings setup/Skip and restart persistence. Windows x64 installed and transcribed/pasted under ARM emulation. Original settings were restored and the VM was left on ARM64 0.5.0. Physical dictation and Windows account/Pro flows remain separate. See Testing and the Windows report for exact boundaries. |
 | macOS distribution | Developer ID signature, Apple Accepted notarization, stapled app/DMG, Gatekeeper and independently verified updater archive | The 0.5.0 app and DMG were accepted by Apple, stapled and checked by Gatekeeper. The installed executable matches the read-only DMG; complete public distribution and updater installation remain separate checks. |
 | Windows distribution | Both installed payload architectures/version verified; native x64 CI; ARM64 and x64 VM functional checks; updater signatures | Existing installers have no Microsoft Authenticode certificate. Tauri update signing does not suppress SmartScreen. Build, emulated execution and physical hardware checks must remain distinct. |
 | Free Cloud | 30 minutes per UTC week, included receipt-bound cleanup, exact time metering, user isolation, concurrency/replay protection and quota boundary | Audio-time migration and handlers are deployed. Real fixture used 5.855 seconds once with zero additional cleanup audio; last accepted recording reached 1804.855/1800 seconds and the next request returned 429. Temporary accounts and dependent records were removed. |
