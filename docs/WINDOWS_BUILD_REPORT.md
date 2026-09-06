@@ -13,6 +13,63 @@ Actions artifact IDs are `9981967895` (x64) and `9981973817` (ARM64). ZIP SHA-25
 
 The local ARM VM was shut down normally after its working tree and downloaded artifacts were saved. VMware now assigns 8,192 MB RAM and four virtual processors. Installed runtime results will be appended after boot and execution; a resource setting or build result alone is not a functional test.
 
+### Installed runtime verification (Windows 11 ARM64 VM)
+
+Guest after the resize, read from the running system: `Win32_ComputerSystem.TotalPhysicalMemory` 8,187 MB, `NumberOfLogicalProcessors` 4, `OSArchitecture` ARM 64-bit. Repository at `C:\Users\andre\Downloads\dictamelo`, fast-forwarded to `3cde602` with a clean working tree; `git merge-base --is-ancestor 097551f… HEAD` confirms the application source, and `git diff --stat 097551f..HEAD -- src-tauri/src ui/` is empty, so only documentation moved.
+
+Installers used: the signed assets downloaded from the v0.5.0 draft with `gh release download v0.5.0 --pattern "*setup.exe*"`. Their SHA-256 equals the table above, equals the CI artifacts from run 34008710129 downloaded separately, and equals the draft's own `SHA256SUMS.txt`.
+
+#### Payload hashes
+
+The installer's own PE header is the x86 NSIS bootstrap for both architectures, so the payload was extracted with 7-Zip and compared directly. `build-verification.json` records the **compiled** executable, which the bundler patches for packaging and then restores; the shipped payload therefore differs until the bundle-type marker is normalized. Each payload was read into memory, checked for the marker, normalized `__TAURI_BUNDLE_TYPE_VAR_NSS` → `…_UNK`, and hashed. No installed or extracted file was modified.
+
+| | ARM64 | x86_64 |
+| --- | --- | --- |
+| Packaged payload bytes | 11,385,344 | 12,990,976 |
+| Packaged payload SHA-256 | `b47092f1c9cb7cffb6f3c2a4d0e46872092984bfa6a94e59745cdad408d401e2` | `d2b0a0f19fd2e5f1ed4d70fd89419d29565f06282a30f42cd02c69245d5842f7` |
+| Installed executable equals packaged payload | yes | yes |
+| PE machine | `0xaa64` | `0x8664` |
+| ProductVersion | 0.5.0 | 0.5.0 |
+| `__TAURI_BUNDLE_TYPE_VAR_*` occurrences | 1 (`NSS`) | 2 (both `NSS`) |
+| Normalized SHA-256 vs `payloadSha256` | **matches** `f304984b…f207` | **blocked**, see below |
+
+**Blocked check — x86_64 marker count.** The strict rule of exactly one marker fails: the x64 payload carries two adjacent copies at offsets `0x009a55da` and `0x009a55f5`, both already `NSS`, with zero `UNK` remaining. Normalizing only the **second** occurrence reproduces the CI `payloadSha256` `6159f262…82dc` exactly; normalizing the first, or both, does not. The ARM64 payload has a single occurrence and needs no such choice. So the x64 artifact is reproducible and consistent with its metadata, but only under an assumption the strict rule does not permit, and the CI-recorded hash for x64 describes neither the clean compiled binary nor the shipped payload. This needs your decision before the number is quoted as a verification; it is not evidence of tampering, since every installer hash matches the draft, the CI artifact and `SHA256SUMS.txt`.
+
+#### Passed checks
+
+| Check | Evidence |
+| --- | --- |
+| ARM64 upgrade over the existing 0.2.0 | Installed 0.2.0 (`891ed0cd…`, PE `0xaa64`, 11,051,008 B) upgraded in place by the 0.5.0 ARM64 installer run with `/S`. Same path, ProductVersion 0.5.0, PE `0xaa64`. Startup logged `first_run=false`; `settings.json` SHA-256 was identical before and after launch, so no wizard and no rewrite on upgrade. |
+| Stored credentials survive the upgrade | Models page shows the key as stored in Credential Manager with only its last characters; the licensed fixture transcribed immediately after the upgrade. |
+| Clean first launch and Skip | With `settings.json` moved aside, startup logged `first_run=true` and the three-plan wizard appeared ("STEP 1 OF 3"), showing 30 minutes weekly for the free cloud plan. **Skip** closed it, persisted `onboardingSeen: true`, and the next launch logged `first_run=false` with no wizard. |
+| No permanent onboarding entry | Sidebar after Skip is General, Plan, Models, Files, History, Advanced, About only. |
+| Groq Large v3 recommendation | The model dropdown lists "Whisper Large v3 · Recomendado"; a fresh profile defaults to `whisper-large-v3`. Opening the dropdown did not change the saved selection. |
+| Settings window across Alt+Tab | Window stayed `visible` while focus moved to another application and back, twice, with the process alive throughout. |
+| Explicit close to tray | Clicking the window's close button left the window `hidden` with the same PID alive; reopening from the tray menu restored it. |
+| Licensed audio upload with AI cleanup | `tests/fixtures/english-speech.wav` (SHA-256 `799f78ed…`, LibriSpeech CC BY 4.0) imported through the Files page produced "Mr. Quilter is the apostle of the middle classes, and we are glad to welcome his gospel.", matching the corpus transcript word for word after case and punctuation normalization. |
+| AI cleanup demonstrably applied to uploads | Same synthetic audio, same build, cleanup on: "Send the email to Andres on Friday and tell him that the meeting is at 3." Cleanup off: "Um, so, send the email to Andres on Thursday, no wait, on Friday, and, uh, tell him that the meeting is at 3." |
+| Copy and paste of a file transcript | The **Copiar** button placed the transcript on the clipboard; pasting into a separate window reproduced it exactly, with the target window logging the `Ctrl`/`V` keystrokes. |
+| Media conversion | `short.wma` imported: `Media Foundation: … → PCM 16000 Hz, 1 canal(es), remuestreado por el lector`, 121,679 mono samples (7.6 s), transcribed, and the temporary audio directory left empty. |
+| Shortcut and cancellation | Holding the configured `Control+Shift+KeyQ` started recording (`Estado: Grabando…`); pressing Esc mid-recording logged `Grabación cancelada con Esc` and returned to Ready without transcribing. |
+| Credentials after a full restart | After quitting and relaunching, the shortcut re-registered and the licensed fixture transcribed again using the stored credential. |
+| Update check without downgrade | The updater endpoint currently serves 0.1.2 (platforms `darwin-aarch64`, `windows-aarch64`). On ARM64 0.5.0 the startup check produced no update-available event and no error across a 30-second window, so no downgrade was offered. |
+| x64 installation under ARM emulation | The draft x64 installer installed a PE `0x8664`, 0.5.0 payload byte-identical to the extracted one; the process loads `xtajit64se.dll`. The licensed fixture transcribed (88 characters in 0.9 s), pasted into a separate window, and the previous clipboard was restored. |
+
+#### Observations that need your judgement
+
+- **x64 update check fails rather than staying quiet.** The emulated x64 build logs `None of the fallback platforms ["windows-x86_64-nsis", "windows-x86_64"] were found in the response platforms object`, because the published 0.1.2 manifest predates x64 support. No downgrade is offered, but users on x64 would see a failed check until a manifest containing `windows-x86_64` is published.
+- **No manual update check exists on Windows.** The tray item is `#[cfg(target_os = "macos")]`, so Windows relies entirely on the startup and six-hour background checks.
+- **No single-instance guard.** Launching a second copy while one runs leaves the second unable to register the shortcut; it reports the conflict and falls back to `Alt+Shift+Space`, which is graceful, but two instances can run at once.
+- **A second credential entry appears.** 0.5.0 writes `groq.com.dictamelo.desktop.runtime.v1` and keeps the legacy `groq.com.dictamelo.desktop` as a silent migration source, as `secrets.rs` documents. Nothing was deleted.
+
+#### Limitations
+
+- No physical Intel or AMD hardware was involved. Every x64 result here comes from the ARM64 emulation layer, which differs from native execution in timing and CPU feature detection.
+- No physical microphone was exercised. The VM's capture device returns silence or low-level noise; the shortcut test proves the device opens, delivers samples and cancels correctly, not audio quality or that speech transcribes from a real microphone.
+- All transcription used the existing personal Groq credential in "Free · your API keys" mode. No account sign-in, free weekly quota or Pro licence path was exercised, so the 30 minutes per week and 180 hours per 30 days figures were read from the interface, not consumed.
+- The in-app updater was not observed applying an update, only declining to offer one.
+- Configuration was backed up before the first-launch test and restored afterwards; `settings.json` SHA-256 `14c5974a…3655` is identical to its pre-test value, and the machine was left with ARM64 0.5.0 installed.
+
 ## 0.4.0 release candidate
 
 Both official cloud installers were built from `374a77cf3329bfaa210eaa3f3977331c0a248a53`, after that source was pushed to `main`. [Windows run 34001827519](https://github.com/sarrazola/dictamelo/actions/runs/34001827519) passed on Windows Server 2022 x64 runners. Each matrix job ran 16 Python tests, 6 UI contract tests and 61 Rust tests; 3 explicitly opt-in tests were ignored.
