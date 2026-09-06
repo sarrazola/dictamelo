@@ -241,14 +241,13 @@ impl ClipboardBackend for WindowsClipboard {
 mod tests {
     use super::*;
 
-    /// Modifica el portapapeles real del usuario (lo deja como estaba). Se ejecuta solo
-    /// con `DICTAMELO_CLIPBOARD_TESTS=1`.
+    /// Changes the real clipboard, then restores it. Opt in with
+    /// `DICTAMELO_CLIPBOARD_TESTS=1 cargo test snapshot_and_restore_roundtrip -- --ignored`.
     #[test]
+    #[ignore = "requires explicit live/OS opt-in"]
     fn snapshot_and_restore_roundtrip() {
-        if std::env::var("DICTAMELO_CLIPBOARD_TESTS").is_err() {
-            eprintln!("omitido: define DICTAMELO_CLIPBOARD_TESTS=1");
-            return;
-        }
+        assert_eq!(std::env::var("DICTAMELO_CLIPBOARD_TESTS").as_deref(), Ok("1"),
+            "Set DICTAMELO_CLIPBOARD_TESTS=1 before running the ignored OS test");
         let cb = WindowsClipboard;
         let original = cb.snapshot().unwrap();
 
