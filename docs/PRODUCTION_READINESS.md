@@ -1,21 +1,32 @@
 # Production readiness
 
-Last reviewed: September 5, 2026, for the 0.5.0 source and deployed audio-time backend. A working local application, a public installer and a production cloud service are separate delivery milestones. Keep exact commit, artifact and native execution evidence in [Testing](TESTING.md).
+Last reviewed: September 6, 2026, for the 0.5.0 source and deployed audio-time backend. The current review checked source, GitHub releases/updater and public website URLs. Google, SMTP, CAPTCHA and checkout dashboard settings below were last checked on September 5; they have not been revalidated in those dashboards today. A working local application, a public installer and a production cloud service are separate delivery milestones. Keep exact commit, artifact and native execution evidence in [Testing](TESTING.md).
+
+## Remaining launch inventory
+
+1. Finish installed Windows ARM64 and x64-under-emulation checks against the final 0.5.0 payloads. The VM is now unlocked; that alone does not establish a passing runtime test.
+2. Publish the verified 0.5.0 candidate and update the README's architecture-specific download links. Before stable promotion, verify the complete three-platform update manifest and an actual version-to-version update.
+3. Restore the public homepage, privacy and terms pages; verify Google branding and the installed 0.5.0 browser-to-app login flow with an ordinary account.
+4. Configure production SMTP and verify real confirmation and password-recovery delivery. Add tested signup abuse controls and provider spend alerts before broad signup.
+5. Test purchase, activation, cancellation/expiry and existing-license compatibility. Bind new hosted Pro requests to their activated device instance through a compatible client/server transition.
+6. Review the price/180-hour subsidy and assign an operating budget. Publish real support, retention and deletion procedures and verify database recovery ownership.
+
+The seven-day trial can stay disabled for the initial launch. Additional model providers, a private wrapper repository and a repository-history reset are not prerequisites. Windows Authenticode and physical Intel/AMD microphone tests remain separate trust and hardware-validation improvements; updater signatures and VM emulation do not replace them.
 
 ## Release requirements
 
 | Area | Required evidence before stable cloud launch | Current boundary |
 | --- | --- | --- |
-| Desktop | Same reviewed source; installed Mac, Windows x64 and ARM64; first-run/Skip behavior; real file upload and cleanup; settings survive installation | 0.5.0 source and browser checks passed. Browser mocks do not establish native startup, Cmd-Tab behavior, permissions or dictation. Record new installed-artifact results in Testing; 0.4.0 retained the account/settings and passed real Free file transcription/cleanup. |
+| Desktop | Same reviewed source; installed Mac, Windows x64 and ARM64; first-run/Skip behavior; real file upload and cleanup; settings survive installation | The installed Mac 0.5.0 passed the licensed file transcription/cleanup/copy flow and retained settings and its existing Groq key. Native clean-profile startup, installed Windows results and physical dictation remain separate from the successful source/browser checks. See Testing for exact evidence. |
 | macOS distribution | Developer ID signature, Apple Accepted notarization, stapled app/DMG, Gatekeeper and independently verified updater archive | The 0.5.0 app and DMG were accepted by Apple, stapled and checked by Gatekeeper. The installed executable matches the read-only DMG; complete public distribution and updater installation remain separate checks. |
 | Windows distribution | Both installed payload architectures/version verified; native x64 CI; ARM64 and x64 VM functional checks; updater signatures | Existing installers have no Microsoft Authenticode certificate. Tauri update signing does not suppress SmartScreen. Build, emulated execution and physical hardware checks must remain distinct. |
 | Free Cloud | 30 minutes per UTC week, included receipt-bound cleanup, exact time metering, user isolation, concurrency/replay protection and quota boundary | Audio-time migration and handlers are deployed. Real fixture used 5.855 seconds once with zero additional cleanup audio; last accepted recording reached 1804.855/1800 seconds and the next request returned 429. Temporary accounts and dependent records were removed. |
-| Google account | Verified homepage/privacy/terms on the owned domain; configured audience; browser-to-installed-app sign-in and restart persistence | Megacubos Google project and Supabase provider are configured. Owned test-user login passed in 0.3.1; Google audience remains Testing. |
-| Email account and signup abuse | Verified sender domain/SMTP; real confirmation and recovery delivered to an owned mailbox; login/refresh; tested signup abuse controls | Password/Auth API tests passed. Confirmations remain enabled, but SMTP has no configured host and CAPTCHA is off. Synthetic tokens do not prove email delivery; per-account quotas do not prevent multiple-account abuse. |
+| Google account | Verified homepage/privacy/terms on the owned domain; configured audience; browser-to-installed-app sign-in and restart persistence | Last dashboard check: Megacubos Google project and Supabase provider configured, audience Testing. Owned-account login passed in 0.3.1. Identity-only Google login is exempt from the Testing allowlist/warning/seven-day restrictions; Testing alone does not prove public login is blocked. Finish branding and installed 0.5.0 verification. |
+| Email account and signup abuse | Verified sender domain/SMTP; real confirmation and recovery delivered to an owned mailbox; login/refresh; tested signup abuse controls | Password/Auth API tests passed. Last dashboard check: confirmations enabled, SMTP host absent and CAPTCHA off. Synthetic tokens do not prove email delivery; per-account quotas do not prevent multiple-account abuse. Supabase's default sender is restricted to project-team addresses and is not production SMTP. |
 | Pro | Correct store/product/variant, actual purchase or test checkout, immediate access, cancellation/expiry, compatible device enforcement and quota behavior | Ownership and 180-hour rolling quota service are deployed. Existing licenses remain supported. A fresh paid provider/lifecycle test remains outstanding. Normal activation limits five devices, but legacy key-only API requests do not enforce the instance/device cap against modified clients. |
-| Product information | App, website and checkout display 30 minutes/week and 180 hours/rolling 30 days; policies match actual data flow | Last verified homepage, privacy and terms URLs redirect to parking content. The Lemon description was saved and reloaded with 180 hours per rolling 30 days; price remains $4.99/month and the trial stays off. The public website and product images still need a final consistency review. |
+| Product information | App, website and checkout display 30 minutes/week and 180 hours/rolling 30 days; policies match actual data flow | September 6: apex homepage/privacy/terms return HTTP 308 to www. System resolution of www failed locally; DNS lookup returned its Vercel address, and requests through that observed address with TLS verification returned HTTP 404 for all three pages. September 5: the saved/reloaded Lemon description confirmed 180 hours per rolling 30 days, $4.99/month and trial off. Website and product images need a final consistency review. |
 | Trial | Verified immediate entitlement and the complete seven-day trial lifecycle | Checkout and desktop trial flag remain false. No trial availability is claimed. |
-| Public downloads | All architecture links, checksums and signatures re-downloaded and verified; actual update installation | The last recorded public preview is 0.4.0, with nine downloads verified; stable remained 0.1.2. A 0.5.0 build is not evidence of publication or update installation. Record new results in Testing. |
+| Public downloads | All architecture links, checksums and signatures re-downloaded and verified; actual update installation | September 6: 0.5.0 remains a draft with nine verified assets; public preview is 0.4.0. The configured stable updater returns 0.1.2 with Mac ARM64 and Windows ARM64 only. A prerelease does not advance this channel. Include all three platforms before stable promotion and verify a real installed update. |
 
 ## Cost of the 180-hour allowance
 
@@ -62,6 +73,7 @@ Do not mark unavailable credentials, a skipped mailbox check, an inaccessible VM
 ## External documentation
 
 - [Google OAuth branding requirements](https://support.google.com/cloud/answer/15549049?hl=en)
+- [Google audience and identity-only Testing exception](https://support.google.com/cloud/answer/15549945)
 - [Supabase production SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 - [Supabase Google login configuration](https://supabase.com/docs/guides/auth/social-login/auth-google)
 - [Supabase CAPTCHA integration](https://supabase.com/docs/guides/auth/auth-captcha)
