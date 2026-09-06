@@ -1,4 +1,19 @@
-# Windows build report — 0.2.0
+# Windows build report
+
+## 0.4.0 release candidate
+
+Both official cloud installers were built from `374a77cf3329bfaa210eaa3f3977331c0a248a53`, after that source was pushed to `main`. [Windows run 34001827519](https://github.com/sarrazola/dictamelo/actions/runs/34001827519) passed on Windows Server 2022 x64 runners. Each matrix job ran 16 Python tests, 6 UI contract tests and 61 Rust tests; 3 explicitly opt-in tests were ignored.
+
+| Installer | Bytes | Application PE machine | GitHub artifact ID |
+| --- | ---: | --- | --- |
+| `Dictamelo_0.4.0_x86_64-setup.exe` | 3,716,357 | `0x8664` | `9979889040` |
+| `Dictamelo_0.4.0_aarch64-setup.exe` | 3,343,832 | `0xaa64` | `9979900519` |
+
+GitHub artifact ZIP digests were verified before extraction. Build metadata matched the exact commit, version, target and official-cloud configuration. The existing Tauri updater key signed both installers; detached signatures independently passed `verify_artifact`. Signing did not alter the installer payload bytes. The NSIS launcher is x86 for both packages; the compiled application payload determines the target architecture.
+
+ARM64 was cross-compiled on x64. The local ARM VM displayed a black screen and was unavailable for installation or functional checks. This release therefore has native x64 test execution and cross-compiled ARM64 packaging evidence, but no new Windows installation, ARM64 execution, physical Intel/AMD microphone or Windows upgrade test. The installers do not have an Authenticode certificate. Historical VM results below are not results for 0.4.0.
+
+## Historical report — 0.2.0
 
 Record of how the Windows installers are built, what was verified for 0.2.0, and which parts of
 that verification are weaker than they look. Written from the Windows machine; the macOS side and

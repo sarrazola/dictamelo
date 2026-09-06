@@ -5,6 +5,8 @@
 - Include hosted AI cleanup in Free Cloud without charging transcription words twice.
 - Apply optional cleanup to uploaded audio as well as dictation; preserve the original result when cleanup fails.
 - Add an attributed open speech fixture, transcript comparison and repeatable offline/live regression checks.
+- Validate all six interface languages and referenced controls before packaging.
+- Recover from native file-dialog creation failures and offer local-path audio import.
 - Prepare macOS, Windows Intel/AMD x64 and Windows ARM64 from the same source on `main`.
 - Add a production-readiness checklist and an explicit prerelease publishing mode that preserves the stable updater channel.
 
