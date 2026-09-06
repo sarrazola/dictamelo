@@ -1,5 +1,18 @@
 # Windows build report
 
+## 0.5.0 release candidate
+
+Application source: `097551f9582fce8c17d6f4a539192d89b80236d8`. Both official-cloud installers came from [Actions run 34008710129](https://github.com/sarrazola/dictamelo/actions/runs/34008710129). Each matrix job passed 63 native x64 Rust tests (three explicit opt-in tests ignored), sixteen Python checks and eleven UI contract/behavior checks. ARM64 was cross-compiled on x64.
+
+| Installer | Bytes | SHA-256 | Verified payload PE |
+| --- | ---: | --- | --- |
+| `Dictamelo_0.5.0_x86_64-setup.exe` | 3,717,291 | `dba093828f4adf58ee8046c1270632d6cee9cf91d37b4d30fb651d690cc2ee29` | `0x8664` |
+| `Dictamelo_0.5.0_aarch64-setup.exe` | 3,343,997 | `f0b501459f0031619f8471db5fe592c11855f8d79b5e64228192a4648abfcd51` | `0xaa64` |
+
+Actions artifact IDs are `9981967895` (x64) and `9981973817` (ARM64). ZIP SHA-256 and byte counts matched the GitHub API. Build metadata matched the exact source, version, target and official-cloud flag. The local EXE header is the x86 NSIS bootstrap, not its payload architecture. Both detached updater signatures were created with the existing signing key and independently verified against the application's public key. There is no Authenticode signature claim.
+
+The local ARM VM was shut down normally after its working tree and downloaded artifacts were saved. VMware now assigns 8,192 MB RAM and four virtual processors. Installed runtime results will be appended after boot and execution; a resource setting or build result alone is not a functional test.
+
 ## 0.4.0 release candidate
 
 Both official cloud installers were built from `374a77cf3329bfaa210eaa3f3977331c0a248a53`, after that source was pushed to `main`. [Windows run 34001827519](https://github.com/sarrazola/dictamelo/actions/runs/34001827519) passed on Windows Server 2022 x64 runners. Each matrix job ran 16 Python tests, 6 UI contract tests and 61 Rust tests; 3 explicitly opt-in tests were ignored.
