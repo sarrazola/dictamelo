@@ -22,13 +22,13 @@ On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone a
 
 Mac releases require Developer ID signing, Apple notarization and stapling. Windows installers are signed for the Tauri updater, but do not currently have a Microsoft Authenticode certificate; SmartScreen may display a warning. See [the actual verification record](docs/TESTING.md).
 
-**Cloud account setup:** Installed-app Google sign-in has been verified. Public branding and production email confirmation/recovery delivery remain pending; the proposed seven-day Pro trial is disabled. Personal-key mode works without a Dictámelo account.
+**Cloud account setup:** Installed-app Google sign-in and real email confirmation/password recovery have been verified. Auth emails are delivered by Resend from **Dictámelo <no-reply@dictamelo.com>**. Public branding and signup abuse controls remain launch follow-ups; the proposed seven-day Pro trial is disabled. Personal-key mode works without a Dictámelo account.
 
 ## Get started
 
 1. On the first launch, choose your own keys, Free Cloud or Pro in the setup assistant. **Skip** is available on every step; you can configure everything later in Settings.
 2. With your own keys, choose a Groq model in **Models** and save the provider key. **Whisper Large v3** is recommended. No Dictámelo account is required. Existing provider configurations remain supported.
-3. Use **Continue with Google** for Free Cloud, or **Create free account** and **Sign in** with email/password once the email setup noted above is complete. Existing Pro licenses can be activated in **Plan**.
+3. Use **Continue with Google** for Free Cloud, or **Create free account** with email/password and enter the confirmation code sent to your inbox. Returning users can **Sign in**; password recovery also uses an emailed code. Existing Pro licenses can be activated in **Plan**.
 4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release.
 5. Open **Files** to transcribe a recording. You can also expand **Import using a local path**. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
 

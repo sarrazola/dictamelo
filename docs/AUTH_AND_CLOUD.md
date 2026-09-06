@@ -121,19 +121,27 @@ The explicit live regression is `python3 scripts/test-free-cleanup-live.py --liv
 
 ## Email/password accounts
 
-The preview supports account creation with email and password, ordinary password login, account confirmation and password recovery. Tokens are used for confirmation/recovery, not as the normal sign-in method. Passwords are sent to Supabase Auth; session tokens use the operating system credential store.
+The app supports account creation with email and password, ordinary password login, account confirmation and password recovery. Tokens are used for confirmation/recovery, not as the normal sign-in method. Passwords are sent to Supabase Auth; session tokens use the operating system credential store.
 
 The credential store introduced in 0.3.1 remains the 0.5.0 design: separate release and debug runtime namespaces. Release builds can silently migrate accessible legacy entries; debug builds cannot read or migrate the installed app's credentials. See [Local credentials](LOCAL_CREDENTIALS.md) for caching, denied-access recovery and logout deletion markers.
 
-Keep email confirmations enabled. Live readback on September 5, 2026 confirmed that setting; SMTP has no host, user or sender configured. Configure a production transactional sender in Supabase Auth's SMTP settings. Supabase manages identity and authentication; the SMTP provider delivers the messages. Changing the login screen to use a password does not remove confirmation and recovery email requirements. The default Supabase email service is restricted and is not a production sender. [Supabase SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
+Keep email confirmations enabled. On September 6, 2026, production custom SMTP was configured and saved in the official Supabase project, using the verified Resend domain `dictamelo.com`. The saved settings use `smtp.resend.com`, port `465`, username `resend`, sender address `no-reply@dictamelo.com`, sender name `Dictámelo`, and the existing 60-second minimum email interval per user. A dedicated Resend key named `Dictamelo Supabase Auth` has sending access restricted to this domain; it is stored only as Supabase's server-side SMTP password. Never put that key in this repository or the desktop build. Supabase manages accounts and authentication; Resend delivers their messages. No app rebuild is required for an SMTP configuration change. [Resend's Supabase SMTP setup](https://resend.com/docs/send-with-supabase-smtp), [Supabase SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
 
-CAPTCHA was disabled in the same readback. Before opening public signup, implement and verify an account-creation abuse control and provider spend alerts. Per-account audio quotas do not stop someone creating many accounts. Enabling CAPTCHA requires a corresponding client flow; do not turn it on server-side without testing signup, login and recovery. [Supabase CAPTCHA integration](https://supabase.com/docs/guides/auth/auth-captcha).
+CAPTCHA was disabled in the September 5 readback and was not changed during the SMTP setup. Before broad signup, implement and verify an account-creation abuse control and provider spend alerts. Per-account audio quotas do not stop someone creating many accounts. Enabling CAPTCHA requires a corresponding client flow; do not turn it on server-side without testing signup, login and recovery. [Supabase CAPTCHA integration](https://supabase.com/docs/guides/auth/auth-captcha).
 
 Confirmation and recovery templates must show `{{ .Token }}` so the user can enter the code in the app. Do not replace normal password login with magic-link-only wording. Preserve any required legacy template behavior for existing draft clients while they remain in use.
 
 Avoid an unreviewed `supabase config push`: it can change unrelated Auth, API and Storage settings. Prefer a targeted Auth Management API patch or the dashboard, preserving existing settings and keeping credentials out of tracked files and logs.
 
-The live Auth API contract passed confirmation, replay rejection, password login, refresh, recovery and logout using a temporary synthetic account; that account was removed afterward. Before announcing the complete flow, verify actual delivery and confirmation/recovery with an owned mailbox. Admin-generated test tokens verify backend behavior but do not verify SMTP delivery.
+The earlier synthetic Auth API contract passed confirmation, replay rejection, password login, refresh, recovery and logout without sending email. On September 6, a separate real-mail test used public signup and recovery endpoints with a newly generated alias of an owned mailbox. Both messages arrived in Inbox from the configured sender with SPF and DKIM passing. The actual delivered eight-digit codes confirmed the account and reset its password; an unconfirmed login and reused confirmation code were rejected, and after recovery the old password failed while the new password worked. Only that temporary account was deleted, and removal was verified. This checks real SMTP delivery and the public Auth API, not the installed email/password UI. No DMARC result was present in the inspected Gmail authentication headers.
+
+To repeat the real-mail check after changing sender configuration or templates:
+
+```sh
+python3 scripts/test-auth-smtp-live.py --live --project-ref YOUR_PROJECT_REF --mailbox YOUR_OWNED_MAILBOX
+```
+
+The mailbox must support plus addressing. Run from a terminal and enter the actual received confirmation/recovery codes at the hidden prompts; do not use admin-generated tokens. The script creates a unique disposable alias/account and verifies its deletion afterward. Inspect sender, Inbox/Spam placement and authentication headers separately. This deliberately opt-in test sends two real auth emails and must not run automatically in offline CI. Preserve confirmations, the Google provider, redirects and unrelated Auth settings when rotating the SMTP key. Save a replacement domain-restricted sending key in Supabase, repeat the delivery check, and revoke the old key only after it passes.
 
 ## Google sign-in
 
