@@ -31,9 +31,9 @@ The installer's own PE header is the x86 NSIS bootstrap for both architectures, 
 | PE machine | `0xaa64` | `0x8664` |
 | ProductVersion | 0.5.0 | 0.5.0 |
 | `__TAURI_BUNDLE_TYPE_VAR_*` occurrences | 1 (`NSS`) | 2 (both `NSS`) |
-| Normalized SHA-256 vs `payloadSha256` | **matches** `f304984b…f207` | **blocked**, see below |
+| Normalized SHA-256 vs `payloadSha256` | matches `f304984b…f207` | matches `6159f262…82dc` after reversing the second marker |
 
-**Blocked check — x86_64 marker count.** The strict rule of exactly one marker fails: the x64 payload carries two adjacent copies at offsets `0x009a55da` and `0x009a55f5`, both already `NSS`, with zero `UNK` remaining. Normalizing only the **second** occurrence reproduces the CI `payloadSha256` `6159f262…82dc` exactly; normalizing the first, or both, does not. The ARM64 payload has a single occurrence and needs no such choice. So the x64 artifact is reproducible and consistent with its metadata, but only under an assumption the strict rule does not permit, and the CI-recorded hash for x64 describes neither the clean compiled binary nor the shipped payload. This needs your decision before the number is quoted as a verification; it is not evidence of tampering, since every installer hash matches the draft, the CI artifact and `SHA256SUMS.txt`.
+**x86_64 marker count.** The x64 payload carries two adjacent `NSS` copies, at offsets `0x009a55da` and `0x009a55f5`, with zero `UNK` remaining. Reversing only the **second** reproduces the CI `payloadSha256` exactly; reversing the first, or both, does not. The ARM64 payload has a single occurrence at `0x0089013a` and needs no such choice. This is not a defect in the artifact: the compiled x64 binary genuinely contains one pre-existing `NSS` string plus the one `UNK` marker that Tauri patches, so a rule of "exactly one `NSS` in the packaged payload" is too strict for x64. The verification below, run with the corrected helper, settles it.
 
 #### Passed checks
 
@@ -58,7 +58,7 @@ The installer's own PE header is the x86 NSIS bootstrap for both architectures, 
 #### Observations that need your judgement
 
 - **x64 update check fails rather than staying quiet.** The emulated x64 build logs `None of the fallback platforms ["windows-x86_64-nsis", "windows-x86_64"] were found in the response platforms object`, because the published 0.1.2 manifest predates x64 support. No downgrade is offered, but users on x64 would see a failed check until a manifest containing `windows-x86_64` is published.
-- **No manual update check exists on Windows.** The tray item is `#[cfg(target_os = "macos")]`, so Windows relies entirely on the startup and six-hour background checks.
+- **The manual update check lives in About, not the tray.** The tray item is `#[cfg(target_os = "macos")]`, but the About page's **Buscar ahora** button is cross-platform and works on Windows; see the measured result below.
 - **No single-instance guard.** Launching a second copy while one runs leaves the second unable to register the shortcut; it reports the conflict and falls back to `Alt+Shift+Space`, which is graceful, but two instances can run at once.
 - **A second credential entry appears.** 0.5.0 writes `groq.com.dictamelo.desktop.runtime.v1` and keeps the legacy `groq.com.dictamelo.desktop` as a silent migration source, as `secrets.rs` documents. Nothing was deleted.
 
@@ -69,6 +69,25 @@ The installer's own PE header is the x86 NSIS bootstrap for both architectures, 
 - All transcription used the existing personal Groq credential in "Free · your API keys" mode. No account sign-in, free weekly quota or Pro licence path was exercised, so the 30 minutes per week and 180 hours per 30 days figures were read from the interface, not consumed.
 - The in-app updater was not observed applying an update, only declining to offer one.
 - Configuration was backed up before the first-launch test and restored afterwards; `settings.json` SHA-256 `14c5974a…3655` is identical to its pre-test value, and the machine was left with ARM64 0.5.0 installed.
+
+#### Follow-up measurements
+
+**Payload verification with `scripts/windows_payload.py` from `e467b03`.** The helper was read out of that commit into a temporary file outside the working tree and driven against the payloads extracted from the signed draft installers. The compiler output was reconstructed in memory by reversing one `NSS` marker back to `UNK`; the candidate offset was not chosen by hand but accepted only when its **full** SHA-256 equalled the recorded CI `payloadSha256`. Nothing on disk was rewritten.
+
+| | ARM64 | x86_64 |
+| --- | --- | --- |
+| Packaged payload SHA-256 | `b47092f1c9cb7cffb6f3c2a4d0e46872092984bfa6a94e59745cdad408d401e2` | `d2b0a0f19fd2e5f1ed4d70fd89419d29565f06282a30f42cd02c69245d5842f7` |
+| `NSS` offsets in the packaged payload | `0x89013a` | `0x9a55da`, `0x9a55f5` |
+| Offset reversed to `UNK` | `0x89013a` (8,978,746) | `0x9a55f5` (10,114,549) |
+| Reconstructed compiler SHA-256 | `f304984b7133d1c751337c3027f92fc3ca09c065f063f962671e450e0685f207` | `6159f262ac7e5b08bee88df83e8b1141c9f0da6a00d91050428a168a880682dc` |
+| Full CI `payloadSha256` assertion | pass | pass |
+| `verify_payloads` | pass | pass |
+| `preexistingNssMarkers` reported | 0 | 1 |
+| `payloadBytes` | 11,385,344 | 12,990,976 |
+
+Both architectures pass. The helper confirms the packaged payload differs from the compiler output *only* by the documented `UNK`→`NSS` change at the compiler's own marker offset, and that the x64 payload's pre-existing `NSS` string is byte-identical on both sides. The earlier "blocked" note stood only because a single-`NSS` rule cannot describe the x64 binary; with the corrected comparison there is no open question about either artifact.
+
+**Manual update check in About.** The installed ARM64 0.5.0 About page has an **Actualizaciones** row with a **Buscar ahora** button, so the manual check does exist on Windows even though the tray entry is macOS-only. Clicking it changed the row's caption from "Se comprueba sola al abrir…" to **"Estás en la última versión"**, wrote nothing to the log, and left the installed ProductVersion at 0.5.0. The updater endpoint still advertises 0.1.2, so this also confirms the button reports up to date rather than offering a downgrade.
 
 ## 0.4.0 release candidate
 
