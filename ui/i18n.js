@@ -182,6 +182,7 @@ window.I18N = {
     "toast.copied": "Copiado al portapapeles",
     "toast.key_saved": "API key guardada en el Llavero",
     // Variantes para Windows (main.js las prefiere cuando la app no corre en macOS).
+    "history.subtitle.win": "Tus últimas transcripciones, guardadas solo en este equipo.",
     "general.hint.win": "Usa un modificador (Ctrl, Alt, Shift o Win) más una tecla, o F1–F24. Esc cancela.",
     "general.hint.mod.win": "Añade un modificador (Ctrl, Alt, Shift o Win) o usa una tecla F1–F24.",
     "models.apikey.stored.win": "Guardada en el Administrador de credenciales",
