@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 from urllib.parse import urlsplit
 
@@ -151,6 +152,11 @@ def main(argv: list[str] | None = None) -> int:
     environment = os.environ.copy()
     environment.update(values)
     try:
+        if os.name == "nt":
+            # Windows CRT exec can crash under redirected subprocess handles and does not
+            # provide POSIX process replacement semantics. Wait explicitly and propagate
+            # the child's exit status, preserving literal argv and the validated environment.
+            return subprocess.run(command[1:], env=environment, shell=False, check=False).returncode
         os.execvpe(command[1], command[1:], environment)
     except OSError:
         print("The requested build command could not be started.", file=sys.stderr)
