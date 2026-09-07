@@ -7,6 +7,8 @@
 - Keep local transcription independent of accounts and hosted quotas; require explicit consent for optional cloud cleanup of local text.
 - Expose personal-key OpenAI, Mistral and Deepgram alongside Groq, with provider logos and separate cleanup-provider selection.
 - Enable launch at login for new installations while preserving existing preferences.
+- Show saved personal keys as masked fields with explicit Change/Cancel actions, including cleanup and onboarding.
+- Show cloud plans, account actions and Free usage in Models; require authentication for signed-out cloud selection instead of falling back to a stored personal key.
 
 This iteration is developed and tested on Mac. No 0.6.0 Windows installer or public updater manifest is published. See `docs/TESTING.md` for actual verification results.
 

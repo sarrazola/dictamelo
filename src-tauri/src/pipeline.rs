@@ -125,6 +125,11 @@ async fn start_recording(app: &AppHandle) {
     let settings = &plan.settings;
 
     let lang = settings.ui_lang();
+    if plan.route == TranscriptionRoute::SignInRequired {
+        fail(app, t(&lang, "err.cloud_signin_required"));
+        app_windows::show_settings(app);
+        return;
+    }
     // Con Pro la credencial es la licencia, no una API key del usuario: no hay nada que revisar.
     if matches!(plan.route, TranscriptionRoute::FreeCloud | TranscriptionRoute::ProCloud) {
         return start_stream(app, &state, &plan, &lang).await;
@@ -367,6 +372,7 @@ pub(crate) enum TranscriptionRoute {
     Local,
     FreeCloud,
     ProCloud,
+    SignInRequired,
 }
 
 /// Immutable destination and privacy choices for a recording, file batch, or retry.
@@ -409,7 +415,7 @@ impl TranscriptionRoute {
         } else if signed_in {
             Self::FreeCloud
         } else {
-            Self::OwnKey
+            Self::SignInRequired
         }
     }
 }
@@ -432,6 +438,7 @@ pub(crate) async fn transcription_source(
     let settings = &plan.settings;
     let route = plan.route;
     let (provider, api_key) = match route {
+        TranscriptionRoute::SignInRequired => return Err(t(&settings.ui_lang(), "err.cloud_signin_required").into()),
         TranscriptionRoute::ProCloud => (state.backend_provider.clone(), crate::license::stored_key(&state.secrets)),
         TranscriptionRoute::FreeCloud => (state.backend_provider.clone(), Some(format!("Bearer {}", state.account.token().await?))),
         TranscriptionRoute::OwnKey => {
@@ -622,7 +629,7 @@ mod route_tests {
         for (provider, own_key, pro, signed_in, expected) in [
             ("local", false, false, false, TranscriptionRoute::Local),
             ("openai", true, true, true, TranscriptionRoute::OwnKey),
-            ("groq", false, false, false, TranscriptionRoute::OwnKey),
+            ("groq", false, false, false, TranscriptionRoute::SignInRequired),
             ("groq", false, false, true, TranscriptionRoute::FreeCloud),
             ("groq", false, true, true, TranscriptionRoute::ProCloud),
         ] {
@@ -667,7 +674,18 @@ mod route_tests {
         }
         assert_eq!(TranscriptionRoute::from_flags(true, false, true, true), TranscriptionRoute::ProCloud);
         assert_eq!(TranscriptionRoute::from_flags(true, false, false, true), TranscriptionRoute::FreeCloud);
-        assert_eq!(TranscriptionRoute::from_flags(true, false, false, false), TranscriptionRoute::OwnKey);
+        assert_eq!(TranscriptionRoute::from_flags(true, false, false, false), TranscriptionRoute::SignInRequired);
+    }
+
+    #[test]
+    fn signed_out_cloud_selection_requires_auth_instead_of_using_saved_provider_keys() {
+        for provider in ["groq", "openai", "mistral", "deepgram"] {
+            let settings = Settings { provider: provider.into(), use_own_key: false, ..Settings::default() };
+            assert_eq!(TranscriptionRoute::for_settings(&settings, true, false, false), TranscriptionRoute::SignInRequired);
+            assert_eq!(TranscriptionRoute::for_settings(&settings, true, true, false), TranscriptionRoute::ProCloud);
+            assert_eq!(TranscriptionRoute::for_settings(&settings, true, false, true), TranscriptionRoute::FreeCloud);
+            assert_eq!(TranscriptionRoute::for_settings(&settings, false, false, false), TranscriptionRoute::OwnKey);
+        }
     }
 
     #[test]

@@ -100,6 +100,64 @@ function loadUiState(invoke = async () => {}) {
   return { sandbox, calls };
 }
 
+// State-only DOM boundary: values, visibility and accessibility attributes are real
+// assertions here; geometry, CSS and native dialogs need the separate browser checks.
+function loadRenderedUi(invoke = async () => {}) {
+  const loaded = loadUiState(invoke);
+  const controls = new Map();
+  function control(selector) {
+    if (!controls.has(selector)) {
+      const attributes = new Map();
+      const classes = new Set();
+      controls.set(selector, {
+        value: "", textContent: "", hidden: false, disabled: false, readOnly: false,
+        type: "password", style: {}, dataset: {}, children: [],
+        classList: {
+          toggle(name, force) {
+            if (force === undefined) force = !classes.has(name);
+            if (force) classes.add(name); else classes.delete(name);
+            return force;
+          },
+          contains(name) { return classes.has(name); },
+          add(name) { classes.add(name); }, remove(name) { classes.delete(name); },
+        },
+        setAttribute(name, value) { attributes.set(name, String(value)); },
+        getAttribute(name) { return attributes.get(name) ?? null; },
+        removeAttribute(name) { attributes.delete(name); },
+        querySelector(child) { return control(`${selector} ${child}`); },
+        querySelectorAll() { return []; },
+        appendChild(child) { this.children.push(child); },
+        append(...children) { this.children.push(...children); },
+        replaceChildren(...children) { this.children = children; },
+        addEventListener() {}, focus() {}, select() {}, scrollIntoView() {},
+        scrollTo() {}, close() {},
+      });
+    }
+    return controls.get(selector);
+  }
+  loaded.sandbox.document.querySelector = control;
+  loaded.sandbox.document.createElement = tag => control(`created-${tag}-${controls.size}`);
+  loaded.sandbox.state.settings = {
+    provider: "groq", model: "whisper-large-v3", useOwnKey: true,
+    cleanupProvider: "groq", cleanupModel: "openai/gpt-oss-20b", language: "auto",
+  };
+  loaded.sandbox.state.providers = [
+    { id: "groq", name: "Groq", defaultModel: "whisper-large-v3" },
+    { id: "openai", name: "OpenAI", defaultModel: "whisper-1" },
+  ];
+  loaded.sandbox.state.cleaners = [
+    { id: "groq", name: "Groq", keyProvider: "groq" },
+    { id: "openai", name: "OpenAI", keyProvider: "openai" },
+  ];
+  return { ...loaded, control, controls };
+}
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
 test("first-run setup persists its seen flag before opening and never restarts", async () => {
   let saves = 0;
   const { sandbox, calls } = loadUiState(async (command, { settings }) => {
@@ -294,4 +352,303 @@ test("every local catalog description is translated in all interface languages",
   for (const model of catalog.models) {
     for (const language of languages) assert.ok(dictionaries[language][model.description]?.trim(), `${language}: ${model.id} description is missing`);
   }
+});
+
+test("saved provider keys display only a readonly mask and require an explicit change", async () => {
+  const commands = [];
+  const { sandbox, control } = loadRenderedUi(async (command, args) => {
+    commands.push([command, args]);
+    if (command === "get_api_key_status") return { configured: true, hint: "…7xQ9" };
+    assert.fail(`Readonly saved keys must not invoke ${command}`);
+  });
+  for (const [kind, inputId] of [
+    ["transcription", "#api-key"], ["cleanup", "#cleanup-api-key"], ["onboarding", "#onboarding-api-key"],
+  ]) {
+    await sandbox.refreshApiKeyEditor(kind);
+    const input = control(inputId);
+    assert.equal(input.readOnly, true, kind);
+    assert.equal(input.type, "text", kind);
+    assert.match(input.value, /[•*].*7xQ9$/, kind);
+    await sandbox.saveApiKey(kind);
+    sandbox.editApiKey(kind);
+    assert.equal(input.readOnly, false, kind);
+    assert.equal(input.type, "password", kind);
+    assert.equal(input.value, "", "Editing starts empty; the mask is never treated as a credential");
+    input.value = "unsaved-example-only";
+    sandbox.cancelApiKeyEdit(kind);
+    assert.equal(input.readOnly, true, kind);
+    assert.match(input.value, /[•*].*7xQ9$/, kind);
+    assert.equal(input.value.includes("unsaved-example-only"), false);
+  }
+  assert.equal(commands.every(([command]) => command === "get_api_key_status"), true);
+});
+
+test("failed key replacement retains the saved status and Cancel restores its mask", async () => {
+  const writes = [];
+  const { sandbox, control } = loadRenderedUi(async (command, args) => {
+    if (command === "get_api_key_status") return { configured: true, hint: "…old4" };
+    if (command === "set_api_key") {
+      writes.push({ ...args });
+      throw new Error("Credential storage unavailable");
+    }
+    assert.fail(command);
+  });
+  await sandbox.refreshApiKeyEditor("transcription");
+  sandbox.editApiKey("transcription");
+  control("#api-key").value = "replacement-example-only";
+  await sandbox.saveApiKey("transcription");
+  assert.deepEqual(writes, [{ provider: "groq", apiKey: "replacement-example-only" }]);
+  assert.equal(sandbox.state.keyEditors.transcription.busy, false);
+  assert.equal(sandbox.state.keyEditors.transcription.status.configured, true);
+  sandbox.cancelApiKeyEdit("transcription");
+  assert.equal(control("#api-key").readOnly, true);
+  assert.match(control("#api-key").value, /old4$/);
+});
+
+test("a stale key-status response cannot overwrite a newer response for the same provider", async () => {
+  const pending = [];
+  const { sandbox, control } = loadRenderedUi((command) => {
+    assert.equal(command, "get_api_key_status");
+    const request = deferred();
+    pending.push(request);
+    return request.promise;
+  });
+  const first = sandbox.refreshApiKeyEditor("transcription");
+  const second = sandbox.refreshApiKeyEditor("transcription");
+  assert.equal(pending.length, 2);
+  pending[1].resolve({ configured: true, hint: "…new4" });
+  await second;
+  pending[0].resolve({ configured: false, hint: null });
+  await first;
+  assert.equal(control("#api-key").readOnly, true);
+  assert.match(control("#api-key").value, /new4$/);
+});
+
+test("a stale provider lookup failure does not erase the newly selected provider's key", async () => {
+  const pending = [];
+  const { sandbox, control } = loadRenderedUi((command, args) => {
+    assert.equal(command, "get_api_key_status");
+    const request = deferred();
+    pending.push({ ...request, provider: args.provider });
+    return request.promise;
+  });
+  const first = sandbox.refreshApiKeyEditor("transcription");
+  sandbox.state.settings.provider = "openai";
+  const second = sandbox.refreshApiKeyEditor("transcription");
+  assert.deepEqual(pending.map(request => request.provider), ["groq", "openai"]);
+  pending[1].resolve({ configured: true, hint: "…oa44" });
+  await second;
+  pending[0].reject(new Error("Obsolete Groq lookup failed"));
+  await first;
+  assert.match(control("#api-key").value, /oa44$/);
+  assert.doesNotMatch(control("#key-status").textContent, /Obsolete Groq/);
+  assert.equal(sandbox.state.keyEditors.transcription.provider, "openai");
+});
+
+test("a draft key cannot be saved to a provider selected after editing began", async () => {
+  const writes = [];
+  const { sandbox, control } = loadRenderedUi(async (command, args) => {
+    if (command === "get_api_key_status") return { configured: true, hint: "…old4" };
+    writes.push([command, args]);
+  });
+  await sandbox.refreshApiKeyEditor("transcription");
+  sandbox.editApiKey("transcription");
+  control("#api-key").value = "draft-for-groq-only";
+  sandbox.state.settings.provider = "openai";
+  await sandbox.saveApiKey("transcription");
+  assert.deepEqual(writes, [], "Changing provider invalidates the previous editor's draft");
+});
+
+test("saving a shared cleanup key refreshes transcription and onboarding status", async () => {
+  let hint = "…old4";
+  const writes = [];
+  const { sandbox, control } = loadRenderedUi(async (command, args) => {
+    if (command === "get_api_key_status") return { configured: true, hint };
+    if (command === "set_api_key") {
+      writes.push({ ...args });
+      hint = "…new4";
+      return;
+    }
+    assert.fail(command);
+  });
+  await sandbox.refreshKeyStatus();
+  await sandbox.refreshApiKeyEditor("onboarding");
+  sandbox.editApiKey("cleanup");
+  control("#cleanup-api-key").value = "shared-provider-example-new4";
+  await sandbox.saveApiKey("cleanup");
+  assert.deepEqual(writes, [{ provider: "groq", apiKey: "shared-provider-example-new4" }]);
+  for (const input of ["#api-key", "#cleanup-api-key", "#onboarding-api-key"]) {
+    assert.equal(control(input).readOnly, true, input);
+    assert.match(control(input).value, /new4$/, input);
+    assert.equal(control(input).value.includes("shared-provider-example"), false, input);
+  }
+});
+
+test("confirmed deletion clears the shared saved mask and enables empty credential fields", async () => {
+  let configured = true;
+  let deletions = 0;
+  const { sandbox, control } = loadRenderedUi(async (command, args) => {
+    if (command === "get_api_key_status") return { configured, hint: configured ? "…old4" : null };
+    assert.equal(command, "delete_api_key");
+    assert.equal(args.provider, "groq");
+    deletions++;
+    configured = false;
+  });
+  sandbox.setTimeout = () => {};
+  await sandbox.refreshKeyStatus();
+  await sandbox.refreshApiKeyEditor("onboarding");
+  await sandbox.deleteApiKey("transcription");
+  assert.equal(deletions, 0, "The first click only arms confirmation");
+  await sandbox.deleteApiKey("transcription");
+  assert.equal(deletions, 1);
+  for (const input of ["#api-key", "#cleanup-api-key", "#onboarding-api-key"]) {
+    assert.equal(control(input).value, "", input);
+    assert.equal(control(input).readOnly, false, input);
+    assert.equal(control(input).disabled, false, input);
+    assert.equal(control(input).type, "password", input);
+  }
+  assert.equal(sandbox.state.onboarding.keyConfigured, false);
+});
+
+test("a successful replacement followed by a lookup error cannot display the old saved suffix", async () => {
+  let replaced = false;
+  const { sandbox, control } = loadRenderedUi(async (command) => {
+    if (command === "set_api_key") { replaced = true; return; }
+    assert.equal(command, "get_api_key_status");
+    if (replaced) throw new Error("Status lookup failed after save");
+    return { configured: true, hint: "…old4" };
+  });
+  await sandbox.refreshApiKeyEditor("transcription");
+  sandbox.editApiKey("transcription");
+  control("#api-key").value = "replacement-example-only";
+  await sandbox.saveApiKey("transcription");
+  assert.equal(replaced, true);
+  assert.equal(control("#api-key").value, "");
+  assert.equal(sandbox.state.keyEditors.transcription.status, null);
+  assert.match(control("#key-status").textContent, /Status lookup failed after save/);
+});
+
+test("cloud refresh never queries personal provider keys, with or without a signed-in account", async () => {
+  const { sandbox } = loadRenderedUi(() => assert.fail("Cloud status must not read personal credentials"));
+  sandbox.state.settings.useOwnKey = false;
+  sandbox.state.modelsSource = "cloud";
+  for (const signedIn of [false, true]) {
+    for (const active of [false, true]) {
+      sandbox.state.account.signedIn = signedIn;
+      sandbox.state.license.active = active;
+      await sandbox.refreshKeyStatus();
+      await sandbox.refreshCleanupKeyStatus();
+    }
+  }
+});
+
+test("cloud without an account shows available plans without inventing an active plan or quota", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.useOwnKey = false;
+  sandbox.state.modelsSource = "cloud";
+  const view = sandbox.cloudPlanView();
+  assert.equal(view.available, true);
+  assert.equal(view.selected, true);
+  assert.equal(view.signedIn, false);
+  assert.equal(view.plan, null);
+  assert.equal(view.active, false);
+  assert.equal(view.usedSeconds, null);
+  sandbox.renderCloudPlan();
+  assert.equal(control("#models-cloud-notice").hidden, false);
+  assert.equal(control("#cloud-free-badge").hidden, true);
+  assert.equal(control("#cloud-pro-badge").hidden, true);
+  assert.equal(control("#btn-cloud-signin").hidden, false);
+  assert.equal(control("#btn-cloud-signout").hidden, true);
+  assert.equal(control("#cloud-usage").hidden, true);
+});
+
+test("Free cloud reports server usage, limit and renewal rather than a hardcoded allowance", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.useOwnKey = false;
+  sandbox.state.modelsSource = "cloud";
+  sandbox.state.account = { signedIn: true, email: "account@example.com", usedSeconds: 321, limitSeconds: 900, resetsAt: "2030-01-07T00:00:00Z" };
+  const view = sandbox.cloudPlanView();
+  assert.equal(view.plan, "free");
+  assert.equal(view.active, true);
+  assert.equal(view.usedSeconds, 321);
+  assert.equal(view.limitSeconds, 900);
+  assert.equal(view.resetsAt, "2030-01-07T00:00:00Z");
+  sandbox.renderCloudPlan();
+  assert.equal(control("#cloud-free-badge").hidden, false);
+  assert.equal(control("#cloud-pro-badge").hidden, true);
+  assert.equal(control("#btn-cloud-signin").hidden, true);
+  assert.equal(control("#btn-cloud-signout").hidden, false);
+  assert.equal(control("#cloud-usage-progress").hidden, false);
+  assert.equal(control("#cloud-usage-progress").max, 900);
+  assert.equal(control("#cloud-usage-progress").value, 321);
+  assert.match(control("#cloud-account-label").textContent, /account@example.com/);
+});
+
+test("a Pro license works without account login and never displays Free usage as Pro usage", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.useOwnKey = false;
+  sandbox.state.modelsSource = "cloud";
+  sandbox.state.license = { active: true };
+  sandbox.state.account = { signedIn: false, usedSeconds: 100, limitSeconds: 1800 };
+  const view = sandbox.cloudPlanView();
+  assert.equal(view.plan, "pro");
+  assert.equal(view.pro, true);
+  assert.equal(view.active, true);
+  assert.equal(view.signedIn, false);
+  assert.equal(view.usedSeconds, null);
+  assert.equal(view.resetsAt, null);
+  sandbox.renderCloudPlan();
+  assert.equal(control("#cloud-pro-badge").hidden, false);
+  assert.equal(control("#cloud-free-badge").hidden, true);
+  assert.equal(control("#cloud-usage-progress").hidden, true);
+  assert.equal(control("#btn-cloud-signout").hidden, true);
+});
+
+test("a cloud usage error retains account identity and does not report zero consumption", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.useOwnKey = false;
+  sandbox.state.modelsSource = "cloud";
+  sandbox.state.account = { signedIn: true, email: "account@example.com", usedSeconds: null, limitSeconds: 1800, error: "Usage temporarily unavailable" };
+  const view = sandbox.cloudPlanView();
+  assert.equal(view.signedIn, true);
+  assert.equal(view.plan, "free");
+  assert.equal(view.usedSeconds, null);
+  assert.equal(view.error, "Usage temporarily unavailable");
+  sandbox.renderCloudPlan();
+  assert.equal(control("#cloud-usage-progress").hidden, true);
+  assert.equal(control("#cloud-usage-error").hidden, false);
+  assert.equal(control("#cloud-usage-error").textContent, "Usage temporarily unavailable");
+});
+
+test("exhausted Free usage retains the plan and renewal while capping the progress display", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.useOwnKey = false;
+  sandbox.state.modelsSource = "cloud";
+  sandbox.state.account = { signedIn: true, usedSeconds: 1810, limitSeconds: 1800, resetsAt: "2030-01-07T00:00:00Z" };
+  const view = sandbox.cloudPlanView();
+  assert.equal(view.plan, "free");
+  assert.equal(view.usedSeconds, 1810, "The true usage is retained even when the final recording passes the allowance");
+  assert.equal(view.statusKey, "models.cloud.limit_reached");
+  assert.equal(view.resetsAt, "2030-01-07T00:00:00Z");
+  sandbox.renderCloudPlan();
+  assert.equal(control("#cloud-free-badge").hidden, false);
+  assert.equal(control("#cloud-usage-progress").value, 1800);
+  assert.equal(control("#cloud-usage-progress").max, 1800);
+  assert.doesNotMatch(control("#cloud-usage-label").textContent, /-\s*\d/);
+});
+
+test("rendering cloud account details cannot enable cloud routing for a local model", () => {
+  const { sandbox } = loadRenderedUi();
+  sandbox.state.settings = { provider: "local", model: "parakeet-v3", localCleanupCloudEnabled: false };
+  sandbox.state.modelsSource = "local";
+  sandbox.state.account = { signedIn: true, usedSeconds: 100, limitSeconds: 1800 };
+  sandbox.state.license = { active: true };
+  sandbox.renderCloudPlan();
+  assert.equal(sandbox.cloudPlanView().selected, false);
+  assert.equal(sandbox.isHostedMode(), false);
+  assert.equal(sandbox.localCleanupAllowed(), false);
+  assert.equal(sandbox.state.settings.provider, "local");
+  sandbox.state.appInfo = { cloudAvailable: false };
+  sandbox.renderCloudPlan();
+  assert.equal(sandbox.cloudPlanView().available, false);
 });

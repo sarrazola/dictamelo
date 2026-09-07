@@ -136,6 +136,8 @@ nav { display: flex; flex-direction: column; gap: 1px; flex: 1; }
 .actions.full input { flex: 1; min-width: 0; }
 .hint { margin: 0; padding: 0 0 13px; color: var(--muted); font-size: 12px; min-height: 1px; }
 .hint.error { color: var(--err); }
+.label .key-saved, .key-saved { color: var(--ok); }
+input.stored-key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; background: var(--hover); border-color: var(--ok); }
 .footnote { margin: -2px 2px 0; color: var(--faint); font-size: 11.5px; line-height: 1.45; }
 .card .desc { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 textarea {
@@ -458,6 +460,23 @@ body.overlay { background: transparent; overflow: hidden; }
 input[type="email"] { -webkit-user-select: text; user-select: text; }
 
 /* The source picker and model catalog share the existing Settings spacing. */
+.cloud-plan-panel { display: grid; gap: 16px; }
+.cloud-plan-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cloud-plan-heading > strong { font-size: 14px; }
+.cloud-plan-panel > .desc { margin: 0; overflow-wrap: anywhere; }
+.cloud-plan-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cloud-plan-option { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+.cloud-plan-option.selected { border-color: var(--accent); background: var(--accent-soft); }
+.cloud-plan-option p { margin: 0; color: var(--muted); font-size: 12px; }
+.cloud-plan-option > button { margin-top: auto; white-space: normal; }
+.cloud-plan-price { font-size: 19px; }
+.cloud-account-actions { flex-wrap: wrap; }
+.cloud-account-actions button { white-space: normal; }
+.cloud-included-model { border-top: 1px solid var(--border); padding-top: 14px; }
+.cloud-included-model .desc { margin: 6px 0 0; }
+#cloud-usage-label { font-size: 12px; font-weight: 550; }
+.cloud-plan-panel .footnote { margin: 0; }
+@media (max-width: 650px) { .cloud-plan-options { grid-template-columns: minmax(0, 1fr); } }
 .source-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
 .source-picker.standalone { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .source-option { display: grid; gap: 7px; min-width: 0; padding: 15px; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); white-space: normal; }

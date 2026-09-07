@@ -37,6 +37,14 @@ pub fn resolve(lang: &str) -> String {
 /// Devuelve el texto de `key` en `lang`. Las claves desconocidas se devuelven tal cual.
 pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
     match key {
+        "err.cloud_signin_required" => pick(lang, [
+            "Inicia sesión o activa tu licencia Pro para usar la nube de Dictámelo.",
+            "Sign in or activate your Pro license to use Dictámelo Cloud.",
+            "Entre ou ative sua licença Pro para usar a nuvem do Dictámelo.",
+            "Connectez-vous ou activez votre licence Pro pour utiliser le cloud Dictámelo.",
+            "Melde dich an oder aktiviere deine Pro-Lizenz, um die Dictámelo-Cloud zu nutzen.",
+            "Accedi o attiva la tua licenza Pro per usare il cloud di Dictámelo.",
+        ]),
         // --- Estados ---
         "status.idle" => pick(lang, ["Listo", "Ready", "Pronto", "Prêt", "Bereit", "Pronto"]),
         "status.recording" => pick(lang, ["Grabando…", "Recording…", "Gravando…", "Enregistrement…", "Aufnahme…", "Registrazione…"]),

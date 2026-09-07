@@ -214,7 +214,37 @@
         <button class="source-option" data-source="own"><span class="source-symbol" aria-hidden="true">⌘</span><strong data-i18n="models.source.own"></strong><span data-i18n="models.source.own.desc"></span></button>
         <button class="source-option" data-source="local"><span class="source-symbol" aria-hidden="true">▣</span><strong data-i18n="models.source.local"></strong><span data-i18n="models.source.local.desc"></span></button>
       </div>
-      <div id="models-cloud-notice" class="card" hidden><div class="row stack"><div class="label"><strong data-i18n="models.cloud.title"></strong><span id="models-cloud-desc"></span></div><button id="btn-models-own" class="ghost" data-i18n="plan.own.choose"></button></div></div>
+      <div id="models-cloud-notice" class="card cloud-plan-panel" hidden>
+        <div class="cloud-plan-heading"><strong data-i18n="models.cloud.account_title"></strong><span id="models-cloud-status" class="model-tag" role="status"></span></div>
+        <p id="cloud-account-label" class="desc"></p>
+        <div class="cloud-plan-options">
+          <div id="cloud-plan-free" class="cloud-plan-option">
+            <div class="cloud-plan-heading"><strong data-i18n="plan.free.name"></strong><span id="cloud-free-badge" class="plan-badge" data-i18n="plan.current" hidden></span></div>
+            <strong class="cloud-plan-price" data-i18n="plan.free.price"></strong>
+            <p data-i18n="plan.free.f1"></p><p data-i18n="plan.free.f2"></p><p data-i18n="plan.free.f4"></p>
+            <button id="btn-cloud-free" class="ghost" data-i18n="account.create"></button>
+          </div>
+          <div id="cloud-plan-pro" class="cloud-plan-option">
+            <div class="cloud-plan-heading"><strong data-i18n="plan.pro.name"></strong><span id="cloud-pro-badge" class="plan-badge" data-i18n="plan.current" hidden></span></div>
+            <strong class="cloud-plan-price" data-i18n="plan.pro.price"></strong>
+            <p data-i18n="plan.pro.f2"></p><p data-i18n="plan.pro.f3"></p><p data-i18n="plan.pro.f4"></p>
+            <button id="btn-cloud-pro" class="primary" data-i18n="plan.get"></button>
+          </div>
+        </div>
+        <div id="cloud-usage" class="usage-panel" hidden>
+          <strong id="cloud-usage-label"></strong>
+          <progress id="cloud-usage-progress" max="1800" value="0" data-i18n-aria-label="account.usage.audio_label"></progress>
+          <span id="cloud-usage-renews" class="footnote"></span>
+        </div>
+        <p id="cloud-usage-error" class="footnote error-text" role="status" hidden></p>
+        <div id="cloud-account-actions" class="actions cloud-account-actions">
+          <button id="btn-cloud-signin" class="primary" data-i18n="account.signin"></button>
+          <button id="btn-cloud-refresh" class="ghost" data-i18n="account.refresh" hidden></button>
+          <button id="btn-cloud-signout" class="ghost" data-i18n="account.signout" hidden></button>
+          <button id="btn-cloud-manage" class="ghost" data-i18n="models.cloud.manage"></button>
+        </div>
+        <div class="cloud-included-model"><strong data-i18n="models.cloud.title"></strong><p id="models-cloud-desc" class="desc" data-i18n="models.cloud.included"></p></div>
+      </div>
       <div class="card byok-models">
         <div id="provider-choices" class="provider-choices" role="group" data-i18n-aria-label="models.provider"></div>
         <div class="provider-model-row">
@@ -224,10 +254,12 @@
         <p id="model-description" class="desc"></p>
         <p id="legacy-provider-note" class="footnote" hidden></p>
         <div class="row stack">
-          <div class="label"><strong data-i18n="models.apikey"></strong><span id="key-status"></span></div>
+          <div class="label"><strong data-i18n="models.apikey"></strong><span id="key-status" role="status"></span></div>
           <div class="actions full">
-            <input id="api-key" type="password" autocomplete="off" spellcheck="false">
+            <input id="api-key" type="password" autocomplete="off" spellcheck="false" data-i18n-aria-label="models.apikey" aria-describedby="key-status">
             <button id="btn-save-key" class="primary" data-i18n="models.save"></button>
+            <button id="btn-change-key" class="ghost" hidden data-i18n="models.apikey.change"></button>
+            <button id="btn-cancel-key" class="ghost" hidden data-i18n="general.cancel"></button>
             <button id="btn-delete-key" class="ghost danger" hidden data-i18n="models.delete"></button>
           </div>
         </div>
@@ -267,7 +299,7 @@
             <div class="label"><strong data-i18n="models.cleanup.model"></strong><span id="cleanup-model-desc"></span></div>
             <div class="actions"><select id="cleanup-model"></select></div>
           </div>
-          <div id="cleanup-key-form" class="row stack"><div class="label"><strong data-i18n="models.apikey"></strong><span id="cleanup-key-status" role="status"></span></div><div class="actions full"><input id="cleanup-api-key" type="password" autocomplete="off" spellcheck="false" data-i18n-aria-label="models.apikey"><button id="btn-save-cleanup-key" class="primary" data-i18n="models.save"></button><button id="btn-delete-cleanup-key" class="ghost danger" data-i18n="models.delete" hidden></button></div><button id="link-cleanup-key" class="link" data-i18n="models.getkey"></button></div>
+          <div id="cleanup-key-form" class="row stack"><div class="label"><strong data-i18n="models.apikey"></strong><span id="cleanup-key-status" role="status"></span></div><div class="actions full"><input id="cleanup-api-key" type="password" autocomplete="off" spellcheck="false" data-i18n-aria-label="models.apikey" aria-describedby="cleanup-key-status"><button id="btn-save-cleanup-key" class="primary" data-i18n="models.save"></button><button id="btn-change-cleanup-key" class="ghost" hidden data-i18n="models.apikey.change"></button><button id="btn-cancel-cleanup-key" class="ghost" hidden data-i18n="general.cancel"></button><button id="btn-delete-cleanup-key" class="ghost danger" data-i18n="models.delete" hidden></button></div><button id="link-cleanup-key" class="link" data-i18n="models.getkey"></button></div>
           <div class="row" id="cleanup-prompt-row">
             <div class="label"><strong data-i18n="models.cleanup.prompt"></strong><span data-i18n="models.cleanup.prompt.desc"></span></div>
             <div class="actions">
@@ -426,8 +458,8 @@
             <label><span data-i18n="models.model"></span><select id="onboarding-model"></select></label>
           </div>
           <p id="onboarding-key-status" class="footnote" role="status"></p>
-          <label><span data-i18n="models.apikey"></span><input id="onboarding-api-key" type="password" autocomplete="off" spellcheck="false"></label>
-          <div class="actions"><button type="submit" class="primary" data-i18n="models.save"></button><button id="onboarding-get-key" type="button" class="link" data-i18n="models.getkey"></button></div>
+          <label><span data-i18n="models.apikey"></span><input id="onboarding-api-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="onboarding-key-status"></label>
+          <div class="actions"><button id="btn-save-onboarding-key" type="submit" class="primary" data-i18n="models.save"></button><button id="btn-change-onboarding-key" type="button" class="ghost" hidden data-i18n="models.apikey.change"></button><button id="btn-cancel-onboarding-key" type="button" class="ghost" hidden data-i18n="general.cancel"></button><button id="onboarding-get-key" type="button" class="link" data-i18n="models.getkey"></button></div>
           <p class="footnote" data-i18n="models.privacy"></p>
         </form>
         <div id="onboarding-account"></div>

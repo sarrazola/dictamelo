@@ -28,6 +28,7 @@ const ui = {
   googlePending: false,
   onboarding: { step: 1, mode: "free", keyConfigured: false },
   accountBusy: false,
+  keyEditors: {},
   update: { available: false, installed: false, busy: false },
   deleteArmed: false,
 };
@@ -71,7 +72,6 @@ function applyStaticText() {
   for (const el of $$("[data-i18n]")) el.textContent = t(el.dataset.i18n);
   for (const el of $$("[data-i18n-aria-label]")) el.setAttribute("aria-label", t(el.dataset.i18nAriaLabel));
   $("#btn-change-hotkey").textContent = t(ui.capturing ? "general.cancel" : "general.change");
-  $("#api-key").placeholder = t("models.apikey.placeholder");
   $("#vocabulary").placeholder = t("models.vocab.placeholder");
   $("#btn-toggle-prompt").textContent = t($("#prompt-editor").hidden ? "models.cleanup.edit" : "models.cleanup.hide");
 }
@@ -171,11 +171,11 @@ function modelDescription(model) {
 
 function isLocalMode() { return ui.settings?.provider === "local"; }
 function isHostedMode() { return !isLocalMode() && cloudAvailable() && !ui.settings.useOwnKey && (ui.license.active || ui.account.signedIn); }
-function activeSource() { return isLocalMode() ? "local" : isHostedMode() ? "cloud" : "own"; }
+function activeSource() { return isLocalMode() ? "local" : cloudAvailable() && !ui.settings.useOwnKey ? "cloud" : "own"; }
 function localCleanupAllowed() { return !isLocalMode() || ui.settings.localCleanupCloudEnabled === true; }
 
 function renderCleanup() {
-  const hosted = isHostedMode();
+  const hosted = isHostedMode() || (cloudAvailable() && (ui.modelsSource || activeSource()) === "cloud");
   const freeCloud = hosted && !ui.license.active;
   const enabled = ui.settings.cleanupEnabled && localCleanupAllowed();
   $("#cleanup-enabled").disabled = !localCleanupAllowed();
@@ -284,11 +284,6 @@ async function chooseSource(source) {
     else await saveSettings({ useOwnKey: true });
   } else {
     if (!(await saveSettings(cloudSourcePatch()))) return;
-    if (!ui.account.signedIn && !ui.license.active) {
-      showPage("plan");
-      setAuthMode("signup");
-      $("#account-card").scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   }
   return true;
 }
@@ -320,11 +315,10 @@ function renderModels() {
   });
   $(".source-picker").classList.toggle("standalone", !cloudAvailable());
   $("#dropzone .formats").textContent = t(hosted && !ui.license.active ? "files.formats.free" : "files.formats");
-  $("#models-cloud-notice").hidden = source !== "cloud";
-  $("#models-cloud-desc").textContent = t(ui.license.active ? "models.cloud.pro" : "models.cloud.free");
+  renderCloudPlan();
   $$(".byok-models").forEach(el => el.hidden = source !== "own");
   $("#local-models-home").hidden = source !== "local";
-  $("#models-privacy-note").textContent = t(isLocalMode() ? (localCleanupAllowed() && ui.settings.cleanupEnabled ? "models.local.privacy_cleanup" : "models.local.privacy") : "models.privacy");
+  $("#models-privacy-note").textContent = t(source === "cloud" ? "models.cloud.privacy" : isLocalMode() ? (localCleanupAllowed() && ui.settings.cleanupEnabled ? "models.local.privacy_cleanup" : "models.local.privacy") : "models.privacy");
   renderProviderChoices();
   renderLocalModels();
   const selected = renderProviderSelection($("#provider-select"), $("#model-select"));
@@ -617,8 +611,185 @@ async function refreshPermissions() {
   }
 }
 
+// Only the stored key's hint crosses IPC. The masked value is never a credential.
+const KEY_EDITORS = {
+  transcription: { input: "api-key", status: "key-status", suffix: "key", link: "link-key" },
+  cleanup: { input: "cleanup-api-key", status: "cleanup-key-status", suffix: "cleanup-key", link: "link-cleanup-key" },
+  onboarding: { input: "onboarding-api-key", status: "onboarding-key-status", suffix: "onboarding-key", link: "onboarding-get-key" },
+};
+
+function keyProvider(kind) {
+  const provider = kind === "cleanup" ? currentCleaner() : currentProvider();
+  return provider && { id: provider.keyProvider || provider.id, name: provider.name };
+}
+
+function keyEditor(kind) {
+  const provider = keyProvider(kind)?.id;
+  let editor = ui.keyEditors[kind];
+  if (!editor || editor.provider !== provider) {
+    editor = { provider, status: null, editing: false, busy: false, error: null, request: 0, deleteArmed: false };
+    ui.keyEditors[kind] = editor;
+    $(`#${KEY_EDITORS[kind].input}`).value = "";
+  }
+  return editor;
+}
+
+function renderKeyEditor(kind) {
+  const spec = KEY_EDITORS[kind];
+  const editor = keyEditor(kind);
+  const input = $(`#${spec.input}`);
+  const stored = editor.status?.configured === true;
+  const locked = stored && !editor.editing;
+  const label = $(`#${spec.status}`);
+  input.readOnly = locked;
+  input.type = locked ? "text" : "password";
+  input.disabled = editor.busy || !editor.status;
+  input.classList.toggle("stored-key", locked);
+  input.placeholder = t(stored ? "models.apikey.replace" : "models.apikey.placeholder");
+  if (locked) input.value = `•••• ••••${editor.status.hint ? ` ${Array.from(editor.status.hint).slice(-4).join("")}` : ""}`;
+  label.textContent = editor.error || (stored ? t("models.apikey.saved") : editor.status ? t("models.apikey.missing", { p: keyProvider(kind)?.name }) : t("models.apikey.checking"));
+  label.classList.toggle("key-saved", stored && !editor.error);
+  label.classList.toggle("error-text", !!editor.error);
+  const save = $(`#btn-save-${spec.suffix}`);
+  save.hidden = locked;
+  save.disabled = editor.busy || !editor.status || !input.value.trim();
+  const change = $(`#btn-change-${spec.suffix}`);
+  change.hidden = !locked;
+  change.disabled = editor.busy;
+  const cancel = $(`#btn-cancel-${spec.suffix}`);
+  cancel.hidden = !stored || !editor.editing;
+  cancel.disabled = editor.busy;
+  const remove = $(`#btn-delete-${spec.suffix}`);
+  if (remove) {
+    remove.hidden = !locked;
+    remove.disabled = editor.busy;
+    remove.textContent = t(editor.deleteArmed ? "models.confirm" : "models.delete");
+  }
+  $(`#${spec.link}`).hidden = stored && !editor.editing;
+}
+
+function editApiKey(kind) {
+  const editor = keyEditor(kind);
+  if (editor.busy || !editor.status?.configured) return;
+  editor.editing = true;
+  editor.deleteArmed = false;
+  editor.error = null;
+  $(`#${KEY_EDITORS[kind].input}`).value = "";
+  renderKeyEditor(kind);
+  $(`#${KEY_EDITORS[kind].input}`).focus();
+}
+
+function cancelApiKeyEdit(kind) {
+  const editor = keyEditor(kind);
+  if (editor.busy) return;
+  editor.editing = false;
+  editor.error = null;
+  $(`#${KEY_EDITORS[kind].input}`).value = "";
+  renderKeyEditor(kind);
+}
+
+async function refreshApiKeyEditor(kind) {
+  const editor = keyEditor(kind);
+  const request = ++editor.request;
+  renderKeyEditor(kind);
+  if (!editor.provider || editor.provider === "local") return;
+  try {
+    const status = await invoke("get_api_key_status", { provider: editor.provider });
+    if (ui.keyEditors[kind] !== editor || keyProvider(kind)?.id !== editor.provider || request !== editor.request) return;
+    editor.status = status;
+    editor.error = null;
+  } catch (err) {
+    if (ui.keyEditors[kind] !== editor || keyProvider(kind)?.id !== editor.provider || request !== editor.request) return;
+    editor.error = String(err);
+  }
+  renderKeyEditor(kind);
+  if (kind === "onboarding") {
+    ui.onboarding.keyConfigured = editor.status?.configured === true;
+    renderOnboardingNext();
+  }
+}
+
+async function refreshProviderKeyEditors(provider) {
+  await Promise.all(Object.keys(KEY_EDITORS).filter(kind => keyProvider(kind)?.id === provider).map(kind => {
+    const editor = keyEditor(kind);
+    editor.editing = false;
+    editor.deleteArmed = false;
+    editor.status = null;
+    $(`#${KEY_EDITORS[kind].input}`).value = "";
+    return refreshApiKeyEditor(kind);
+  }));
+  if (!isLocalMode()) {
+    $("#foot-dot").style.background = isHostedMode() || keyEditor("transcription").status?.configured ? "var(--ok)" : "var(--warn)";
+  }
+}
+
+async function saveApiKey(kind) {
+  const editor = keyEditor(kind);
+  const input = $(`#${KEY_EDITORS[kind].input}`);
+  if (editor.busy || !editor.status || (editor.status.configured && !editor.editing) || input.readOnly) return;
+  const key = input.value.trim();
+  if (!key) return;
+  editor.busy = true;
+  ++editor.request;
+  renderKeyEditor(kind);
+  try {
+    await invoke("set_api_key", { provider: editor.provider, apiKey: key });
+    await refreshProviderKeyEditors(editor.provider);
+    toast(t("toast.key_saved"));
+  } catch (err) { toast(String(err), true); }
+  finally {
+    editor.busy = false;
+    renderKeyEditor(kind);
+  }
+}
+
+async function deleteApiKey(kind) {
+  const editor = keyEditor(kind);
+  if (editor.busy || !editor.status?.configured || editor.editing) return;
+  if (!editor.deleteArmed) {
+    editor.deleteArmed = true;
+    renderKeyEditor(kind);
+    setTimeout(() => {
+      editor.deleteArmed = false;
+      if (ui.keyEditors[kind] === editor) renderKeyEditor(kind);
+    }, 4000);
+    return;
+  }
+  editor.busy = true;
+  ++editor.request;
+  renderKeyEditor(kind);
+  try {
+    await invoke("delete_api_key", { provider: editor.provider });
+    editor.status = { configured: false, hint: null };
+    await refreshProviderKeyEditors(editor.provider);
+    toast(t("toast.key_deleted"));
+  } catch (err) { toast(String(err), true); }
+  finally {
+    editor.busy = false;
+    editor.deleteArmed = false;
+    renderKeyEditor(kind);
+  }
+}
+
+function bindKeyEditor(kind) {
+  const spec = KEY_EDITORS[kind];
+  $(`#btn-change-${spec.suffix}`).addEventListener("click", () => editApiKey(kind));
+  $(`#btn-cancel-${spec.suffix}`).addEventListener("click", () => cancelApiKeyEdit(kind));
+  $(`#btn-save-${spec.suffix}`).addEventListener("click", e => { e.preventDefault(); saveApiKey(kind); });
+  $(`#btn-delete-${spec.suffix}`)?.addEventListener("click", () => deleteApiKey(kind));
+  $(`#${spec.input}`).addEventListener("input", () => renderKeyEditor(kind));
+  $(`#${spec.input}`).addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); saveApiKey(kind); }
+    if (e.key === "Escape" && keyEditor(kind).editing) { e.preventDefault(); e.stopPropagation(); cancelApiKeyEdit(kind); }
+  });
+}
+
 async function refreshKeyStatus() {
-  refreshCleanupKeyStatus();
+  if (!isLocalMode() && cloudAvailable() && !ui.settings.useOwnKey) {
+    $("#foot-dot").style.background = isHostedMode() ? "var(--ok)" : "var(--warn)";
+    return;
+  }
+  await refreshCleanupKeyStatus();
   if (isLocalMode()) {
     const model = ui.localModels.find(item => item.id === ui.settings.model);
     $("#foot-dot").style.background = model?.installed ? "var(--ok)" : "var(--warn)";
@@ -626,35 +797,14 @@ async function refreshKeyStatus() {
   }
   const provider = currentProvider();
   if (!provider) return;
-  try {
-    const status = await invoke("get_api_key_status", { provider: provider.id });
-    if (provider.id !== ui.settings.provider) return;
-    $("#key-status").textContent = status.configured
-      ? `${t("models.apikey.stored")}${status.hint ? ` (${status.hint})` : ""}`
-      : t("models.apikey.missing", { p: provider.name });
-    $("#btn-delete-key").hidden = !status.configured;
-    $("#api-key").placeholder = t(status.configured ? "models.apikey.replace" : "models.apikey.placeholder");
-    $("#foot-dot").style.background = status.configured || isHostedMode() ? "var(--ok)" : "var(--warn)";
-  } catch (err) {
-    $("#key-status").textContent = String(err);
-  }
-  ui.deleteArmed = false;
-  $("#btn-delete-key").textContent = t("models.delete");
+  await refreshApiKeyEditor("transcription");
+  $("#foot-dot").style.background = keyEditor("transcription").status?.configured || isHostedMode() ? "var(--ok)" : "var(--warn)";
 }
 
 async function refreshCleanupKeyStatus() {
   const cleaner = currentCleaner();
-  if (!cleaner || isHostedMode()) return;
-  const provider = cleaner.keyProvider || cleaner.id;
-  try {
-    const status = await invoke("get_api_key_status", { provider });
-    if ((currentCleaner()?.keyProvider || currentCleaner()?.id) !== provider) return;
-    $("#cleanup-key-status").textContent = status.configured ? `${t("models.apikey.stored")}${status.hint ? ` (${status.hint})` : ""}` : t("models.apikey.missing", { p: cleaner.name });
-    $("#cleanup-api-key").placeholder = t(status.configured ? "models.apikey.replace" : "models.apikey.placeholder");
-    $("#btn-delete-cleanup-key").hidden = !status.configured;
-  } catch (err) { $("#cleanup-key-status").textContent = String(err); }
-  ui.cleanupDeleteArmed = false;
-  $("#btn-delete-cleanup-key").textContent = t("models.delete");
+  if (!cleaner || (!isLocalMode() && cloudAvailable() && !ui.settings.useOwnKey)) return;
+  await refreshApiKeyEditor("cleanup");
 }
 
 // ---------- Actualizaciones ----------
@@ -725,6 +875,76 @@ function openUpdateCheck() {
 
 // ---------- Plan y licencia ----------
 
+// Keep entitlement, chosen source and metered Free usage distinct. License status does
+// not contain Pro usage telemetry, so never substitute the Free meter or invent zero.
+function cloudPlanView() {
+  const a = ui.account;
+  const pro = ui.license.active === true;
+  const signedIn = a.signedIn === true;
+  const available = cloudAvailable();
+  const selected = available && (ui.modelsSource || activeSource()) === "cloud";
+  const active = available && isHostedMode();
+  const usedSeconds = !pro && signedIn && Number.isFinite(a.usedSeconds) && a.usedSeconds >= 0 ? a.usedSeconds : null;
+  const limitSeconds = pro ? window.PLAN_LIMITS.proHours * 3600 : Number.isFinite(a.limitSeconds) && a.limitSeconds > 0 ? a.limitSeconds : window.PLAN_LIMITS.freeMinutes * 60;
+  return {
+    available, selected, active, pro, signedIn,
+    plan: pro ? "pro" : signedIn ? "free" : null,
+    usedSeconds,
+    limitSeconds,
+    resetsAt: !pro && signedIn && a.resetsAt ? a.resetsAt : null,
+    error: pro ? ui.license.message || null : a.error || null,
+    statusKey: usedSeconds !== null && usedSeconds >= limitSeconds ? "models.cloud.limit_reached" : active ? "models.cloud.active" : pro || signedIn ? "models.cloud.ready" : "models.cloud.needs_account",
+  };
+}
+
+function renderCloudPlan() {
+  const view = cloudPlanView();
+  $("#models-cloud-notice").hidden = !view.selected;
+  $("#models-cloud-status").textContent = t(view.statusKey);
+  $("#cloud-account-label").textContent = view.signedIn
+    ? t("models.cloud.signed_in", { email: ui.account.email || "" })
+    : t(view.pro ? "models.cloud.license_only" : "models.cloud.signed_out");
+  for (const plan of ["free", "pro"]) {
+    const current = view.plan === plan;
+    $(`#cloud-${plan}-badge`).hidden = !current;
+    $(`#cloud-plan-${plan}`).classList.toggle("selected", current);
+  }
+  $("#btn-cloud-free").textContent = t(view.pro ? "models.cloud.free_available" : view.signedIn ? "plan.current" : "account.create");
+  $("#btn-cloud-free").disabled = view.signedIn && !view.pro;
+  $("#btn-cloud-pro").textContent = t(view.pro ? "models.cloud.manage_license" : "plan.get");
+  $("#btn-cloud-signin").hidden = view.signedIn;
+  $("#btn-cloud-signout").hidden = !view.signedIn;
+  $("#btn-cloud-signout").disabled = ui.accountBusy;
+  $("#btn-cloud-refresh").hidden = !view.signedIn || view.pro;
+  $("#btn-cloud-refresh").disabled = ui.accountBusy;
+  $("#cloud-usage").hidden = !view.plan;
+  $("#cloud-usage-label").textContent = view.pro ? t("models.cloud.pro_usage_unavailable") : view.usedSeconds === null ? t("account.unavailable") : t("account.usage", {
+    used: (view.usedSeconds / 60).toLocaleString(ui.lang, { maximumFractionDigits: 1 }),
+    limit: (view.limitSeconds / 60).toLocaleString(ui.lang, { maximumFractionDigits: 1 }),
+    remaining: (Math.max(0, view.limitSeconds - view.usedSeconds) / 60).toLocaleString(ui.lang, { maximumFractionDigits: 1 }),
+  });
+  $("#cloud-usage-progress").hidden = view.usedSeconds === null;
+  $("#cloud-usage-progress").max = view.limitSeconds;
+  $("#cloud-usage-progress").value = Math.min(view.limitSeconds, view.usedSeconds || 0);
+  const resetDate = view.resetsAt ? new Date(view.resetsAt) : null;
+  $("#cloud-usage-renews").textContent = resetDate && !Number.isNaN(resetDate.valueOf()) ? t("account.renews", { date: resetDate.toLocaleString(ui.lang) }) : "";
+  $("#cloud-usage-error").hidden = !view.error;
+  $("#cloud-usage-error").textContent = view.error || "";
+  $("#models-cloud-desc").textContent = t("models.cloud.included");
+}
+
+function openCloudAccount(mode) {
+  showPage("plan");
+  if (!ui.account.signedIn) setAuthMode(mode || "signin");
+  $("#account-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!ui.account.signedIn) $("#account-email").focus({ preventScroll: true });
+}
+
+function openCloudLicense() {
+  showPage("plan");
+  $("#license-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function renderPlan() {
   renderAccount();
   renderSidebar();
@@ -738,7 +958,7 @@ function renderPlan() {
   $(".plans").classList.toggle("standalone", !available);
   $(".plans + .footnote").hidden = !available;
   const active = ui.license.active;
-  const mode = isLocalMode() ? "local" : !available || ui.settings.useOwnKey || (!active && !ui.account.signedIn) ? "own" : active ? "pro" : "free";
+  const mode = isLocalMode() ? "local" : !available || ui.settings.useOwnKey ? "own" : active ? "pro" : ui.account.signedIn ? "free" : null;
   for (const id of ["own", "free", "pro"]) {
     $(`#plan-${id}`).querySelector(".plan-badge").hidden = id !== mode;
     $(`#plan-${id}`).classList.toggle("featured", id === mode);
@@ -793,6 +1013,7 @@ function renderAccount() {
   $("#usage-progress").max = limit;
   $("#usage-progress").value = Math.min(limit, used || 0);
   $("#usage-renews").textContent = a.resetsAt ? t("account.renews", { date: new Date(a.resetsAt).toLocaleString(ui.lang) }) : "";
+  renderCloudPlan();
   renderOnboardingNext();
 }
 
@@ -916,17 +1137,7 @@ function renderOnboarding() {
 }
 
 async function refreshOnboardingKey() {
-  try {
-    const provider = ui.settings.provider;
-    const status = await invoke("get_api_key_status", { provider });
-    if (provider !== ui.settings.provider) return;
-    ui.onboarding.keyConfigured = status.configured;
-    $("#onboarding-key-status").textContent = status.configured ? t("models.apikey.stored") : t("models.apikey.missing", { p: currentProvider().name });
-  } catch (err) {
-    ui.onboarding.keyConfigured = false;
-    $("#onboarding-key-status").textContent = String(err);
-  }
-  renderOnboardingNext();
+  await refreshApiKeyEditor("onboarding");
 }
 
 async function refreshLicense() {
@@ -1110,6 +1321,7 @@ function renderAll() {
   renderPlan();
   renderUpdate();
   renderOnboarding();
+  for (const kind of Object.keys(KEY_EDITORS)) renderKeyEditor(kind);
 }
 
 // ---------- Acciones ----------
@@ -1247,28 +1459,6 @@ function wireEvents() {
     $("#cleanup-api-key").value = "";
     saveSettings({ cleanupProvider: cleaner.id, cleanupModel: cleaner.defaultModel });
   });
-  $("#btn-save-cleanup-key").addEventListener("click", async () => {
-    const input = $("#cleanup-api-key");
-    const key = input.value.trim();
-    if (!key) return;
-    const cleaner = currentCleaner();
-    try {
-      await invoke("set_api_key", { provider: cleaner.keyProvider || cleaner.id, apiKey: key });
-      input.value = "";
-      await refreshKeyStatus();
-      toast(t("toast.key_saved"));
-    } catch (err) { toast(String(err), true); }
-  });
-  $("#cleanup-api-key").addEventListener("keydown", e => { if (e.key === "Enter") $("#btn-save-cleanup-key").click(); });
-  $("#btn-delete-cleanup-key").addEventListener("click", async () => {
-    if (!ui.cleanupDeleteArmed) { ui.cleanupDeleteArmed = true; $("#btn-delete-cleanup-key").textContent = t("models.confirm"); return; }
-    const cleaner = currentCleaner();
-    try {
-      await invoke("delete_api_key", { provider: cleaner.keyProvider || cleaner.id });
-      await refreshKeyStatus();
-      toast(t("toast.key_deleted"));
-    } catch (err) { toast(String(err), true); }
-  });
   $("#link-cleanup-key").addEventListener("click", () => {
     const cleaner = currentCleaner();
     const provider = ui.providers.find(item => item.id === (cleaner.keyProvider || cleaner.id));
@@ -1288,40 +1478,7 @@ function wireEvents() {
   });
   $("#btn-reset-prompt").addEventListener("click", () => saveSettings({ cleanupPrompt: "" }));
 
-  $("#btn-save-key").addEventListener("click", async () => {
-    const input = $("#api-key");
-    const key = input.value.trim();
-    if (!key) return;
-    try {
-      await invoke("set_api_key", { provider: ui.settings.provider, apiKey: key });
-      input.value = "";
-      toast(t("toast.key_saved"));
-      await refreshKeyStatus();
-    } catch (err) {
-      toast(String(err), true);
-    }
-  });
-  $("#api-key").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("#btn-save-key").click();
-  });
-  $("#btn-delete-key").addEventListener("click", async () => {
-    if (!ui.deleteArmed) {
-      ui.deleteArmed = true;
-      $("#btn-delete-key").textContent = t("models.confirm");
-      setTimeout(() => {
-        ui.deleteArmed = false;
-        $("#btn-delete-key").textContent = t("models.delete");
-      }, 4000);
-      return;
-    }
-    try {
-      await invoke("delete_api_key", { provider: ui.settings.provider });
-      toast(t("toast.key_deleted"));
-      await refreshKeyStatus();
-    } catch (err) {
-      toast(String(err), true);
-    }
-  });
+  for (const kind of Object.keys(KEY_EDITORS)) bindKeyEditor(kind);
   $("#link-key").addEventListener("click", () =>
     invoke("open_url", { url: currentProvider().keyUrl }).catch((e) => toast(String(e), true)));
 
@@ -1417,19 +1574,17 @@ function wireEvents() {
   });
   $("#onboarding-language").addEventListener("change", e => saveSettings({ language: e.target.value }));
   $("#onboarding-model").addEventListener("change", e => saveSettings({ model: e.target.value }));
-  $("#onboarding-key-form").addEventListener("submit", async e => {
+  $("#onboarding-key-form").addEventListener("submit", e => {
     e.preventDefault();
-    const input = $("#onboarding-api-key");
-    if (!input.value.trim()) return;
-    try {
-      await invoke("set_api_key", { provider: ui.settings.provider, apiKey: input.value.trim() });
-      input.value = "";
-      await Promise.all([refreshOnboardingKey(), refreshKeyStatus()]);
-      toast(t("toast.key_saved"));
-    } catch (err) { toast(String(err), true); }
+    saveApiKey("onboarding");
   });
   $("#onboarding-get-key").addEventListener("click", () => invoke("open_url", { url: currentProvider().keyUrl }).catch(e => toast(String(e), true)));
-  $("#btn-models-own").addEventListener("click", () => chooseSource("own"));
+  $("#btn-cloud-free").addEventListener("click", () => openCloudAccount("signup"));
+  $("#btn-cloud-signin").addEventListener("click", () => openCloudAccount("signin"));
+  $("#btn-cloud-manage").addEventListener("click", () => showPage("plan"));
+  $("#btn-cloud-pro").addEventListener("click", () => ui.license.active ? openCloudLicense() : checkout());
+  $("#btn-cloud-signout").addEventListener("click", () => $("#btn-signout").click());
+  $("#btn-cloud-refresh").addEventListener("click", () => $("#btn-refresh-usage").click());
   $("#btn-use-own").addEventListener("click", async () => { await chooseSource("own"); showPage("models"); });
   $("#btn-use-cloud").addEventListener("click", async () => {
     ui.modelsSource = "cloud";

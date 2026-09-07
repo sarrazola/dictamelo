@@ -933,6 +933,18 @@ window.I18N = {
   },
 };
 
+// A saved key is recognizable without retrieving its secret into the webview.
+for (const [lang, labels] of Object.entries({
+  en: ["API key saved", "Change", "Checking saved key…"],
+  es: ["API key guardada", "Cambiar", "Comprobando la clave guardada…"],
+  pt: ["Chave de API salva", "Alterar", "Verificando a chave salva…"],
+  fr: ["Clé API enregistrée", "Modifier", "Vérification de la clé enregistrée…"],
+  de: ["API-Schlüssel gespeichert", "Ändern", "Gespeicherten Schlüssel prüfen…"],
+  it: ["API key salvata", "Modifica", "Verifica della chiave salvata…"],
+})) Object.assign(window.I18N[lang], {
+  "models.apikey.saved": labels[0], "models.apikey.change": labels[1], "models.apikey.checking": labels[2],
+});
+
 // Nombres nativos, no se traducen.
 window.UI_LANGUAGE_NAMES = {
   es: "Español", en: "English", pt: "Português", fr: "Français", de: "Deutsch", it: "Italiano",
@@ -941,6 +953,107 @@ window.UI_LANGUAGE_NAMES = {
 
 // Shared display limit. Keep aligned with the enforced cloud quota.
 window.PLAN_LIMITS = Object.freeze({ proHours: 180, freeMinutes: 30 });
+
+// Cloud account summaries reuse the account and license actions from Plan.
+const CLOUD_ACCOUNT_COPY = {
+  es: {
+    "models.cloud.account_title": "Tu plan de nube",
+    "models.cloud.active": "En uso",
+    "models.cloud.limit_reached": "Cupo semanal agotado",
+    "models.cloud.ready": "Disponible",
+    "models.cloud.needs_account": "Pendiente de activar",
+    "models.cloud.signed_in": "Sesión iniciada como {email}",
+    "models.cloud.signed_out": "Aún no tienes un plan de nube activo. Crea una cuenta gratis, inicia sesión o activa tu licencia Pro.",
+    "models.cloud.license_only": "Tu licencia Pro está activa y funciona sin iniciar sesión en una cuenta.",
+    "models.cloud.manage": "Ver planes y cuenta",
+    "models.cloud.manage_license": "Gestionar licencia Pro",
+    "models.cloud.free_available": "Ver cuenta gratis",
+    "models.cloud.pro_usage_unavailable": "Pro incluye {hours} horas cada 30 días. El contador de consumo Pro todavía no está disponible en la app.",
+    "models.cloud.included": "Whisper Large v3 Turbo para transcripción y GPT-OSS 20B para limpieza con IA. La limpieza está incluida y no consume minutos adicionales.",
+    "models.cloud.privacy": "El audio se envía al servicio de Dictámelo para transcribirlo. La limpieza con IA procesa el texto cuando está activada."
+  },
+  en: {
+    "models.cloud.account_title": "Your cloud plan",
+    "models.cloud.active": "In use",
+    "models.cloud.limit_reached": "Weekly allowance used up",
+    "models.cloud.ready": "Available",
+    "models.cloud.needs_account": "Activation needed",
+    "models.cloud.signed_in": "Signed in as {email}",
+    "models.cloud.signed_out": "You do not have an active cloud plan yet. Create a free account, sign in or activate your Pro license.",
+    "models.cloud.license_only": "Your Pro license is active and works without signing into an account.",
+    "models.cloud.manage": "View plans and account",
+    "models.cloud.manage_license": "Manage Pro license",
+    "models.cloud.free_available": "View free account",
+    "models.cloud.pro_usage_unavailable": "Pro includes {hours} hours every 30 days. The Pro usage counter is not yet available in the app.",
+    "models.cloud.included": "Whisper Large v3 Turbo for transcription and GPT-OSS 20B for AI cleanup. Cleanup is included and uses no additional minutes.",
+    "models.cloud.privacy": "Audio is sent to Dictámelo's service for transcription. AI cleanup processes the text when enabled."
+  },
+  pt: {
+    "models.cloud.account_title": "Seu plano de nuvem",
+    "models.cloud.active": "Em uso",
+    "models.cloud.limit_reached": "Cota semanal esgotada",
+    "models.cloud.ready": "Disponível",
+    "models.cloud.needs_account": "Ativação pendente",
+    "models.cloud.signed_in": "Conectado como {email}",
+    "models.cloud.signed_out": "Você ainda não tem um plano de nuvem ativo. Crie uma conta grátis, entre ou ative sua licença Pro.",
+    "models.cloud.license_only": "Sua licença Pro está ativa e funciona sem entrar em uma conta.",
+    "models.cloud.manage": "Ver planos e conta",
+    "models.cloud.manage_license": "Gerenciar licença Pro",
+    "models.cloud.free_available": "Ver conta grátis",
+    "models.cloud.pro_usage_unavailable": "O Pro inclui {hours} horas a cada 30 dias. O contador de uso Pro ainda não está disponível no app.",
+    "models.cloud.included": "Whisper Large v3 Turbo para transcrição e GPT-OSS 20B para limpeza com IA. A limpeza está incluída e não consome minutos adicionais.",
+    "models.cloud.privacy": "O áudio é enviado ao serviço do Dictámelo para transcrição. A limpeza com IA processa o texto quando ativada."
+  },
+  fr: {
+    "models.cloud.account_title": "Votre forfait cloud",
+    "models.cloud.active": "En cours d’utilisation",
+    "models.cloud.limit_reached": "Quota hebdomadaire épuisé",
+    "models.cloud.ready": "Disponible",
+    "models.cloud.needs_account": "Activation requise",
+    "models.cloud.signed_in": "Connecté en tant que {email}",
+    "models.cloud.signed_out": "Vous n’avez pas encore de forfait cloud actif. Créez un compte gratuit, connectez-vous ou activez votre licence Pro.",
+    "models.cloud.license_only": "Votre licence Pro est active et fonctionne sans connexion à un compte.",
+    "models.cloud.manage": "Voir les forfaits et le compte",
+    "models.cloud.manage_license": "Gérer la licence Pro",
+    "models.cloud.free_available": "Voir le compte gratuit",
+    "models.cloud.pro_usage_unavailable": "Pro inclut {hours} heures tous les 30 jours. Le compteur d’utilisation Pro n’est pas encore disponible dans l’app.",
+    "models.cloud.included": "Whisper Large v3 Turbo pour la transcription et GPT-OSS 20B pour le nettoyage par IA. Le nettoyage est inclus et ne consomme pas de minutes supplémentaires.",
+    "models.cloud.privacy": "L’audio est envoyé au service Dictámelo pour la transcription. Le nettoyage par IA traite le texte lorsqu’il est activé."
+  },
+  de: {
+    "models.cloud.account_title": "Dein Cloud-Tarif",
+    "models.cloud.active": "Wird verwendet",
+    "models.cloud.limit_reached": "Wochenkontingent aufgebraucht",
+    "models.cloud.ready": "Verfügbar",
+    "models.cloud.needs_account": "Aktivierung erforderlich",
+    "models.cloud.signed_in": "Angemeldet als {email}",
+    "models.cloud.signed_out": "Du hast noch keinen aktiven Cloud-Tarif. Erstelle ein kostenloses Konto, melde dich an oder aktiviere deine Pro-Lizenz.",
+    "models.cloud.license_only": "Deine Pro-Lizenz ist aktiv und funktioniert ohne Anmeldung bei einem Konto.",
+    "models.cloud.manage": "Tarife und Konto ansehen",
+    "models.cloud.manage_license": "Pro-Lizenz verwalten",
+    "models.cloud.free_available": "Kostenloses Konto ansehen",
+    "models.cloud.pro_usage_unavailable": "Pro enthält {hours} Stunden alle 30 Tage. Der Pro-Verbrauchszähler ist in der App noch nicht verfügbar.",
+    "models.cloud.included": "Whisper Large v3 Turbo für die Transkription und GPT-OSS 20B für die KI-Bereinigung. Die Bereinigung ist enthalten und verbraucht keine zusätzlichen Minuten.",
+    "models.cloud.privacy": "Audio wird zur Transkription an den Dictámelo-Dienst gesendet. Die KI-Bereinigung verarbeitet den Text, wenn sie aktiviert ist."
+  },
+  it: {
+    "models.cloud.account_title": "Il tuo piano cloud",
+    "models.cloud.active": "In uso",
+    "models.cloud.limit_reached": "Quota settimanale esaurita",
+    "models.cloud.ready": "Disponibile",
+    "models.cloud.needs_account": "Attivazione necessaria",
+    "models.cloud.signed_in": "Accesso effettuato come {email}",
+    "models.cloud.signed_out": "Non hai ancora un piano cloud attivo. Crea un account gratuito, accedi o attiva la tua licenza Pro.",
+    "models.cloud.license_only": "La tua licenza Pro è attiva e funziona senza accedere a un account.",
+    "models.cloud.manage": "Visualizza piani e account",
+    "models.cloud.manage_license": "Gestisci licenza Pro",
+    "models.cloud.free_available": "Visualizza account gratuito",
+    "models.cloud.pro_usage_unavailable": "Pro include {hours} ore ogni 30 giorni. Il contatore di utilizzo Pro non è ancora disponibile nell’app.",
+    "models.cloud.included": "Whisper Large v3 Turbo per la trascrizione e GPT-OSS 20B per la pulizia con IA. La pulizia è inclusa e non consuma minuti aggiuntivi.",
+    "models.cloud.privacy": "L’audio viene inviato al servizio Dictámelo per la trascrizione. La pulizia con IA elabora il testo quando è attivata."
+  }
+};
+for (const [lang, copy] of Object.entries(CLOUD_ACCOUNT_COPY)) Object.assign(window.I18N[lang], copy);
 
 // Account, plan and onboarding copy in every supported interface language.
 const ACCOUNT_COPY = {
