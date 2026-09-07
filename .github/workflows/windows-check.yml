@@ -91,11 +91,12 @@ jobs:
           python scripts/with-cloud-config.py --config .env.cloud-build -- python -c "print('Official public configuration validated')"
           if ($LASTEXITCODE -ne 0) { throw 'Invalid official public build configuration' }
       - name: Test on native x64 Windows
+        if: matrix.arch == 'x86_64'
         shell: pwsh
         run: |
           if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw 'This check requires native x64 Windows' }
           . ./scripts/windows-native-toolchain.ps1 -Target x86_64-pc-windows-msvc
-          cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { throw 'Rust tests failed' }
       - name: Transcribe committed speech with the native x64 CPU engine
         if: matrix.arch == 'x86_64'
@@ -135,6 +136,9 @@ jobs:
           $payloads = @(Get-ChildItem $extracted -Recurse -File -Filter 'dictamelo.exe')
           if ($payloads.Count -ne 1) { throw 'Expected exactly one packaged dictamelo.exe' }
           $packaged = $payloads[0].FullName
+          $nativeImports = @(Get-VerifiedWindowsImports -Executable $exe)
+          $packagedImports = @(Get-VerifiedWindowsImports -Executable $packaged)
+          if (($nativeImports -join ',') -ne ($packagedImports -join ',')) { throw 'Packaging changed the native runtime dependencies' }
 
           $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a three-part numeric release version' }
@@ -166,6 +170,8 @@ jobs:
           $metadata.testsExecutedOn = 'native x64 Windows runner'
           $metadata.targetExecution = '${{ matrix.arch }}' -eq 'x86_64'
           $metadata.officialCloud = Test-Path '.env.cloud-build'
+          $metadata.nativeImports = $nativeImports
+          $metadata.requiresExternalNativeRuntime = $false
           $metadata | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $bundleDir 'build-verification.json')
           Write-Output "Verified ${{ matrix.arch }} compiled and NSIS-packaged payloads, versions and exact bundle-marker transformation"
 

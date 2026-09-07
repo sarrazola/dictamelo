@@ -158,7 +158,7 @@ if (-not (Test-Path 'node_modules\@tauri-apps\cli')) {
 Write-Host '==> Running native regression tests for the requested target'
 # A target that cannot execute on this machine needs a compatible test runner;
 # compiling it successfully is not sufficient release verification.
-cargo test --locked --manifest-path src-tauri/Cargo.toml --target $Target
+cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target $Target
 if ($LASTEXITCODE -ne 0) { throw "Rust regression tests failed for $Target" }
 
 Write-Host '==> Building'
@@ -189,4 +189,7 @@ Get-ChildItem "$bundleDir\*" -Include '*.exe', '*.sig' -ErrorAction SilentlyCont
     "    {0}  ({1:N0} bytes)" -f $_.Name, $_.Length
 }
 $appExe = "src-tauri\target\$Target\release\dictamelo.exe"
-if (Test-Path $appExe) { Write-Host "    $appExe" }
+if (Test-Path $appExe) {
+    $nativeImports = @(Get-VerifiedWindowsImports -Executable $appExe)
+    Write-Host "    $appExe ($($nativeImports.Count) verified Windows system imports)"
+}
