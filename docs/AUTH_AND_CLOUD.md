@@ -165,11 +165,23 @@ Do not expand this to arbitrary remote hosts. Request only identity scopes (`ope
 
 The redirect allowlist above is present in the live Supabase configuration. An owned account added as a Google test user completed the installed 0.3.1 candidate's browser → Supabase → native PKCE callback flow. The app displayed the correct account and 0/2,000-word usage. Quitting and reopening preserved the session without a Keychain prompt. This is real native verification, not a mock or admin-generated token test; it does not establish cancellation/timeout behavior or general Google availability.
 
-Google's audience remains **Testing** according to the last recorded dashboard verification on September 5. Production publishing was disabled while branding was incomplete. Google explicitly [exempts identity-only login](https://support.google.com/cloud/answer/15549945) from the Testing allowlist, warning and seven-day authorization expiry; this app requests only those identity scopes. Testing status alone therefore does not establish that other Google accounts cannot sign in. The installed 0.5.0 app completed owned-account Google login, native callback and full-restart persistence on September 6 without a Keychain prompt.
+On September 6, 2026, the Megacubos Google Cloud dashboard was saved and rechecked with **External** audience and **In production** publishing status. Data Access declares only `openid`, `https://www.googleapis.com/auth/userinfo.email` and `https://www.googleapis.com/auth/userinfo.profile`, with no sensitive or restricted scopes. The live Supabase authorization redirect requests `email profile` and preserves the callback above. The installed 0.5.0 app completed owned-account Google login, native callback and full-restart persistence on September 6 without a Keychain prompt; that native test preceded the branding changes.
 
-The latest homepage/privacy/terms URL checks are recorded in [Production readiness](PRODUCTION_READINESS.md): they still did not return usable product or policy pages on September 6. Publish the actual pages before completing production branding. Do not invent a policy or treat a successful HTTP status as sufficient. Branding completion, installed login and production email delivery are separate checks.
+The website is now public on Vercel, with privacy and terms in all six interface languages, footer links, canonical URLs and official 0.5.0 downloads. The website repository's commits `da30e8f` and `18c92b0` passed build, type, lint, seven offline tests and public HTTP checks for 18 pages, ten assets, aliases and sitemap. The following values and the existing 160×160 PNG logo were saved in Google:
 
-Google's [branding requirements](https://support.google.com/cloud/answer/15549049?hl=en) also require public terms of service for external production apps. Complete the homepage, privacy-policy and terms links, register the domains used in branding/client configuration, and verify the owned brand before public rollout. The current test login requests only name/profile and email identity information; it does not grant Gmail inbox access.
+| Branding field | Saved value |
+| --- | --- |
+| App name | Dictámelo |
+| Homepage | https://www.dictamelo.com/en |
+| Privacy policy | https://www.dictamelo.com/en/privacy |
+| Terms of service | https://www.dictamelo.com/en/terms |
+| Logo source | https://www.dictamelo.com/dictamelo-icon.png |
+| Authorized domains | `dictamelo.com` and the existing `iburiyhhfodndqgmsaot.supabase.co` callback domain |
+| Support and developer contact | `andres@megacubos.com` |
+
+The first **Verify branding** check returned one issue: Google had not established ownership of the homepage domain. Audience production status is saved, but Google does not yet show the submitted name/logo to users. Verify the website in Search Console using the Megacubos account, rerun branding verification, and use **Publish branding** if Google reports it ready. Do not mark a submitted or pending review as approved. No application rebuild or OAuth secret rotation is needed for these dashboard and website changes.
+
+For future branding changes, keep the public homepage, policy content and Google URLs consistent, retain the Search Console verification record, and follow Google's [branding requirements](https://support.google.com/cloud/answer/15549049?hl=en). The privacy policy describes the actual identity, audio, usage, provider and deletion flows; HTTP availability alone is not a policy review. Identity-only login does not grant Gmail inbox access. Branding publication, installed login and production email delivery remain separate checks.
 
 ## Seven-day Pro trial
 

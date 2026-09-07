@@ -22,7 +22,7 @@ On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone a
 
 Mac releases require Developer ID signing, Apple notarization and stapling. Windows installers are signed for the Tauri updater, but do not currently have a Microsoft Authenticode certificate; SmartScreen may display a warning. See [the actual verification record](docs/TESTING.md).
 
-**Cloud account setup:** Installed-app Google sign-in and real email confirmation/password recovery have been verified. Auth emails are delivered by Resend from **Dictámelo <no-reply@dictamelo.com>**. Public branding and signup abuse controls remain launch follow-ups; the proposed seven-day Pro trial is disabled. Personal-key mode works without a Dictámelo account.
+**Cloud account setup:** Installed-app Google sign-in and real email confirmation/password recovery have been verified. Auth emails are delivered by Resend from **Dictámelo <no-reply@dictamelo.com>**. Google OAuth is External / In production; brand verification and signup abuse controls remain launch follow-ups. The [privacy policy](https://www.dictamelo.com/en/privacy) and [terms](https://www.dictamelo.com/en/terms) are public in six languages. The proposed seven-day Pro trial is disabled. Personal-key mode works without a Dictámelo account.
 
 ## Get started
 
