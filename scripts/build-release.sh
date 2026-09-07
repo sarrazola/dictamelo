@@ -3,6 +3,10 @@
 # The updater archive is created AFTER stapling, then signed with the existing Tauri key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Keep packaging dependencies outside the application and fail before building.
+DMG_PYTHON="${DICTAMELO_DMG_PYTHON:-$PWD/dist/dmg-tools/bin/python}"
+[[ -x "$DMG_PYTHON" ]] || { echo 'Set up the DMG build virtualenv described in docs/RELEASING.md.' >&2; exit 1; }
+"$DMG_PYTHON" -c 'import dmgbuild' || { echo 'Install scripts/requirements-dmg.txt in the DMG build virtualenv.' >&2; exit 1; }
 # Fail before reading signing credentials or building if an offline regression fails.
 node --check ui/main.js
 node --check ui/i18n.js
@@ -46,15 +50,15 @@ spctl --assess --type execute --verbose=2 "$APP"
 TARBALL="$BUNDLE/macos/Dictámelo.app.tar.gz"
 COPYFILE_DISABLE=1 tar -czf "$TARBALL" -C "$BUNDLE/macos" 'Dictámelo.app'
 npx tauri signer sign "$TARBALL" >/dev/null
-mkdir -p "$WORK/dmg" "$BUNDLE/dmg"
-/usr/bin/ditto "$APP" "$WORK/dmg/Dictámelo.app"
-ln -s /Applications "$WORK/dmg/Applications"
-DMG="$BUNDLE/dmg/Dictamelo_${VERSION}_${ARCH}.dmg"
-hdiutil create -volname 'Dictámelo' -srcfolder "$WORK/dmg" -ov -format UDZO "$DMG"
+mkdir -p "$BUNDLE/dmg"
+DMG="$WORK/Dictamelo_${VERSION}_${ARCH}.dmg"
+"$DMG_PYTHON" scripts/create-dmg.py "$APP" "$DMG"
 codesign --force --sign "$IDENTITY" --timestamp "$DMG"
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait --output-format json > "$WORK/dmg-notary.json"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d); sys.exit(0 if d.get("status")=="Accepted" else 1)' "$WORK/dmg-notary.json"
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+mv "$DMG" "$BUNDLE/dmg/"
+DMG="$BUNDLE/dmg/Dictamelo_${VERSION}_${ARCH}.dmg"
 printf 'Verified artifacts:\n%s\n%s\n' "$DMG" "$TARBALL"

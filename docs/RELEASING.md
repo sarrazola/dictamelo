@@ -2,7 +2,7 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current release: 0.5.0
+## Current release: 0.5.1
 
 This iteration restores macOS and both Windows targets. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
 
@@ -14,10 +14,10 @@ Start from current `main` and preserve any unrelated work. Choose a new version;
 
 ```sh
 git pull --ff-only
-python3 scripts/set-version.py 0.5.0
+python3 scripts/set-version.py 0.5.1
 ```
 
-This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.5.0.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
+This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.5.1.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
 
 ## 2. Validate and deploy backend changes
 
@@ -67,10 +67,23 @@ The existing Tauri updater private key is stored in Keychain, service `com.dicta
 Runtime credentials use different namespaces: release `.runtime.v1` and debug `.runtime.debug.v1`. Debug builds do not migrate release credentials; use dedicated test keys when developing. The runtime store rejects `updater_*` entries. Do not move signing keys into runtime storage or change their ACLs as a workaround for an application prompt. See [Local credentials](LOCAL_CREDENTIALS.md).
 
 ```sh
+python3 -m venv dist/dmg-tools
+dist/dmg-tools/bin/python -m pip install -r scripts/requirements-dmg.txt
 NOTARY_KEYCHAIN_PROFILE=SnipHaloNotary python3 scripts/with-cloud-config.py --config .env.cloud-build -- ./scripts/build-release.sh
 ```
 
 The script explicitly targets `aarch64-apple-darwin`, signs with Developer ID, submits the app to Apple, staples and verifies it, rebuilds the updater archive from the stapled app, signs that archive with Tauri, then creates/signs/notarizes/staples/verifies the DMG. It refuses to proceed without the required identity, key, or notarization profile.
+
+DMG packaging uses `scripts/create-dmg.py` and the Retina background drawn by `scripts/generate-dmg-background.swift`. The 660 × 432 Finder window holds 660 × 400 points of artwork, large app/Applications icons, a drag arrow, and an instruction to open the installed app from Applications. The build-only Python dependencies are pinned in `scripts/requirements-dmg.txt`; they are not bundled with the app. Override `DICTAMELO_DMG_PYTHON` with an absolute virtualenv Python path if needed. Finder metadata is written directly without requiring Finder Automation permission.
+
+To review packaging changes using an already verified app, create a separate local preview:
+
+```sh
+dist/dmg-tools/bin/python scripts/create-dmg.py "/Applications/Dictámelo.app" \
+  "dist/dmg-design-preview/Dictamelo-installer-preview.dmg"
+```
+
+The helper refuses to replace an existing output. It creates an unsigned container, so sign, notarize, staple and verify the preview DMG before sharing it. Inspect the final mounted image in Finder and verify the contained app's signature and stapled ticket. A packaging preview is not a new application release; do not upload it over any published installer's bytes. Ship the design with the next version through the complete release procedure.
 
 Outputs are under `src-tauri/target/aarch64-apple-darwin/release/bundle/`. Keep the `.app.tar.gz.sig` beside the archive. A successful build without an `Accepted` notarization response is not a finished release.
 
@@ -104,16 +117,16 @@ CI uses the Windows runner's existing 7-Zip to extract its unsigned NSIS install
 Copy the signed outputs to the Mac's ignored `dist/windows/` folder, named exactly:
 
 ```text
-Dictamelo_0.5.0_x86_64-setup.exe
-Dictamelo_0.5.0_x86_64-setup.exe.sig
-Dictamelo_0.5.0_aarch64-setup.exe
-Dictamelo_0.5.0_aarch64-setup.exe.sig
+Dictamelo_0.5.1_x86_64-setup.exe
+Dictamelo_0.5.1_x86_64-setup.exe.sig
+Dictamelo_0.5.1_aarch64-setup.exe
+Dictamelo_0.5.1_aarch64-setup.exe.sig
 ```
 
 Create a draft to transfer artifacts between machines:
 
 ```sh
-gh release create v0.5.0 --draft --target main --title "Dictámelo 0.5.0" --notes-file docs/releases/0.5.0.md
+gh release create v0.5.1 --draft --target main --title "Dictámelo 0.5.1" --notes-file docs/releases/0.5.1.md
 ```
 
 Use `gh release upload` / `gh release download` to transfer files. Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The Windows publishing helper refuses to overwrite public releases and can append a platform to a draft release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
@@ -121,7 +134,7 @@ Use `gh release upload` / `gh release download` to transfer files. Keep it draft
 When the x64 release artifact comes from native CI, upload only the ARM64 pair from the VM. The helper otherwise defaults to both targets and could replace the draft's CI artifact with a different cross-built file:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.5.0 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
+powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.5.1 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
 ```
 
 ## 5. Commit, stage, and publish a complete release
@@ -129,9 +142,9 @@ powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.5.0 -Targ
 Update the testing record with actual results and limitations. Review `git diff` and stage only intended paths. Commit and push the source. Ensure source files did not change after the final build; rebuild affected artifacts if they did.
 
 ```sh
-python3 scripts/stage-release.py 0.5.0
-cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.5.0"
-./scripts/release.sh 0.5.0
+python3 scripts/stage-release.py 0.5.1
+cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.5.1"
+./scripts/release.sh 0.5.1
 ```
 
 The release script requires a clean `main`, the correct macOS bundle version, signed artifacts for all three platforms, valid updater signatures, and stapled Apple artifacts. It creates/pushes only this release's tag, uploads a draft's artifacts, and then publishes it as latest. It does not stage arbitrary source changes or push every local tag.
@@ -140,7 +153,7 @@ The release contains the macOS DMG, macOS updater archive and `.sig`, both Windo
 
 ## 6. Verify the public release
 
-Download the assets again into a fresh directory using `gh release download v0.5.0`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
+Download the assets again into a fresh directory using `gh release download v0.5.1`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
 
 ```sh
 DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --ignored --nocapture
@@ -157,7 +170,7 @@ GitHub's public download URL may cache an earlier manifest briefly. Compare the 
 Ordinary releases use the complete-release procedure above. If a version was already published as a prerelease, promote its verified installers through GitHub release metadata; do not rerun a script that uploads every artifact. Never rebuild or replace a public installer, updater archive or detached signature under the same version. A binary correction requires a new version.
 
 ```sh
-gh release edit v0.5.0 --prerelease=false --latest --notes-file docs/releases/0.5.0.md
+gh release edit v0.5.1 --prerelease=false --latest --notes-file docs/releases/0.5.1.md
 ```
 
 If embedded manifest notes describe a superseded publication status, update only those notes and the corresponding `SHA256SUMS.txt` entry. Preserve version, publication timestamp, every platform URL/signature and all immutable artifact bytes. Upload the checksum metadata before the complete manifest, then verify public downloads and the Latest endpoint again. Verify a real installed old-version update and keep the README linked to the same official release.

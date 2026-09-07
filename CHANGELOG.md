@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 — September 6, 2026
+
+- Refresh the Mac disk image with a Retina installation background, large app and Applications icons, a drag arrow and clear installation instructions.
+- Generate Finder layout metadata without requiring Finder Automation permission, while preserving the signed application bundle.
+- Pin the build-only DMG packaging dependencies and retain Developer ID signing, notarization, stapling and updater signature checks.
+- Rebuild all three supported targets from the same versioned source. Existing settings, personal keys, accounts, Pro licenses and plan allowances are unchanged.
+- Document verified Google production branding and production Resend authentication email delivery; these hosted configuration changes also work with 0.5.0.
+
+See `docs/TESTING.md` for the artifact and installed-app verification record. Existing cloud-service follow-ups remain in `docs/PRODUCTION_READINESS.md`.
+
 ## 0.5.0 — September 6, 2026
 
 - Show setup only on first launch, with Skip on every step; retain existing settings.
@@ -10,7 +20,7 @@
 - Enforce measured Free audio reservations and harden client access to billing tables.
 - Add first-launch, quota-upgrade, audio-boundary and provider-failure regressions.
 
-This is the current official release for all three supported targets. See `docs/TESTING.md` for verified artifacts, native runtime results and the real Mac updater installation; `docs/PRODUCTION_READINESS.md` records remaining cloud service work.
+This version was published as the official release for all three supported targets. See `docs/TESTING.md` for verified artifacts, native runtime results and the real Mac updater installation; `docs/PRODUCTION_READINESS.md` records remaining cloud service work.
 
 ## 0.4.0 — Release candidate
 
