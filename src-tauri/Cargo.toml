@@ -1,6 +1,6 @@
 [package]
 name = "dictamelo"
-version = "0.6.0"
+version = "1.0.0"
 description = "Voice dictation for macOS and Windows. Hold a shortcut, speak, and paste text at your cursor."
 authors = ["Andrés Sarrazola"]
 license = "MIT"
@@ -53,6 +53,7 @@ core-graphics = "0.25"
 core-foundation = "0.10"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+transcribe-cpp = { version = "=0.2.3", default-features = false }
 # Win32: SendInput (Ctrl+V), portapapeles completo, ventana sin activación, sondeo de Esc,
 # PlaySound, registro (permiso de micrófono, tema) y Media Foundation (conversión de audio).
 windows = { version = "0.62", features = [

@@ -2,7 +2,7 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::sync::atomic::AtomicU64;
 use crate::transcription::{TranscriptionRequest, TranscriptionResult};
 use super::CatalogModel;
@@ -23,37 +23,37 @@ impl From<String> for InferenceError {
 }
 impl From<&str> for InferenceError { fn from(value: &str) -> Self { value.to_owned().into() } }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use transcribe_cpp::{CancelToken, Feature, Model, RunExtension, RunOptions, SessionOptions, TimestampKind, WhisperRunOptions};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 struct Loaded { id: String, model: Model }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 struct ActiveJob { token: CancelToken, audio_path: std::path::PathBuf }
 
 #[derive(Default)]
 pub struct Runtime {
     stopping: AtomicBool,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     loaded: Mutex<Option<Loaded>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     active: Mutex<Option<ActiveJob>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     generation: AtomicU64,
 }
 
 pub struct Job {
     runtime: Arc<Runtime>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     token: CancelToken,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     generation: u64,
 }
 
 impl Drop for Job {
     fn drop(&mut self) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         {
             self.runtime.active.lock().unwrap_or_else(|e| e.into_inner()).take();
             // A timer never keeps the manager alive or unloads a newer/active model.
@@ -71,7 +71,7 @@ impl Drop for Job {
 
 impl Runtime {
     pub fn begin(self: &Arc<Self>, audio_path: &Path) -> Result<Job, String> {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         {
             static LOGGING: std::sync::Once = std::sync::Once::new();
             LOGGING.call_once(transcribe_cpp::disable_logging);
@@ -83,11 +83,11 @@ impl Runtime {
             let generation = self.generation.fetch_add(1, Ordering::Relaxed) + 1;
             Ok(Job { runtime: self.clone(), token, generation })
         }
-        #[cfg(not(target_os = "macos"))]
-        Err("Local models are currently available on macOS".into())
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        Err("Local models are currently available on macOS and Windows".into())
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn release_idle(&self, generation: u64) -> bool {
         let Ok(active) = self.active.try_lock() else { return false; };
         if self.is_stopping() || active.is_some() || self.generation.load(Ordering::Relaxed) != generation { return false; }
@@ -99,24 +99,24 @@ impl Runtime {
 
     pub fn request_shutdown(&self) {
         self.stopping.store(true, Ordering::Release);
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         if let Some(job) = self.active.lock().unwrap_or_else(|e| e.into_inner()).as_ref() { job.token.cancel(); }
     }
 
     /// Called before Tauri's process exit, which does not drop all managed Rust state.
     /// Never hold `active` while waiting: the inference job needs it during teardown.
     pub fn finish_shutdown(&self) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         self.loaded.lock().unwrap_or_else(|e| e.into_inner()).take();
     }
 
     pub fn cancel_for(&self, audio_path: &Path) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         if let Some(job) = self.active.lock().unwrap_or_else(|e| e.into_inner()).as_ref().filter(|job| job.audio_path == audio_path) { job.token.cancel(); }
     }
 
     pub fn remove(&self, id: &str, remove_file: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         {
             let active = self.active.lock().unwrap_or_else(|e| e.into_inner());
             if active.is_some() { return Err("Wait until local transcription finishes before deleting a model".into()); }
@@ -124,12 +124,12 @@ impl Runtime {
             if loaded.as_ref().is_some_and(|m| m.id == id) { loaded.take(); }
             remove_file()
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         { let _ = id; remove_file() }
     }
 
     pub fn transcribe(&self, catalog: &CatalogModel, path: &Path, request: &TranscriptionRequest, job: Job) -> Result<TranscriptionResult, InferenceError> {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         {
             if self.is_stopping() || job.token.is_cancelled() { return Err(CANCELLED.into()); }
             let samples = read_audio(&request.audio_path)?;
@@ -204,18 +204,22 @@ impl Runtime {
             }
             Ok(TranscriptionResult { text, language: language.or_else(|| request.language.clone()), duration_secs: Some(samples.len() as f64 / 16_000.0), cleanup_receipt: None })
         }
-        #[cfg(not(target_os = "macos"))]
-        { let _ = (catalog, path, request, job); Err("Local models are currently available on macOS".into()) }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        { let _ = (catalog, path, request, job); Err("Local models are currently available on macOS and Windows".into()) }
     }
 }
 
 fn is_digital_silence(samples: &[f32]) -> bool { samples.iter().all(|sample| *sample == 0.0) }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn backend_for_family(engine: &str) -> transcribe_cpp::Backend {
+    // Windows distributes a static CPU engine without GPU drivers or backend DLLs.
+    #[cfg(target_os = "windows")]
+    { let _ = engine; transcribe_cpp::Backend::Cpu }
     // Short dictation with these encoders was faster on CPU in the macOS fixture checks.
     // Whisper benefits from Metal, with the runtime's CPU fallback kept available.
-    match engine { "canary" | "parakeet" => transcribe_cpp::Backend::Cpu, _ => transcribe_cpp::Backend::Auto }
+    #[cfg(target_os = "macos")]
+    { match engine { "canary" | "parakeet" => transcribe_cpp::Backend::Cpu, _ => transcribe_cpp::Backend::Auto } }
 }
 
 fn read_audio(path: &Path) -> Result<Vec<f32>, String> {
@@ -270,7 +274,7 @@ mod tests {
         assert!(!is_digital_silence(&vec![1.0 / 32768.0; 16_000]));
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     fn scoped_cancellation_does_not_abort_an_unrelated_file_job() {
         let runtime = Arc::new(Runtime::default());
@@ -282,7 +286,7 @@ mod tests {
         assert!(runtime.begin(Path::new("next.wav")).is_ok());
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     fn idle_unload_never_releases_a_newer_or_active_model() {
         let runtime = Arc::new(Runtime::default());
@@ -293,15 +297,18 @@ mod tests {
         assert!(!runtime.release_idle(old_generation)); assert!(runtime.release_idle(new_generation));
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     fn short_dictation_families_use_the_cpu_backend() {
         assert_eq!(backend_for_family("canary"), transcribe_cpp::Backend::Cpu);
         assert_eq!(backend_for_family("parakeet"), transcribe_cpp::Backend::Cpu);
+        #[cfg(target_os = "macos")]
         assert_eq!(backend_for_family("whisper"), transcribe_cpp::Backend::Auto);
+        #[cfg(target_os = "windows")]
+        assert_eq!(backend_for_family("whisper"), transcribe_cpp::Backend::Cpu);
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     fn shutdown_cancels_queued_work_and_rejects_late_jobs() {
         let runtime = Arc::new(Runtime::default());
@@ -316,7 +323,7 @@ mod tests {
         assert!(runtime.loaded.lock().unwrap().is_none());
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[test]
     fn shutdown_drains_native_work_without_holding_the_job_lock() {
         use std::sync::mpsc;

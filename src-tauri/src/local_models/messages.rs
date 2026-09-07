@@ -15,7 +15,7 @@ fn message_key(error: &str) -> &'static str {
     let error = error.trim();
     if error == "Download the selected local model first" { "local.error.missing" }
     else if error == "Unknown local model" { "local.error.unknown" }
-    else if error == "Local models are currently available on macOS" { "local.error.mac_only" }
+    else if error == "Local models are currently available on macOS and Windows" { "local.error.mac_only" }
     else if error.contains(" needs an explicit audio language: ") { "local.error.language_required" }
     else if error.starts_with("The selected language is not supported by ") { "local.error.language_unsupported" }
     else if error == "Not enough free disk space for this model" || error.to_ascii_lowercase().contains("no space left") { "local.error.disk_space" }
@@ -41,7 +41,7 @@ mod tests {
     #[test]
     fn known_local_errors_are_translated_in_every_language() {
         for error in [
-            "Download the selected local model first", "Unknown local model", "Local models are currently available on macOS",
+            "Download the selected local model first", "Unknown local model", "Local models are currently available on macOS and Windows",
             "Canary needs an explicit audio language: en, es", "The selected language is not supported by Parakeet",
             "Not enough free disk space for this model", "Another model download is already in progress",
             "A local transcription is already in progress", "Cancel the download before deleting this model",

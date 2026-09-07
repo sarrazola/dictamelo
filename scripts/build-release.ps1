@@ -147,6 +147,8 @@ if ($crossBuild -and $vs) {
 # Build
 # ---------------------------------------------------------------------------
 
+. (Join-Path $PSScriptRoot 'windows-native-toolchain.ps1') -Target $Target
+
 if (-not (Test-Path 'node_modules\@tauri-apps\cli')) {
     Write-Host '==> Installing @tauri-apps/cli'
     npm ci --no-audit --no-fund

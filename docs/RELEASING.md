@@ -2,9 +2,9 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current release: 0.5.1
+## Current release: 1.0.0
 
-This iteration restores macOS and both Windows targets. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
+This iteration adds local speech inference on macOS and both Windows targets, a compact model catalog, more personal-key providers and clearer cloud/key controls. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
 
 Publish one official release as GitHub Latest, with one set of architecture-specific README links and the complete updater manifest. Do not create a separate prerelease channel unless the maintainer explicitly requests one. Track remaining external service work in [Production readiness](PRODUCTION_READINESS.md); do not advertise verified email delivery or the seven-day trial before those flows actually work. Keep `DICTAMELO_PRO_TRIAL_AVAILABLE=false` until trial entitlement has been verified.
 
@@ -14,10 +14,10 @@ Start from current `main` and preserve any unrelated work. Choose a new version;
 
 ```sh
 git pull --ff-only
-python3 scripts/set-version.py 0.5.1
+python3 scripts/set-version.py 1.0.0
 ```
 
-This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/0.5.1.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
+This updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`. Add `docs/releases/1.0.0.md` in English, add a CHANGELOG entry, and review the README's platform support, features, plan limits, installation steps, and download filenames. Update the UI preview version if needed. Do not claim a platform or signing status based only on configuration.
 
 ## 2. Validate and deploy backend changes
 
@@ -101,7 +101,7 @@ Check `SHA256SUMS.txt` from that directory, validate the DMG with `xcrun stapler
 
 ## 4. Build both Windows targets
 
-Use the same committed source, version and appropriate explicit public build metadata on Windows. Ensure MSVC x64/ARM64 toolchains, Windows SDK, Clang, and NASM are installed. Set `TAURI_SIGNING_PRIVATE_KEY` securely in the build process, using the same key as macOS. An empty updater-key password needs an actual empty environment entry on Windows; the build script handles this with `ProcessStartInfo`.
+Use the same committed source, version and appropriate explicit public build metadata on Windows. Ensure MSVC x64/ARM64 toolchains, Windows SDK, Clang, CMake, Ninja and NASM are installed. The release script initializes `scripts/windows-native-toolchain.ps1`; ARM64 native speech uses Ninja and clang-cl, while x64 uses conservative portable CPU flags. Inspect the final executable imports for missing non-system runtime DLLs. Set `TAURI_SIGNING_PRIVATE_KEY` securely in the build process, using the same key as macOS. An empty updater-key password needs an actual empty environment entry on Windows; the build script handles this with `ProcessStartInfo`.
 
 Run the Windows build script once per explicit Rust target:
 
@@ -110,23 +110,23 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Target x86_6
 powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Target aarch64-pc-windows-msvc
 ```
 
-Verify the installed application executable's PE machine type and product version for each target. The NSIS bootstrap itself may be x86, so inspecting only the installer header does not prove payload architecture. Install and run each build, test first-launch setup and Skip, settings-window persistence, clipboard restoration, microphone capture, file conversion, credentials, and updating from the previous installed version. Record whether x64 was tested on physical Intel/AMD hardware or under ARM emulation.
+Verify the installed application executable's PE machine type and product version for each target. The NSIS bootstrap itself may be x86, so inspecting only the installer header does not prove payload architecture. Install and run each build, download and transcribe with every local model, verify cancellation/deletion/restart and an offline file transcription, then test first-launch setup and Skip, settings-window persistence, clipboard restoration, microphone capture, file conversion, credentials, and updating from the previous installed version. Record whether x64 was tested on physical Intel/AMD hardware or under ARM emulation.
 
 CI uses the Windows runner's existing 7-Zip to extract its unsigned NSIS installer, checks both application executables' PE architecture and file/product versions, and runs `scripts/windows_payload.py` to compare their bytes. Tauri CLI 2.11.4 [patches the bundle-type marker](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle.rs#L36-L92) from `UNK` to `NSS` before NSIS packaging and [restores the compiler output afterward](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle.rs#L128-L203). The helper requires exactly one compiler `UNK` marker and permits only its same-offset change to `NSS`; pre-existing `NSS` strings must stay unchanged, and any other byte difference fails the build. It never rewrites an executable. `build-verification.json` records `compiledPayloadSha256`, `packagedPayloadSha256` and `installerSha256` separately; the legacy `payloadSha256` remains an explicitly labeled compiler-output alias. Compare an installed executable with **`packagedPayloadSha256`**. This unsigned-CI check does not normalize Authenticode or replace signature/runtime verification. An upstream packaging change must be investigated before adapting the check.
 
 Copy the signed outputs to the Mac's ignored `dist/windows/` folder, named exactly:
 
 ```text
-Dictamelo_0.5.1_x86_64-setup.exe
-Dictamelo_0.5.1_x86_64-setup.exe.sig
-Dictamelo_0.5.1_aarch64-setup.exe
-Dictamelo_0.5.1_aarch64-setup.exe.sig
+Dictamelo_1.0.0_x86_64-setup.exe
+Dictamelo_1.0.0_x86_64-setup.exe.sig
+Dictamelo_1.0.0_aarch64-setup.exe
+Dictamelo_1.0.0_aarch64-setup.exe.sig
 ```
 
 Create a draft to transfer artifacts between machines:
 
 ```sh
-gh release create v0.5.1 --draft --target main --title "Dictámelo 0.5.1" --notes-file docs/releases/0.5.1.md
+gh release create v1.0.0 --draft --target main --title "Dictámelo 1.0.0" --notes-file docs/releases/1.0.0.md
 ```
 
 Use `gh release upload` / `gh release download` to transfer files. Keep it draft until all platforms are verified. Do not allow two machines to rewrite `latest.json` simultaneously. The Windows publishing helper refuses to overwrite public releases and can append a platform to a draft release; the full-release procedure below regenerates the final manifest from all three verified artifacts.
@@ -134,7 +134,7 @@ Use `gh release upload` / `gh release download` to transfer files. Keep it draft
 When the x64 release artifact comes from native CI, upload only the ARM64 pair from the VM. The helper otherwise defaults to both targets and could replace the draft's CI artifact with a different cross-built file:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.5.1 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
+powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 1.0.0 -Targets aarch64-pc-windows-msvc -SkipBuild -AssetsOnly
 ```
 
 ## 5. Commit, stage, and publish a complete release
@@ -142,9 +142,9 @@ powershell -ExecutionPolicy Bypass -File scripts\release-windows.ps1 0.5.1 -Targ
 Update the testing record with actual results and limitations. Review `git diff` and stage only intended paths. Commit and push the source. Ensure source files did not change after the final build; rebuild affected artifacts if they did.
 
 ```sh
-python3 scripts/stage-release.py 0.5.1
-cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v0.5.1"
-./scripts/release.sh 0.5.1
+python3 scripts/stage-release.py 1.0.0
+cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_release -- "$PWD/dist/v1.0.0"
+./scripts/release.sh 1.0.0
 ```
 
 The release script requires a clean `main`, the correct macOS bundle version, signed artifacts for all three platforms, valid updater signatures, and stapled Apple artifacts. It creates/pushes only this release's tag, uploads a draft's artifacts, and then publishes it as latest. It does not stage arbitrary source changes or push every local tag.
@@ -153,7 +153,7 @@ The release contains the macOS DMG, macOS updater archive and `.sig`, both Windo
 
 ## 6. Verify the public release
 
-Download the assets again into a fresh directory using `gh release download v0.5.1`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
+Download the assets again into a fresh directory using `gh release download v1.0.0`. Compare SHA-256 checksums and verify every updater signature against the app's public key. Run:
 
 ```sh
 DICTAMELO_LIVE_TESTS=1 cargo test --manifest-path src-tauri/Cargo.toml published_release_signature_is_valid -- --ignored --nocapture
@@ -170,7 +170,7 @@ GitHub's public download URL may cache an earlier manifest briefly. Compare the 
 Ordinary releases use the complete-release procedure above. If a version was already published as a prerelease, promote its verified installers through GitHub release metadata; do not rerun a script that uploads every artifact. Never rebuild or replace a public installer, updater archive or detached signature under the same version. A binary correction requires a new version.
 
 ```sh
-gh release edit v0.5.1 --prerelease=false --latest --notes-file docs/releases/0.5.1.md
+gh release edit v1.0.0 --prerelease=false --latest --notes-file docs/releases/1.0.0.md
 ```
 
 If embedded manifest notes describe a superseded publication status, update only those notes and the corresponding `SHA256SUMS.txt` entry. Preserve version, publication timestamp, every platform URL/signature and all immutable artifact bytes. Upload the checksum metadata before the complete manifest, then verify public downloads and the Latest endpoint again. Verify a real installed old-version update and keep the README linked to the same official release.

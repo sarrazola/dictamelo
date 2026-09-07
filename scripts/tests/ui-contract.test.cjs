@@ -328,6 +328,22 @@ test("a pending download remains cancellable and preserves the selected provider
   assert.equal(sandbox.state.settings.provider, "groq");
 });
 
+test("local model details remain available during downloads without invoking native commands", async () => {
+  const { sandbox } = loadUiState(() => assert.fail("Expanding details must not invoke a native command"));
+  sandbox.state.settings = { provider: "local", model: "whisper-base" };
+  sandbox.state.localModels = [{ id: "whisper-tiny", status: "downloading" }];
+  sandbox.state.localActions.add("whisper-tiny");
+  let renders = 0;
+  sandbox.renderLocalModels = () => { renders++; };
+  await sandbox.localModelAction("whisper-tiny", "details");
+  assert.equal(sandbox.state.localDetails.has("whisper-tiny"), true);
+  await sandbox.localModelAction("whisper-tiny", "details");
+  assert.equal(sandbox.state.localDetails.has("whisper-tiny"), false);
+  assert.equal(renders, 2);
+  assert.equal(sandbox.state.localActions.has("whisper-tiny"), true);
+  assert.equal(sandbox.state.settings.model, "whisper-base");
+});
+
 test("the selected local model cannot be deleted from the catalog", async () => {
   const { sandbox } = loadUiState(() => assert.fail("Active model must not be deleted"));
   sandbox.state.settings = { provider: "local", model: "whisper-base" };

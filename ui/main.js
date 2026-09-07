@@ -16,6 +16,7 @@ const ui = {
   localActions: new Set(),
   localDeleteArmed: null,
   localLanguages: {},
+  localDetails: new Set(),
   modelsSource: null,
   appInfo: null,
   lang: "es",
@@ -273,7 +274,7 @@ async function chooseSource(source) {
     if (!model || ui.localModelsError) {
       ui.modelsSource = null;
       renderModels();
-      toast(ui.localModelsError || t("models.local.mac_only"), true);
+      toast(ui.localModelsError || t("models.local.unavailable"), true);
       return false;
     }
     const patch = { provider: "local", model: model.id, useOwnKey: true, ...(!isLocalMode() ? { localCleanupCloudEnabled: false } : {}) };
@@ -403,8 +404,8 @@ function localSelectionPatch(model) {
 
 function renderLocalModels() {
   const list = $("#local-model-list");
-  const focused = document.activeElement?.closest?.("[data-local-action]");
-  const focusKey = focused ? [focused.dataset.localModel, focused.dataset.localAction] : null;
+  const focused = document.activeElement?.closest?.("[data-local-action], [data-local-language]");
+  const focusKey = focused ? [focused.dataset.localModel || focused.dataset.localLanguage, focused.dataset.localAction || "language"] : null;
   list.replaceChildren();
   $("#local-models-error").hidden = !ui.localModelsError;
   $("#local-models-error").textContent = ui.localModelsError || "";
@@ -412,10 +413,12 @@ function renderLocalModels() {
   $("#local-models-empty").textContent = t(ui.localModelsLoaded ? "models.local.empty" : "models.local.loading");
   for (const model of ui.localModels) {
     const card = document.createElement("article");
-    card.className = "local-model-card";
+    card.className = "local-model-row";
     card.dataset.localCard = model.id;
     const selected = isLocalMode() && ui.settings.model === model.id;
     card.classList.toggle("selected", selected);
+    const info = document.createElement("div");
+    info.className = "local-model-info";
     const header = document.createElement("div");
     header.className = "local-model-heading";
     const logo = document.createElement("img");
@@ -423,36 +426,86 @@ function renderLocalModels() {
     logo.alt = "";
     setProviderLogo(logo, model.id.startsWith("whisper") ? "openai" : "nvidia");
     const title = document.createElement("strong");
+    title.id = `local-model-title-${model.id}`;
     title.textContent = model.name;
-    header.append(logo, title);
-    if (selected || model.recommended) {
+    card.setAttribute("aria-labelledby", title.id);
+    header.appendChild(title);
+    if ((!selected && model.recommended) || (selected && !model.installed)) {
       const badge = document.createElement("span");
       badge.className = "model-tag";
-      badge.textContent = t(selected ? (model.installed ? "models.local.selected" : "models.local.needs_download") : "models.recommended");
+      badge.textContent = t(selected ? "models.local.needs_download" : "models.recommended");
       header.appendChild(badge);
     }
-    const description = document.createElement("p");
-    description.className = "desc";
-    description.textContent = modelDescription(model);
     const meta = document.createElement("p");
     meta.className = "local-model-meta";
     const languages = model.languages || [];
-    const languageNames = languages.length > 8 ? t("models.local.languages", { count: languages.length }) : localLanguageChoices(model).map(item => item[1]).join(", ");
-    meta.textContent = [formatModelSize(model.sizeBytes), languageNames, model.license].filter(Boolean).join(" · ");
-    card.append(header, description, meta);
+    meta.textContent = [formatModelSize(model.sizeBytes), t("models.local.languages", { count: languages.length })].join(" · ");
+    info.append(header, meta);
+    card.append(logo, info);
+    const actions = document.createElement("div");
+    actions.className = "local-model-actions";
     if (model.requiresLanguage) {
-      const label = document.createElement("label");
-      label.className = "local-model-language";
-      const caption = document.createElement("span");
-      caption.textContent = t("models.local.language_required");
       const select = document.createElement("select");
+      select.className = "local-model-language";
       select.dataset.localLanguage = model.id;
+      select.setAttribute("aria-label", `${model.name}: ${t("models.local.language_required")}`);
+      select.title = t("models.local.language_required");
       fillSelect(select, localLanguageChoices(model), localModelLanguage(model));
-      label.append(caption, select);
-      card.appendChild(label);
+      actions.appendChild(select);
     }
+    const action = (name, label, className, disabled = false, container = actions) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.dataset.localModel = model.id;
+      button.dataset.localAction = name;
+      button.textContent = label;
+      button.setAttribute("aria-label", `${label}: ${model.name}`);
+      const informational = name === "details" || name === "source";
+      const anotherDownload = name === "download" && (ui.localActions.size > 0 || ui.localModels.some(item => ["downloading", "verifying"].includes(item.status)));
+      button.disabled = !informational && (disabled || model.available === false || anotherDownload || (ui.localActions.has(model.id) && name !== "cancel"));
+      container.appendChild(button);
+      return button;
+    };
+    const icon = (button, path) => {
+      button.title = button.getAttribute("aria-label");
+      button.textContent = "";
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      const drawing = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      drawing.setAttribute("d", path);
+      svg.appendChild(drawing);
+      button.appendChild(svg);
+    };
     const downloading = ["downloading", "verifying"].includes(model.status);
+    if (downloading) action("cancel", t("general.cancel"), "ghost small");
+    else if (model.installed && model.status === "ready") {
+      action("use", t(selected ? "models.local.selected" : "models.local.use"), selected ? "ghost small" : "primary small", selected);
+      const deleting = ui.localDeleteArmed === model.id;
+      const remove = action("delete", t(deleting ? "models.confirm" : "models.local.delete"), `ghost danger small${deleting ? "" : " local-model-icon"}`, selected);
+      if (!deleting) icon(remove, "M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7");
+    } else action("download", t(model.status === "error" ? "models.local.retry" : "models.local.download"), "primary small");
+    const details = document.createElement("div");
+    details.className = "local-model-details";
+    details.id = `local-model-details-${model.id}`;
+    details.hidden = !ui.localDetails.has(model.id);
+    const toggle = action("details", t("models.local.details"), "ghost small local-model-icon");
+    toggle.setAttribute("aria-expanded", String(!details.hidden));
+    toggle.setAttribute("aria-controls", details.id);
+    icon(toggle, "M8 4l8 8-8 8");
+    const description = document.createElement("p");
+    description.className = "desc";
+    description.textContent = modelDescription(model);
+    const metadata = document.createElement("p");
+    metadata.className = "local-model-meta";
+    metadata.textContent = [localLanguageChoices(model).map(item => item[1]).join(", "), model.license].filter(Boolean).join(" · ");
+    details.append(description, metadata);
+    if (model.sourceUrl) action("source", t("models.local.source"), "link small", false, details);
+    card.appendChild(actions);
     if (downloading) {
+      const download = document.createElement("div");
+      download.className = "local-model-download";
       const progress = document.createElement("progress");
       progress.max = 1;
       progress.value = Math.min(1, Math.max(0, Number(model.progress) || 0));
@@ -460,41 +513,18 @@ function renderLocalModels() {
       const status = document.createElement("span");
       status.className = "local-model-meta local-download-status";
       status.textContent = model.status === "verifying" ? t("models.local.verifying") : `${Math.round(progress.value * 100)}% · ${formatModelSize(model.downloadedBytes)} / ${formatModelSize(model.sizeBytes)}`;
-      card.append(progress, status);
+      download.append(progress, status);
+      card.appendChild(download);
     }
-    if (model.error) {
+    if (model.error || model.available === false) {
       const error = document.createElement("p");
-      error.className = "footnote error-text";
+      error.className = "footnote local-model-status";
+      error.classList.toggle("error-text", !!model.error);
       error.setAttribute("role", "status");
-      error.textContent = model.error;
+      error.textContent = model.error || t("models.local.unavailable");
       card.appendChild(error);
     }
-    const actions = document.createElement("div");
-    actions.className = "local-model-actions";
-    const action = (name, label, className, disabled = false) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = className;
-      button.dataset.localModel = model.id;
-      button.dataset.localAction = name;
-      button.textContent = label;
-      const anotherDownload = name === "download" && (ui.localActions.size > 0 || ui.localModels.some(item => ["downloading", "verifying"].includes(item.status)));
-      button.disabled = disabled || model.available === false || anotherDownload || (ui.localActions.has(model.id) && name !== "cancel");
-      actions.appendChild(button);
-    };
-    if (model.available === false) {
-      const unavailable = document.createElement("p");
-      unavailable.className = "footnote";
-      unavailable.textContent = t("models.local.mac_only");
-      card.appendChild(unavailable);
-    }
-    if (downloading) action("cancel", t("general.cancel"), "ghost small");
-    else if (model.installed && model.status === "ready") {
-      action("use", t(selected ? "models.local.selected" : "models.local.use"), selected ? "ghost small" : "primary small", selected);
-      action("delete", t(ui.localDeleteArmed === model.id ? "models.confirm" : "models.local.delete"), "ghost danger small", selected);
-    } else action("download", t(model.status === "error" ? "models.local.retry" : "models.local.download"), "primary small");
-    if (model.sourceUrl) action("source", t("models.local.details"), "link small");
-    card.appendChild(actions);
+    card.appendChild(details);
     list.appendChild(card);
   }
   const selected = ui.localModels.find(model => isLocalMode() && model.id === ui.settings.model);
@@ -503,12 +533,19 @@ function renderLocalModels() {
     fillSelect($("#local-model-language"), dictationLanguageChoices(), ui.settings.language);
     $("#local-language-row .label span").textContent = t(selected.requiresLanguage ? "models.local.language_required" : "models.local.language_auto");
   }
-  if (focusKey) [...list.querySelectorAll("[data-local-action]")].find(button => button.dataset.localModel === focusKey[0] && button.dataset.localAction === focusKey[1])?.focus({ preventScroll: true });
+  if (focusKey) [...list.querySelectorAll("[data-local-action], [data-local-language]")].find(control => (control.dataset.localModel || control.dataset.localLanguage) === focusKey[0] && (control.dataset.localAction || "language") === focusKey[1])?.focus({ preventScroll: true });
 }
 
 async function localModelAction(modelId, action) {
   const model = ui.localModels.find(item => item.id === modelId);
-  if (!model || (ui.localActions.has(modelId) && action !== "cancel")) return;
+  if (!model) return;
+  if (action === "details") {
+    if (ui.localDetails.has(modelId)) ui.localDetails.delete(modelId);
+    else ui.localDetails.add(modelId);
+    renderLocalModels();
+    return;
+  }
+  if (ui.localActions.has(modelId) && !["cancel", "source"].includes(action)) return;
   if (action === "source") {
     if (model.sourceUrl) invoke("open_url", { url: model.sourceUrl }).catch(err => toast(String(err), true));
     return;

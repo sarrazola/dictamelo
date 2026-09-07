@@ -420,9 +420,9 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Dieses lokale Modell ist nicht mehr verfügbar. Wähle ein anderes.", "Questo modello locale non è più disponibile. Selezionane un altro.",
         ]),
         "local.error.mac_only" => pick(lang, [
-            "Los modelos locales están disponibles por ahora en macOS.", "Local models are currently available on macOS.",
-            "Os modelos locais estão disponíveis por enquanto no macOS.", "Les modèles locaux sont actuellement disponibles sur macOS.",
-            "Lokale Modelle sind derzeit unter macOS verfügbar.", "I modelli locali sono attualmente disponibili su macOS.",
+            "Este equipo no admite modelos locales.", "Local models are not supported on this device.",
+            "Este dispositivo não oferece suporte a modelos locais.", "Cet appareil ne prend pas en charge les modèles locaux.",
+            "Lokale Modelle werden auf diesem Gerät nicht unterstützt.", "Questo dispositivo non supporta i modelli locali.",
         ]),
         "local.error.language_required" => pick(lang, [
             "Selecciona el idioma del audio en las opciones de este modelo.", "Select the audio language in this model's options.",

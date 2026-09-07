@@ -8,15 +8,15 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 ## Download
 
-**[Download Dictámelo 0.5.1](https://github.com/sarrazola/dictamelo/releases/latest):** choose the installer for your computer below.
+**[Download Dictámelo 1.0.0](https://github.com/sarrazola/dictamelo/releases/latest):** choose the installer for your computer below.
 
 | Your computer | Installer |
 | --- | --- |
-| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v0.5.1/Dictamelo_0.5.1_aarch64.dmg) |
-| Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.5.1/Dictamelo_0.5.1_x86_64-setup.exe) |
-| Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v0.5.1/Dictamelo_0.5.1_aarch64-setup.exe) |
+| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_aarch64.dmg) |
+| Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_x86_64-setup.exe) |
+| Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_aarch64-setup.exe) |
 
-[Checksums](https://github.com/sarrazola/dictamelo/releases/download/v0.5.1/SHA256SUMS.txt) · [Release notes and signatures](https://github.com/sarrazola/dictamelo/releases/tag/v0.5.1)
+[Checksums](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/SHA256SUMS.txt) · [Release notes and signatures](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.0)
 
 On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
@@ -26,8 +26,8 @@ Mac releases require Developer ID signing, Apple notarization and stapling. Wind
 
 ## Get started
 
-1. On the first launch, choose your own keys, Free Cloud or Pro in the setup assistant. **Skip** is available on every step; you can configure everything later in Settings.
-2. With your own keys, choose a Groq model in **Models** and save the provider key. **Whisper Large v3** is recommended. No Dictámelo account is required. Existing provider configurations remain supported.
+1. On the first launch, choose local models, your own keys, Free Cloud or Pro in the setup assistant. **Skip** is available on every step; you can configure everything later in Settings.
+2. For offline transcription, download a model in **Models → On this computer**, then select **Use model**. With your own keys, choose Groq, OpenAI, Mistral or Deepgram and save the provider key. **Whisper Large v3** is recommended on Groq. Saved keys appear masked with explicit Change/Cancel actions. Neither mode requires a Dictámelo account.
 3. Use **Continue with Google** for Free Cloud, or **Create free account** with email/password and enter the confirmation code sent to your inbox. Returning users can **Sign in**; password recovery also uses an emailed code. Existing Pro licenses can be activated in **Plan**.
 4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release.
 5. Open **Files** to transcribe a recording. You can also expand **Import using a local path**. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
@@ -58,6 +58,7 @@ The seven-day trial stays disabled until checkout, immediate access, cancellatio
 - Floating recording indicator; Escape cancels without transcription.
 - English, Spanish, Portuguese, French, German and Italian interfaces.
 - Launch at login, system sounds, custom vocabulary and optional AI cleanup.
+- Downloadable local speech models with verified downloads, progress, cancellation and deletion in a compact list.
 - Audio-file transcription with local conversion and splitting for longer recordings.
 - Local history with copy/delete controls and retry for failed dictation.
 - Check for Updates in the tray and Mac application menu; verified automatic updates in explicitly enabled official builds.
@@ -66,17 +67,17 @@ Windows uses Win32 for keyboard/clipboard and Media Foundation for conversion. A
 
 ## Public source and credentials
 
-### Mac development build: 0.6.0
+### Local models and personal providers
 
-The current Mac source adds downloadable local Whisper, Canary Flash and Parakeet models, plus personal-key OpenAI, Mistral and Deepgram alongside Groq. New installations enable launch at login by default; saved preferences are preserved. Local transcription needs no account and only sends text to a cloud cleaner after explicit opt-in. These features are not in the published 0.5.1 downloads above. Windows enablement and verification will follow separately.
+Download Whisper Tiny, Base, Small or Large v3, Canary 180M Flash or Parakeet v3 from the compact model list. Initial downloads require internet; local transcription runs on the computer without an account, API key or hosted allowance. Parakeet is the recommended local model. Optional AI cleanup sends local transcripts to the selected cloud cleaner only after explicit consent.
 
-See [local models and catalog maintenance](docs/LOCAL_MODELS.md) and [cloud providers](docs/CLOUD_PROVIDERS.md). Mac source builds now require **CMake** in addition to Xcode Command Line Tools; users of a packaged app do not need either tool.
+New installations enable launch at login by default; saved preferences are preserved. See [local models and catalog maintenance](docs/LOCAL_MODELS.md) and [cloud providers](docs/CLOUD_PROVIDERS.md). Building from source requires **CMake** plus the platform compiler toolchain; packaged-app users do not need development tools.
 
 ### Shared application source
 
 This is the real application used to compile the official edition. **A clean source build uses personal keys and leaves hosted services and automatic updates disabled.** Official and self-hosted builds inject public service metadata into the same source. There is no second editable copy of the app.
 
-Free/Pro audio goes through the configured backend to Groq; personal-key mode sends it to the selected provider. Temporary audio is removed after use and history stays local. The backend records account/license usage metadata and cleanup transcript hashes, not saved audio or transcript contents. Provider retention policies still apply. Supabase Auth manages identity.
+Local audio is transcribed on the computer; optional cloud cleanup of local text requires explicit consent. Free/Pro audio goes through the configured backend to Groq; personal-key mode sends it to the selected provider. Temporary audio is removed after use and history stays local. The backend records account/license usage metadata and cleanup transcript hashes, not saved audio or transcript contents. Provider retention policies still apply. Supabase Auth manages identity.
 
 API keys, account sessions and Pro licenses use macOS Keychain or Windows Credential Manager. The Mac implementation caches runtime credentials, performs noninteractive access and separates development credentials. An inaccessible old credential asks for re-entry in the app. Keys are not stored in unencrypted SQLite or JSON. See [local credentials](docs/LOCAL_CREDENTIALS.md).
 
@@ -84,7 +85,7 @@ Supabase URLs, anon/publishable keys, client IDs and checkout identifiers are pu
 
 ## Development
 
-Install Rust stable, Node.js 20+, Python 3 and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode Command Line Tools. Windows requires MSVC, Windows SDK, Clang and NASM as documented in the [release guide](docs/RELEASING.md). Backend checks require Deno.
+Install Rust stable, Node.js 20+, Python 3 and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs CMake and Xcode Command Line Tools. Windows requires MSVC, Windows SDK, CMake, Ninja, Clang and NASM as documented in the [release guide](docs/RELEASING.md). Backend checks require Deno.
 
 ```sh
 npm ci

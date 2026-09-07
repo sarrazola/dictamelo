@@ -32,7 +32,7 @@ jobs:
             arch: aarch64
             machine: '0xaa64'
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -52,10 +52,11 @@ jobs:
             $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
             $vs = & $vswhere -latest -products * -property installationPath
             $arm = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
-            if (-not $arm) {
+            $llvm = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Llvm.Clang -property installationPath
+            if (-not $arm -or -not $llvm) {
               $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-              $process = Start-Process $installer -ArgumentList @('modify','--installPath',"`"$vs`"",'--add','Microsoft.VisualStudio.Component.VC.Tools.ARM64','--quiet','--norestart') -Wait -PassThru
-              if ($process.ExitCode -notin @(0,3010)) { throw 'MSVC ARM64 installation failed' }
+              $process = Start-Process $installer -ArgumentList @('modify','--installPath',"`"$vs`"",'--add','Microsoft.VisualStudio.Component.VC.Tools.ARM64','--add','Microsoft.VisualStudio.Component.VC.Llvm.Clang','--add','Microsoft.VisualStudio.Component.VC.CMake.Project','--quiet','--norestart') -Wait -PassThru
+              if ($process.ExitCode -notin @(0,3010)) { throw 'ARM64 native build prerequisite installation failed' }
             }
             Add-Content $env:GITHUB_PATH "$vs\VC\Tools\Llvm\x64\bin"
           }
@@ -93,11 +94,26 @@ jobs:
         shell: pwsh
         run: |
           if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') { throw 'This check requires native x64 Windows' }
+          . ./scripts/windows-native-toolchain.ps1 -Target x86_64-pc-windows-msvc
           cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { throw 'Rust tests failed' }
+      - name: Transcribe committed speech with the native x64 CPU engine
+        if: matrix.arch == 'x86_64'
+        shell: pwsh
+        run: |
+          . ./scripts/windows-native-toolchain.ps1 -Target x86_64-pc-windows-msvc
+          $env:DICTAMELO_LOCAL_TESTS = '1'
+          $env:DICTAMELO_LOCAL_TEST_MODELS = 'whisper-tiny,canary-180m-flash,parakeet-v3'
+          $env:DICTAMELO_LOCAL_TEST_DIR = Join-Path $env:RUNNER_TEMP 'dictamelo-local-models/models'
+          $env:DICTAMELO_LOCAL_TEST_REPORT = 'native-local-models.json'
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc local_models_transcribe_the_licensed_english_fixture -- --ignored --nocapture
+          if ($LASTEXITCODE -ne 0) { throw 'Native x64 speech inference failed' }
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc windows_native_model_loads_from_unicode_path_and_releases_file -- --ignored --nocapture
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows Unicode path/model removal failed' }
       - name: Build an unsigned verification installer
         shell: pwsh
         run: |
+          . ./scripts/windows-native-toolchain.ps1 -Target ${{ matrix.target }}
           if (Test-Path '.env.cloud-build') {
             python scripts/with-cloud-config.py --config .env.cloud-build -- cmd /c npx tauri build --target ${{ matrix.target }} --bundles nsis --no-sign
           } else {
@@ -159,5 +175,6 @@ jobs:
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/build-verification.json
+            ${{ runner.temp }}/dictamelo-local-models/native-local-models.json
           retention-days: 7
           if-no-files-found: error

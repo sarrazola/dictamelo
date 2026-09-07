@@ -1,6 +1,6 @@
 # Local speech models
 
-The 0.6.0 Mac implementation adds on-device transcription alongside existing personal-key and hosted modes. It is not included in the published 0.5.1 installers. Windows enablement and installed Windows verification are intentionally deferred.
+Version 1.0.0 enables on-device transcription on macOS and Windows alongside personal-key and hosted modes. See the version-specific verification record for actual native and emulated tests; earlier Windows releases did not contain the local engine.
 
 ## User behavior
 
@@ -31,7 +31,7 @@ Model files live in the application's data directory under `models/`, outside so
 
 Only one local transcription runs at a time. An overlapping recording or separately submitted file batch reports that the model is busy; it does not silently switch providers. Original imported files remain available, and failed voice transcriptions retain their existing retry path.
 
-The native engine is `transcribe-cpp` 0.2.3, built from pinned Cargo dependencies. On Mac it includes Metal support and the embedded Metal library. End users do not need Python, CMake, Homebrew or an external server. Developers need CMake and Xcode Command Line Tools to compile the native dependency.
+The native engine is `transcribe-cpp` 0.2.3, built from pinned Cargo dependencies. On Mac it includes Metal support and the embedded Metal library. End users do not need Python, CMake, Homebrew or an external server. Mac developers need CMake and Xcode Command Line Tools to compile the native dependency. Windows builds use the static CPU backend and the toolchain helper in `scripts/windows-native-toolchain.ps1`: MSVC/Windows SDK, CMake and Ninja, with Clang for ARM64. The x64 build disables host-specific SIMD requirements. Packaged users do not need a Python environment or separate model server.
 
 Canary and Parakeet use the CPU backend, which performed better for short recordings on the tested M4 Max. Whisper uses automatic backend selection with Metal acceleration and a CPU fallback. Loading and checking a model takes longer than a subsequent recording; hardware-specific measurements are recorded separately from general compatibility claims.
 
@@ -44,7 +44,7 @@ Canary and Parakeet use the CPU backend, which performed better for short record
 1. Verify that the pinned native runtime supports the model's architecture and artifact format. A new model in an existing supported family is a catalog change; a new family may require an engine update or adapter.
 2. Review the model and conversion licenses. Preserve required attribution. Obtain a GGUF artifact from its verified source, pin its full immutable repository revision, and independently verify its SHA-256 and byte size.
 3. Add a new stable catalog ID and filename. Do not reuse an installed ID/filename for different model bytes; existing downloads must not change meaning after an app update.
-4. Declare the exact languages, language-selection requirement and engine family. Add the description to all six dictionaries in `ui/i18n.js`. The UI builds cards from catalog metadata; no new card markup or picker logic is needed.
+4. Declare the exact languages, language-selection requirement and engine family. Add the description to all six dictionaries in `ui/i18n.js`. The UI builds compact rows from catalog metadata; no new row markup or picker logic is needed.
 5. Run catalog/download regressions, real English and Spanish audio where supported, silence, longer-than-one-window audio, cancellation, switching/deleting models and a restart with the model already downloaded. Record native hardware and actual results.
 6. If introducing a new engine family, update the catalog validator, native adapter and its capability tests. Verify bundled dependencies, licenses, signing and notarization again before distribution.
 
@@ -60,7 +60,7 @@ The app shows model source and license information. Source links and license not
 
 ## Verification
 
-See [Testing](TESTING.md) for the actual Mac build and execution record. Offline request-contract tests for cloud adapters are not evidence of a live paid account. Native local inference tests use downloaded models and the licensed committed speech fixture; they require explicit opt-in because models are large. Windows builds and VM tests from 0.5.1 do not validate the new local runtime.
+See [Testing](TESTING.md) and [Windows verification](WINDOWS_BUILD_REPORT.md) for actual build and execution records. Offline request-contract tests for cloud adapters are not evidence of a live paid account. Native local inference tests use downloaded models and the licensed committed speech fixture; they require explicit opt-in because models are large. Historical Windows tests from 0.5.1 do not validate the local runtime; 1.0.0 has a separate verification record.
 
 ```sh
 DICTAMELO_LOCAL_TESTS=1 \

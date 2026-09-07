@@ -127,7 +127,7 @@ impl LocalModelManager {
             installed, status: status.into(), progress: (bytes as f64 / model.size_bytes as f64).min(1.0),
             downloaded_bytes: bytes, error, requires_language: model.requires_language, license: model.license.clone(),
             source_url: model.source_url.clone(), artifact_source_url: model.artifact_source_url.clone(),
-            recommended: model.recommended, available: cfg!(target_os = "macos") }
+            recommended: model.recommended, available: cfg!(any(target_os = "macos", target_os = "windows")) }
     }
 
     pub fn list(&self) -> Vec<LocalModelInfo> { self.catalog.iter().map(|model| self.info(model)).collect() }
@@ -139,7 +139,7 @@ impl LocalModelManager {
 
     pub async fn download(&self, id: &str, callback: ProgressCallback) -> Result<(), String> {
         if self.runtime.is_stopping() { return Err("Local transcription is shutting down".into()); }
-        if !cfg!(target_os = "macos") { return Err("Local models are currently available on macOS".into()); }
+        if !cfg!(any(target_os = "macos", target_os = "windows")) { return Err("Local models are currently available on macOS and Windows".into()); }
         let model = self.model(id)?;
         if self.installed(model) { callback(self.info(model)); return Ok(()); }
         let cancelled = Arc::new(AtomicBool::new(false));
@@ -235,7 +235,7 @@ impl LocalModelManager {
 
     pub fn validate_ready(&self, id: &str, language: Option<&str>) -> Result<(), String> {
         if self.runtime.is_stopping() { return Err("Local transcription is shutting down".into()); }
-        if !cfg!(target_os = "macos") { return Err("Local models are currently available on macOS".into()); }
+        if !cfg!(any(target_os = "macos", target_os = "windows")) { return Err("Local models are currently available on macOS and Windows".into()); }
         let model = self.model(id)?;
         if !self.installed(model) { return Err("Download the selected local model first".into()); }
         validate_language(model, language)
@@ -379,7 +379,26 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_catalog_and_unicode_model_store_are_available() {
+        let root = std::env::temp_dir().join(format!("dictamelo-模型-é-{}", uuid::Uuid::new_v4()));
+        let manager = LocalModelManager::new(root.clone()).unwrap();
+        assert_eq!(manager.list().len(), 6);
+        assert!(manager.list().iter().all(|model| model.available));
+        let mut model = catalog().remove(0);
+        model.size_bytes = 5; model.sha256 = format!("{:x}", Sha256::digest(b"model"));
+        let path = root.join(&model.filename);
+        std::fs::write(&path, b"model").unwrap();
+        verify_file(&path, &model, || false).unwrap();
+        let job = manager.runtime.begin(Path::new("audio-é.wav")).unwrap();
+        assert!(manager.delete(&model.id).is_err());
+        assert!(path.exists()); drop(job);
+        manager.delete(&model.id).unwrap(); assert!(!path.exists());
+        drop(manager); std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[tokio::test]
     async fn failed_download_never_publishes_a_model_and_can_be_retried() {
         use tokio::io::AsyncReadExt;
@@ -405,7 +424,7 @@ mod tests {
         assert!(manager.list()[0].installed); server.await.unwrap(); drop(manager); std::fs::remove_dir_all(root).unwrap();
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[tokio::test]
     async fn same_size_corrupt_model_becomes_repairable_and_repair_is_verified() {
         use tokio::io::AsyncReadExt;
@@ -446,7 +465,7 @@ mod tests {
 
     /// Downloads pinned public model weights, then runs the licensed fixture entirely offline.
     /// The opt-in leaves weights in dist so native UI checks can reuse the exact verified files.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[tokio::test]
     #[ignore = "downloads local speech models; requires DICTAMELO_LOCAL_TESTS=1"]
     async fn local_models_transcribe_the_licensed_english_fixture() {
@@ -480,7 +499,7 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[tokio::test]
     #[ignore = "runs downloaded local speech models; requires DICTAMELO_LOCAL_TESTS=1"]
     async fn local_models_handle_silence_and_bounded_window_audio() {
@@ -519,7 +538,7 @@ mod tests {
         std::fs::write(parent.join("silence-and-windowing.json"),serde_json::to_vec_pretty(&serde_json::json!({"silenceModelsPassed":manager.catalog().len(),"longAudio":report})).unwrap()).unwrap();
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     #[tokio::test]
     #[ignore = "runs a downloaded Whisper model in a child process; requires DICTAMELO_LOCAL_TESTS=1"]
     async fn local_models_shutdown_before_process_exit() {
@@ -535,15 +554,34 @@ mod tests {
             assert!(manager.transcribe(&request).await.is_err());
             println!("LOCAL_SHUTDOWN_OK");
             // Tauri also exits without dropping managed Rust state. Native global destructors
-            // must find no live Metal resources even while this manager remains in scope.
+            // must find no live native resources even while this manager remains in scope.
             std::process::exit(0);
         }
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "local_models::tests::local_models_shutdown_before_process_exit", "--ignored", "--nocapture"])
             .env("DICTAMELO_LOCAL_SHUTDOWN_CHILD", "1")
-            .env("DICTAMELO_LOCAL_TEST_BACKEND", "metal")
+            .env("DICTAMELO_LOCAL_TEST_BACKEND", if cfg!(target_os = "macos") { "metal" } else { "cpu" })
             .output().unwrap();
-        assert!(output.status.success(), "Metal shutdown child failed: {}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        assert!(output.status.success(), "Native shutdown child failed: {}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
         assert!(String::from_utf8_lossy(&output.stdout).contains("LOCAL_SHUTDOWN_OK"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    #[ignore = "runs downloaded Whisper Tiny from a Unicode Windows path; requires DICTAMELO_LOCAL_TESTS=1"]
+    async fn windows_native_model_loads_from_unicode_path_and_releases_file() {
+        assert_eq!(std::env::var("DICTAMELO_LOCAL_TESTS").as_deref(), Ok("1"));
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let downloaded = std::env::var_os("DICTAMELO_LOCAL_TEST_DIR").map(PathBuf::from).unwrap_or_else(|| repo.join("dist/local-model-release/models"));
+        let root = std::env::temp_dir().join(format!("dictamelo-模型-é-{}", uuid::Uuid::new_v4()));
+        let manager = LocalModelManager::new(root.clone()).unwrap();
+        let model = manager.model("whisper-tiny").unwrap();
+        std::fs::copy(downloaded.join(&model.filename), root.join(&model.filename)).unwrap();
+        let request = TranscriptionRequest { audio_path: repo.join("tests/fixtures/english-speech.wav"), model: model.id.clone(), language: Some("en".into()), prompt: None };
+        let result = manager.transcribe(&request).await.unwrap();
+        assert!(result.text.to_lowercase().contains("gospel"), "{}", result.text);
+        // Windows refuses deletion while a native mapping still owns the file.
+        manager.delete(&request.model).unwrap(); assert!(!manager.list().iter().any(|model| model.installed));
+        manager.shutdown(); drop(manager); std::fs::remove_dir_all(root).unwrap();
     }
 }

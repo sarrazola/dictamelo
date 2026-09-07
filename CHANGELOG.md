@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.6.0 — In development, Mac first
+## 1.0.0
+
+- Enable downloadable local speech models on macOS and Windows ARM64/x64.
+- Present each model as a compact row with inline actions and expandable details.
+- Preserve installed models, credentials, accounts and preferences when upgrading.
+
+See `docs/TESTING.md` and `docs/WINDOWS_BUILD_REPORT.md` for platform-specific verification.
+
+## 0.6.0 — Local Mac development builds, not published
 
 - Add downloadable local Whisper Tiny, Base, Small and Large v3, Canary 180M Flash and Parakeet v3 through a pinned native engine and extensible model catalog.
 - Verify download size and SHA-256, show progress, support cancellation/removal, and keep models outside the installer.

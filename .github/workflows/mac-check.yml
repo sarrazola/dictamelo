@@ -31,6 +31,8 @@ jobs:
           deno-version: 'v2.9.6'
       - name: Install declared dependencies
         run: npm ci --no-audit --no-fund
+      - name: Ensure native speech build tools
+        run: command -v cmake >/dev/null || brew install cmake
       - name: Validate licensed speech and build configuration
         run: python3 -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Test the native app, including bundled audio decoding

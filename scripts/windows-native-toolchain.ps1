@@ -1,0 +1,58 @@
+# Configure the pinned static speech engine and target-specific Windows compilers.
+# Dot-source before cargo/tauri commands so the child process inherits this environment.
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('aarch64-pc-windows-msvc', 'x86_64-pc-windows-msvc')]
+    [string]$Target
+)
+
+$ErrorActionPreference = 'Stop'
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (-not (Test-Path $vswhere)) { throw 'Visual Studio C++ Build Tools and Windows SDK are required.' }
+$nativeVs = & $vswhere -latest -products * -property installationPath
+if (-not $nativeVs) { throw 'Could not find a Visual Studio installation.' }
+
+foreach ($nativeToolDir in @(
+    "$nativeVs\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin",
+    "$nativeVs\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja",
+    "$env:ProgramFiles\CMake\bin"
+)) {
+    if (Test-Path $nativeToolDir) { $env:Path = "$nativeToolDir;$env:Path" }
+}
+if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+    throw 'CMake is required to compile the local speech engine. Install the Visual Studio C++ CMake tools component.'
+}
+
+# Replacing arbitrary prior flags is intentional for an official portable build.
+# The pinned engine uses the native thread pool; do not introduce OpenMP/BLAS DLLs.
+# Explicit SIMD OFF values also reset a cache previously built with host tuning.
+$env:TRANSCRIBE_CMAKE_ARGS = '-DGGML_NATIVE=OFF -DTRANSCRIBE_X86_CONSERVATIVE=ON -DGGML_SSE42=OFF -DGGML_AVX=OFF -DGGML_AVX_VNNI=OFF -DGGML_AVX2=OFF -DGGML_BMI2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX512_BF16=OFF -DGGML_BLAS=OFF -DTRANSCRIBE_USE_OPENMP=OFF'
+if ($env:TRANSCRIBE_DIR) { throw 'Unset TRANSCRIBE_DIR: official builds must compile the pinned native dependency.' }
+if ($env:CMAKE_ARGS) { throw 'Unset CMAKE_ARGS: official native build flags must not be overridden.' }
+
+if ($Target -eq 'aarch64-pc-windows-msvc') {
+    if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { throw 'Ninja is required for the ARM64 Clang build. Install the Visual Studio C++ CMake tools component.' }
+    $nativeLlvmHosts = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { @('ARM64', 'x64') } else { @('x64') }
+    $nativeClang = @($nativeLlvmHosts | ForEach-Object { "$nativeVs\VC\Tools\Llvm\$_\bin\clang-cl.exe" }) + @("$nativeVs\VC\Tools\Llvm\bin\clang-cl.exe")
+    $nativeClang = $nativeClang | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $nativeClang) { throw 'ARM64 local models require the Visual Studio C++ Clang compiler component.' }
+
+    # ggml's ARM NEON sources require Clang, not MSVC cl.exe. Ninja lets cmake-rs
+    # use the target-specific compiler without its automatic VS toolset argument.
+    $env:CMAKE_GENERATOR_aarch64_pc_windows_msvc = 'Ninja'
+    $env:CC_aarch64_pc_windows_msvc = $nativeClang
+    $env:CXX_aarch64_pc_windows_msvc = $nativeClang
+    $env:TRANSCRIBE_CMAKE_ARGS += ' -DGGML_CPU_ARM_ARCH=armv8-a'
+
+}
+# Native tools need the selected target's SDK environment, including after another
+# architecture was built in this shell. An x64 host toolchain also runs on ARM Windows.
+$nativeVcvars = Join-Path $nativeVs 'VC\Auxiliary\Build\vcvarsall.bat'
+$nativeVcarch = if ($Target -eq 'aarch64-pc-windows-msvc') { 'x64_arm64' } else { 'x64' }
+$nativeEnv = & $env:ComSpec /d /s /c "`"`"$nativeVcvars`" $nativeVcarch >nul && set`""
+if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the selected Visual Studio/Windows SDK environment.' }
+foreach ($nativeLine in $nativeEnv) {
+    if ($nativeLine -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') }
+}
+Write-Host "Native speech build: $Target, static portable CPU backend"
