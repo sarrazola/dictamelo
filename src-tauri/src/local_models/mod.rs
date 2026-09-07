@@ -473,6 +473,8 @@ mod tests {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let root = std::env::var_os("DICTAMELO_LOCAL_TEST_DIR").map(PathBuf::from).unwrap_or_else(|| repo.join("dist/local-model-smoke/models"));
         let manager = Arc::new(LocalModelManager::new(root.clone()).unwrap());
+        let providers = crate::state::provider_registry(manager.clone());
+        let local = providers.get("local").expect("the app must register the native local provider");
         let ids = std::env::var("DICTAMELO_LOCAL_TEST_MODELS").unwrap_or_else(|_| manager.catalog().iter().map(|model| model.id.as_str()).collect::<Vec<_>>().join(","));
         let audio = std::env::var_os("DICTAMELO_LOCAL_TEST_AUDIO").map(PathBuf::from).unwrap_or_else(|| repo.join("tests/fixtures/english-speech.wav"));
         let language = std::env::var("DICTAMELO_LOCAL_TEST_LANGUAGE").unwrap_or_else(|_| "en".into());
@@ -484,12 +486,12 @@ mod tests {
             let download_secs = started.elapsed().as_secs_f64();
             let request = TranscriptionRequest { audio_path: audio.clone(), model: id.into(), language: Some(language.clone()), prompt: None };
             let started = Instant::now();
-            let result = manager.transcribe(&request).await.unwrap_or_else(|error| panic!("{id} inference: {error}"));
+            let result = local.transcribe(None, &request).await.unwrap_or_else(|error| panic!("{id} inference: {error}"));
             let elapsed = started.elapsed().as_secs_f64();
             let normalized = result.text.to_lowercase();
             assert!(expected.split(',').all(|word| normalized.contains(word)), "{id}: unexpected fixture transcription: {}", result.text);
             let warmed = Instant::now();
-            let warm_result = manager.transcribe(&request).await.unwrap_or_else(|error| panic!("{id} warm inference: {error}"));
+            let warm_result = local.transcribe(None, &request).await.unwrap_or_else(|error| panic!("{id} warm inference: {error}"));
             let warm_secs = warmed.elapsed().as_secs_f64();
             assert!(expected.split(',').all(|word| warm_result.text.to_lowercase().contains(word)), "{id}: unexpected warm transcription: {}", warm_result.text);
             eprintln!("{id}: download {download_secs:.2}s, first inference {elapsed:.2}s, warm {warm_secs:.2}s, {}", result.text);

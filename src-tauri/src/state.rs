@@ -81,9 +81,7 @@ impl AppState {
         let secrets: Arc<dyn SecretStore> = Arc::new(KeyringSecretStore::new(KEYCHAIN_SERVICE));
         let local_models = Arc::new(crate::local_models::LocalModelManager::new(data_dir.join("models"))
             .map_err(anyhow::Error::msg)?);
-        let mut providers = ProviderRegistry::with_defaults();
-        #[cfg(target_os = "macos")]
-        providers.register(Arc::new(crate::transcription::local::LocalProvider::new(local_models.clone())));
+        let providers = provider_registry(local_models.clone());
         Ok(AppState {
             settings: RwLock::new(settings),
             settings_path,
@@ -122,5 +120,33 @@ impl AppState {
     /// API key del proveedor indicado (`None` si no está configurada).
     pub fn api_key_for(&self, provider_id: &str) -> Result<Option<String>, SecretError> {
         self.secrets.get(provider_id)
+    }
+}
+
+/// The installed app and native integration tests use this same provider wiring.
+pub(crate) fn provider_registry(local_models: Arc<crate::local_models::LocalModelManager>) -> ProviderRegistry {
+    let mut providers = ProviderRegistry::with_defaults();
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    providers.register(Arc::new(crate::transcription::local::LocalProvider::new(local_models)));
+    providers
+}
+
+#[cfg(all(test, any(target_os = "macos", target_os = "windows")))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn app_registry_routes_local_models_without_a_cloud_key() {
+        let root = std::env::temp_dir().join(format!("dictamelo-app-registry-{}", uuid::Uuid::new_v4()));
+        let models = Arc::new(crate::local_models::LocalModelManager::new(root.clone()).unwrap());
+        let providers = provider_registry(models.clone());
+        for id in ["groq", "openai", "mistral", "deepgram"] { assert!(providers.get(id).is_some()); }
+        let local = providers.get("local").expect("the installed app must register local transcription");
+        let info = local.info(); assert!(!info.requires_api_key); assert_eq!(info.models.len(), 6);
+        let error = local.transcribe(None, &crate::transcription::TranscriptionRequest {
+            audio_path: root.join("speech.wav"), model: "whisper-tiny".into(), language: Some("en".into()), prompt: None,
+        }).await.unwrap_err();
+        assert!(matches!(error, crate::transcription::TranscriptionError::Local(ref message) if message == "Download the selected local model first"));
+        drop(local); drop(providers); drop(models); std::fs::remove_dir_all(root).unwrap();
     }
 }
