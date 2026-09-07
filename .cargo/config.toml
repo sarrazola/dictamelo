@@ -1,0 +1,4 @@
+[env]
+# Build a portable CPU backend rather than requiring the build machine's CPU features.
+# Metal remains available and its shader library is embedded in the native engine.
+TRANSCRIBE_CMAKE_ARGS = { value = "-DGGML_NATIVE=OFF", force = false }

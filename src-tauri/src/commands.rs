@@ -87,7 +87,10 @@ pub struct ApiKeyStatus {
 
 #[tauri::command]
 pub fn get_api_key_status(state: State<'_, AppState>, provider: String) -> Result<ApiKeyStatus, String> {
-    state.providers.get(&provider).ok_or_else(|| format!("Proveedor desconocido: {provider}"))?;
+    let selected = state.providers.get(&provider).ok_or_else(|| format!("Proveedor desconocido: {provider}"))?;
+    if !selected.info().requires_api_key {
+        return Ok(ApiKeyStatus { configured: false, hint: None });
+    }
     match state.secrets.get(&provider).map_err(|e| e.to_string())? {
         Some(key) if !key.trim().is_empty() => {
             let key = key.trim();
@@ -257,7 +260,10 @@ pub async fn install_update(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn restart_app(app: AppHandle) {
     log::info!("Reiniciando para aplicar la actualización");
-    app.restart();
+    // `restart()` can skip lifecycle callbacks when invoked on the main thread.
+    // Drain first to cover request_restart's emergency fallback as well.
+    app.state::<AppState>().local_models.shutdown();
+    app.request_restart();
 }
 
 // ---------- Licencia Pro ----------

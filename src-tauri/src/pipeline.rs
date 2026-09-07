@@ -90,10 +90,17 @@ pub fn cancel_recording(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        if !matches!(*lock(&state.status), Status::Recording) {
+        let status = lock(&state.status).clone();
+        if matches!(status, Status::Transcribing) {
+            let path = lock(&state.active_voice_transcription).clone();
+            if let Some(path) = path { state.local_models.cancel_transcription_for(&path); }
+            return;
+        }
+        if !matches!(status, Status::Recording) {
             return;
         }
         let lang = state.settings().ui_lang();
+        lock(&state.recording_plan).take();
         log::info!("Grabación cancelada con Esc");
         // Primero el estado, para que al soltar el atajo no se intente transcribir.
         set_status(&app, Status::Done { message: t(&lang, "msg.cancelled").into() });
@@ -114,18 +121,26 @@ async fn start_recording(app: &AppHandle) {
             return;
         }
     }
-    let settings = state.settings();
+    let plan = TranscriptionPlan::capture(&state, state.settings());
+    let settings = &plan.settings;
 
     let lang = settings.ui_lang();
     // Con Pro la credencial es la licencia, no una API key del usuario: no hay nada que revisar.
-    if state.uses_cloud() {
-        return start_stream(app, &state, &settings, &lang).await;
+    if matches!(plan.route, TranscriptionRoute::FreeCloud | TranscriptionRoute::ProCloud) {
+        return start_stream(app, &state, &plan, &lang).await;
     }
     let Some(provider) = state.providers.get(&settings.provider) else {
         fail(app, tf(&lang, "err.provider_unknown", &[("p", &settings.provider)]));
         return;
     };
     let info = provider.info();
+    if settings.uses_local_transcription() {
+        if let Err(error) = state.local_models.validate_ready(&settings.model, settings.language_code().as_deref()) {
+            fail(app, crate::local_models::messages::localize(&error, &lang));
+            app_windows::show_settings(app);
+            return;
+        }
+    }
     if info.requires_api_key {
         match state.api_key_for(&info.id) {
             Ok(Some(key)) if !key.trim().is_empty() => {}
@@ -159,12 +174,13 @@ async fn start_recording(app: &AppHandle) {
         _ => {}
     }
 
-    start_stream(app, &state, &settings, &lang).await
+    start_stream(app, &state, &plan, &lang).await
 }
 
 /// Abre el micrófono y pasa a «grabando». Se separa porque el camino Pro se salta las
 /// comprobaciones de API key pero necesita exactamente lo mismo a partir de aquí.
-async fn start_stream(app: &AppHandle, state: &AppState, settings: &Settings, lang: &str) {
+async fn start_stream(app: &AppHandle, state: &AppState, plan: &TranscriptionPlan, lang: &str) {
+    let settings = &plan.settings;
     if platform::permissions_status().microphone == PermissionState::Denied {
         fail(app, t(lang, "err.mic_denied"));
         app_windows::show_settings(app);
@@ -172,12 +188,13 @@ async fn start_stream(app: &AppHandle, state: &AppState, settings: &Settings, la
     }
     match state.recorder.start(settings.input_device.clone()).await {
         Ok(()) => {
+            *lock(&state.recording_plan) = Some(plan.clone());
             let generation = set_status(app, Status::Recording);
             sound(app, SoundKind::Start);
             spawn_level_monitor(app.clone(), generation);
-            let max_seconds = if state.is_free_cloud() {
+            let max_seconds = if plan.route == TranscriptionRoute::FreeCloud {
                 settings.max_recording_secs.min(119)
-            } else if state.uses_cloud() {
+            } else if plan.route == TranscriptionRoute::ProCloud {
                 settings.max_recording_secs.min(599)
             } else {
                 settings.max_recording_secs
@@ -217,10 +234,12 @@ async fn stop_and_transcribe(app: &AppHandle) {
         return;
     }
     if !matches!(*lock(&state.status), Status::Recording) {
+        lock(&state.recording_plan).take();
         state.recorder.cancel();
         return;
     }
-    let lang = state.settings().ui_lang();
+    let Some(plan) = lock(&state.recording_plan).take() else { return };
+    let lang = plan.settings.ui_lang();
     let raw = match state.recorder.stop().await {
         Ok(raw) => raw,
         Err(e) => {
@@ -228,6 +247,7 @@ async fn stop_and_transcribe(app: &AppHandle) {
             return;
         }
     };
+    if !matches!(*lock(&state.status), Status::Recording) { return; }
     sound(app, SoundKind::Stop);
     let prepared = audio::prepare(&raw);
     let secs = prepared.duration_secs();
@@ -237,15 +257,21 @@ async fn stop_and_transcribe(app: &AppHandle) {
         return;
     }
     set_status(app, Status::Transcribing);
-    transcribe_and_deliver(app, prepared).await;
+    transcribe_with_plan(app, prepared, plan).await;
 }
 
 /// Transcribe y entrega el audio. Devuelve el texto si la transcripción tuvo éxito.
 pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio) -> Option<String> {
     let state = app.state::<AppState>();
-    let settings = state.settings();
+    let plan = TranscriptionPlan::capture(&state, state.settings());
+    transcribe_with_plan(app, audio, plan).await
+}
+
+async fn transcribe_with_plan(app: &AppHandle, audio: PreparedAudio, plan: TranscriptionPlan) -> Option<String> {
+    let state = app.state::<AppState>();
+    let settings = &plan.settings;
     let lang = settings.ui_lang();
-    let source = match transcription_source(&state, &settings).await {
+    let source = match transcription_source(&state, &plan).await {
         Ok(pair) => pair,
         Err(e) => {
             fail(app, tf(&lang, "err.keychain", &[("e", &e)]));
@@ -265,7 +291,11 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
         prompt: settings.vocabulary_prompt(),
     };
     let started = Instant::now();
+    if source.route == TranscriptionRoute::Local {
+        *lock(&state.active_voice_transcription) = Some(path.clone());
+    }
     let result = transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request).await;
+    lock(&state.active_voice_transcription).take();
 
     // El audio temporal se elimina siempre, haya ido bien o mal.
     match std::fs::remove_file(&path) {
@@ -289,10 +319,10 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             }
             let mut text = result.text.trim().to_string();
             let mut cleanup_failed = false;
-            if settings.cleanup_enabled {
+            if settings.should_clean_transcript() {
                 set_status(app, Status::Cleaning);
                 let started = Instant::now();
-                match clean_text(&state, &settings, &source, &result.text, result.cleanup_receipt.as_deref()).await {
+                match clean_text(&state, settings, &source, &result.text, result.cleanup_receipt.as_deref()).await {
                     Ok(cleaned) if !cleaned.trim().is_empty() => {
                         log::info!("Texto limpio en {:.1}s ({} → {} caracteres)", started.elapsed().as_secs_f32(), text.chars().count(), cleaned.chars().count());
                         text = cleaned.trim().to_string();
@@ -313,9 +343,15 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
             deliver(app, text.clone(), result.language, audio.duration_secs(), &delivery_settings, cleanup_failed).await;
             Some(text)
         }
+        Err(TranscriptionError::Cancelled) => {
+            *lock(&state.last_failed) = None;
+            tray::set_retry_enabled(app, false);
+            set_status(app, Status::Done { message: t(&lang, "msg.cancelled").into() });
+            None
+        }
         Err(e) => {
             let attempts = lock(&state.last_failed).as_ref().map(|p| p.attempts).unwrap_or(0) + 1;
-            *lock(&state.last_failed) = Some(PendingTranscription { audio, attempts });
+            *lock(&state.last_failed) = Some(PendingTranscription { audio, attempts, plan });
             tray::set_retry_enabled(app, true);
             fail(app, tf(&lang, "err.retry_hint", &[("e", &e.localized(&lang))]));
             None
@@ -328,11 +364,43 @@ pub(crate) async fn transcribe_and_deliver(app: &AppHandle, audio: PreparedAudio
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TranscriptionRoute {
     OwnKey,
+    Local,
     FreeCloud,
     ProCloud,
 }
 
+/// Immutable destination and privacy choices for a recording, file batch, or retry.
+/// Credentials are acquired at execution time so refresh tokens never enter this snapshot.
+#[derive(Debug, Clone)]
+pub(crate) struct TranscriptionPlan {
+    pub settings: Settings,
+    route: TranscriptionRoute,
+}
+
+impl TranscriptionPlan {
+    pub(crate) fn capture(state: &AppState, settings: Settings) -> Self {
+        let configured = crate::cloud_config::configured();
+        let pro = state.is_pro();
+        let signed_in = !settings.uses_local_transcription() && configured
+            && !settings.use_own_key && !pro && state.account.signed_in();
+        Self::from_flags(settings, configured, pro, signed_in)
+    }
+
+    fn from_flags(settings: Settings, configured: bool, pro: bool, signed_in: bool) -> Self {
+        let route = TranscriptionRoute::for_settings(&settings, configured, pro, signed_in);
+        Self { settings, route }
+    }
+}
+
 impl TranscriptionRoute {
+    fn for_settings(settings: &Settings, configured: bool, pro: bool, signed_in: bool) -> Self {
+        if settings.uses_local_transcription() {
+            Self::Local
+        } else {
+            Self::from_flags(configured, settings.use_own_key, pro, signed_in)
+        }
+    }
+
     fn from_flags(configured: bool, own_key: bool, pro: bool, signed_in: bool) -> Self {
         if !configured || own_key {
             Self::OwnKey
@@ -354,17 +422,15 @@ pub(crate) struct TranscriptionSource {
 }
 
 fn source_model(route: TranscriptionRoute, personal_model: &str, provider: &crate::transcription::ProviderInfo) -> String {
-    if route == TranscriptionRoute::OwnKey { personal_model.to_string() } else { provider.default_model.clone() }
+    if matches!(route, TranscriptionRoute::OwnKey | TranscriptionRoute::Local) { personal_model.to_string() } else { provider.default_model.clone() }
 }
 
 pub(crate) async fn transcription_source(
     state: &AppState,
-    settings: &Settings,
+    plan: &TranscriptionPlan,
 ) -> Result<TranscriptionSource, String> {
-    let configured = crate::cloud_config::configured();
-    let pro = state.is_pro();
-    let signed_in = configured && !settings.use_own_key && !pro && state.account.signed_in();
-    let route = TranscriptionRoute::from_flags(configured, settings.use_own_key, pro, signed_in);
+    let settings = &plan.settings;
+    let route = plan.route;
     let (provider, api_key) = match route {
         TranscriptionRoute::ProCloud => (state.backend_provider.clone(), crate::license::stored_key(&state.secrets)),
         TranscriptionRoute::FreeCloud => (state.backend_provider.clone(), Some(format!("Bearer {}", state.account.token().await?))),
@@ -374,6 +440,11 @@ pub(crate) async fn transcription_source(
             let key = state.api_key_for(&settings.provider).map_err(|e| e.to_string())?;
             (provider, key)
         }
+        TranscriptionRoute::Local => {
+            let provider = state.providers.get("local")
+                .ok_or_else(|| "Local transcription is not available in this build".to_string())?;
+            (provider, None)
+        }
     };
     let model = source_model(route, &settings.model, &provider.info());
     Ok(TranscriptionSource { provider, api_key, route, model })
@@ -381,7 +452,10 @@ pub(crate) async fn transcription_source(
 
 /// Cleanup keeps the transcription request's captured route and cloud credential.
 pub(crate) async fn clean_text(state: &AppState, settings: &Settings, source: &TranscriptionSource, text: &str, cleanup_receipt: Option<&str>) -> Result<String, TranscriptionError> {
-    let (cleaner, api_key, model) = if source.route != TranscriptionRoute::OwnKey {
+    if source.route == TranscriptionRoute::Local && !settings.local_cleanup_cloud_enabled {
+        return Ok(text.to_string());
+    }
+    let (cleaner, api_key, model) = if matches!(source.route, TranscriptionRoute::FreeCloud | TranscriptionRoute::ProCloud) {
         let cleaner = state.backend_cleaner.clone();
         let model = cleaner.info().default_model;
         (cleaner, source.api_key.clone(), model)
@@ -490,8 +564,10 @@ pub async fn retry_last(app: &AppHandle) {
             log::info!("Reintentando transcripción (intento {})", pending.attempts + 1);
             set_status(app, Status::Transcribing);
             // Conservamos el conteo de intentos si vuelve a fallar.
-            *lock(&state.last_failed) = Some(PendingTranscription { audio: pending.audio.clone(), attempts: pending.attempts });
-            let _ = transcribe_and_deliver(app, pending.audio).await;
+            *lock(&state.last_failed) = Some(PendingTranscription {
+                audio: pending.audio.clone(), attempts: pending.attempts, plan: pending.plan.clone(),
+            });
+            let _ = transcribe_with_plan(app, pending.audio, pending.plan).await;
         }
         None => {
             let lang = state.settings().ui_lang();
@@ -519,6 +595,65 @@ pub fn startup_checks(app: &AppHandle, first_run: bool) {
 #[cfg(test)]
 mod route_tests {
     use super::*;
+
+    #[test]
+    fn queued_local_work_keeps_model_language_and_privacy_after_ui_changes() {
+        let mut preferences = Settings {
+            provider: "local".into(), model: "whisper-base".into(), language: "es".into(),
+            cleanup_enabled: true, local_cleanup_cloud_enabled: false, ..Settings::default()
+        };
+        let batch = TranscriptionPlan::from_flags(preferences.clone(), true, false, false);
+        preferences.provider = "openai".into();
+        preferences.model = "gpt-4o-transcribe".into();
+        preferences.language = "en".into();
+        preferences.local_cleanup_cloud_enabled = true;
+        let future = TranscriptionPlan::from_flags(preferences, true, true, true);
+        assert_eq!(future.route, TranscriptionRoute::ProCloud);
+        for queued_job in [batch.clone(), batch] {
+            assert_eq!(queued_job.route, TranscriptionRoute::Local);
+            assert_eq!(queued_job.settings.model, "whisper-base");
+            assert_eq!(queued_job.settings.language, "es");
+            assert!(!queued_job.settings.should_clean_transcript());
+        }
+    }
+
+    #[test]
+    fn retry_keeps_original_route_even_after_account_or_provider_changes() {
+        for (provider, own_key, pro, signed_in, expected) in [
+            ("local", false, false, false, TranscriptionRoute::Local),
+            ("openai", true, true, true, TranscriptionRoute::OwnKey),
+            ("groq", false, false, false, TranscriptionRoute::OwnKey),
+            ("groq", false, false, true, TranscriptionRoute::FreeCloud),
+            ("groq", false, true, true, TranscriptionRoute::ProCloud),
+        ] {
+            let original = Settings { provider: provider.into(), use_own_key: own_key, ..Settings::default() };
+            let pending = PendingTranscription {
+                audio: PreparedAudio { samples: vec![0; 160], sample_rate: 16_000 }, attempts: 1,
+                plan: TranscriptionPlan::from_flags(original.clone(), true, pro, signed_in),
+            };
+            // The new mode applies only to a new recording; retry carries its original plan.
+            let future = TranscriptionPlan::from_flags(Settings { provider: "mistral".into(), use_own_key: false, ..original }, true, !pro, !signed_in);
+            assert_eq!(future.settings.provider, "mistral");
+            let retry = PendingTranscription { audio: pending.audio.clone(), attempts: pending.attempts + 1, plan: pending.plan.clone() };
+            assert_eq!(retry.plan.route, expected);
+            assert_eq!(retry.plan.settings.provider, provider);
+            assert_eq!(retry.plan.settings.use_own_key, own_key);
+        }
+    }
+
+    #[test]
+    fn local_models_never_select_hosted_billing_or_credentials() {
+        for own_key in [false, true] {
+            let settings = Settings { provider: "local".into(), use_own_key: own_key, ..Settings::default() };
+            for configured in [false, true] {
+                for pro in [false, true] {
+                    for signed_in in [false, true] {
+                        assert_eq!(TranscriptionRoute::for_settings(&settings, configured, pro, signed_in), TranscriptionRoute::Local);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn personal_keys_and_unconfigured_builds_never_select_hosted_billing() {

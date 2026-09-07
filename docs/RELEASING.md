@@ -89,12 +89,12 @@ Outputs are under `src-tauri/target/aarch64-apple-darwin/release/bundle/`. Keep 
 
 ### Verify a Mac-only preview without publishing
 
-Stage the final 0.3.1 local files in `dist/v0.3.1-macos-preview/`. Verify the single updater archive with:
+For the 0.6.0 Mac-first work, install CMake before running the release script. Native speech inference is built from source, with portable CPU settings enforced by the script. Stage the final local files in `dist/v0.6.0-macos-native/`. Verify the single updater archive with:
 
 ```sh
 cargo run --quiet --manifest-path src-tauri/Cargo.toml --example verify_artifact -- \
-  "dist/v0.3.1-macos-preview/Dictámelo.app.tar.gz" \
-  "dist/v0.3.1-macos-preview/Dictámelo.app.tar.gz.sig"
+  "dist/v0.6.0-macos-native/Dictámelo.app.tar.gz" \
+  "dist/v0.6.0-macos-native/Dictámelo.app.tar.gz.sig"
 ```
 
 Check `SHA256SUMS.txt` from that directory, validate the DMG with `xcrun stapler` and Gatekeeper, mount it read-only, and inspect the actual contained app before copying it to Applications. Verify the installed app too. This preview path does not require Windows artifacts and must not create or upload `latest.json`; the complete-release verifier and publisher below serve a different, later release step.

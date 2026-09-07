@@ -1,6 +1,7 @@
 //! Limpieza opcional del texto dictado con un modelo de lenguaje (muletillas, puntuación,
 //! autocorrecciones). Desacoplada igual que la transcripción: la app solo conoce `TextCleaner`.
 
+pub mod cloud;
 pub mod dictamelo;
 pub mod groq;
 pub mod openai_compatible_chat;
@@ -94,7 +95,11 @@ pub struct CleanerRegistry {
 
 impl CleanerRegistry {
     pub fn with_defaults(http: reqwest::Client) -> Self {
-        CleanerRegistry { cleaners: vec![Arc::new(groq::GroqCleaner::new(http))] }
+        CleanerRegistry { cleaners: vec![
+            Arc::new(groq::GroqCleaner::new(http.clone())),
+            Arc::new(cloud::CloudCleaner::new(http.clone(), &cloud::OPENAI_CLEANER)),
+            Arc::new(cloud::CloudCleaner::new(http, &cloud::MISTRAL_CLEANER)),
+        ] }
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn TextCleaner>> {

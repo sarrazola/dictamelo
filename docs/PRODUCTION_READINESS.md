@@ -1,5 +1,15 @@
 # Production readiness
 
+## Current Mac development work — September 7, 2026
+
+Version 0.6.0 adds local speech models and more personal-key providers. Its signed/notarized Mac build has passed the recorded native model, file, shutdown/restart and first-settings checks before Windows work begins. It does not replace the published 0.5.1 installers or updater manifest. See the current [verification record](TESTING.md) and [local model guide](LOCAL_MODELS.md).
+
+The new OpenAI, Mistral and Deepgram adapters have offline request/response contract coverage. Live paid-provider calls still require suitable test keys; protocol tests must not be reported as live provider verification. Local-model speed and accuracy measurements come from an Apple M4 Max, not every supported Mac. Canary's tested Spanish phrase loses two `ñ` characters with both Q8 and F16 weights; Parakeet and Whisper transcribe those words correctly. Parakeet is the recommended local default. Model recognition is not corrected by secretly sending local text to a cloud service.
+
+The historical release and service review below remains scoped to 0.5.1. Cloud plans, billing entitlements, public policy pages and hosted deployment are unchanged by this Mac-first work. Before distributing 0.6.0 publicly, synchronize policy/provider descriptions, complete installed Windows verification, and publish a complete new set of immutable artifacts.
+
+## Published release review
+
 Last reviewed: September 6, 2026, for the 0.5.1 distribution and website. Version 0.5.1 changes the Mac installer layout and version; application and backend behavior remain the same as 0.5.0. The release review checked builds, installed artifacts, public downloads and updating. Resend SMTP and Google branding/audience were separately verified earlier on September 6. CAPTCHA and checkout dashboard settings below were last checked on September 5; they have not been revalidated in those dashboards today. A working local application, a public installer and a production cloud service are separate delivery milestones. Keep exact commit, artifact and native execution evidence in [Testing](TESTING.md).
 
 ## Remaining service and verification work
@@ -14,8 +24,6 @@ The website, six-language policies, official logo and 0.5.1 download links are p
 4. Complete physical microphone/hardware checks. Installer upgrades and ARM64/x64-emulated runtime tests passed; actual installed 0.5.0 → 0.5.1 updating passed on Mac and both Windows architectures (x64 under ARM emulation). The Windows report distinguishes the clean x64 native-UI repetition from an earlier assisted attempt that paused on a file-write lock.
 
 The seven-day trial can stay disabled for the initial launch. Additional model providers, a private wrapper repository and a repository-history reset are not prerequisites. Windows Authenticode and physical Intel/AMD microphone tests remain separate trust and hardware-validation improvements; updater signatures and VM emulation do not replace them.
-
-Small UI follow-up found during native testing: the Free usage progress control still has the accessible label `Weekly words used`, although its value now measures audio seconds. Visible minute totals are correct; update and translate the accessible label in the next UI build.
 
 Windows follow-up: launching a second copy currently permits two processes, with a reported shortcut conflict and fallback. Add a single-instance guard that focuses the existing Settings window. The normal one-instance startup/restart checks passed.
 

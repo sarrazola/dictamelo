@@ -57,7 +57,7 @@ test("translations preserve interpolation names and balanced placeholder syntax"
 });
 
 test("HTML labels and literal translation calls refer to existing keys", () => {
-  const staticLabels = attributes("data-i18n");
+  const staticLabels = [...attributes("data-i18n"), ...attributes("data-i18n-aria-label")];
   // Deliberately checks only literal calls; computed status/model keys need runtime tests.
   const literalCalls = [...main.matchAll(/\bt\(\s*(["'`])([A-Za-z][\w.-]*)\1/g)].map((match) => match[2]);
   assert.ok(staticLabels.length > 0 && literalCalls.length > 0, "No translation references were discovered");
@@ -160,14 +160,138 @@ test("Skip closes setup, clears input buffers and retains saved onboarding state
   assert.deepEqual(commands, ["cancel_google_sign_in"]);
 });
 
-test("new provider choices offer Groq and recommend Large v3 without altering legacy settings", () => {
+test("provider choices follow the native registry and retain existing selections", () => {
   const { sandbox } = loadUiState();
-  sandbox.state.providers = [{ id: "groq" }, { id: "openai" }];
+  sandbox.state.providers = [{ id: "groq" }, { id: "openai" }, { id: "mistral" }, { id: "deepgram" }, { id: "local" }];
   sandbox.state.settings = { provider: "openai", model: "whisper-1" };
-  assert.deepEqual(Array.from(sandbox.selectableProviders(), provider => provider.id), ["groq"]);
+  assert.deepEqual(Array.from(sandbox.selectableProviders(), provider => provider.id), ["groq", "openai", "mistral", "deepgram"]);
   assert.equal(sandbox.currentProvider().id, "openai");
-  assert.equal(sandbox.state.providers.length, 2);
+  assert.equal(sandbox.state.providers.length, 5);
   assert.match(sandbox.recommendedModelName({ id: "whisper-large-v3", name: "Whisper Large v3" }), /Recommended/);
   assert.equal(sandbox.recommendedModelName({ id: "whisper-large-v3-turbo", name: "Whisper Large v3 Turbo" }), "Whisper Large v3 Turbo");
   assert.equal(ids.includes("btn-onboarding"), false, "The temporary launch button must be removed");
+});
+
+test("local transcription cannot route to hosted cloud even with a signed-in account and Pro license", () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.settings = { provider: "local", model: "whisper-base", useOwnKey: false, cleanupEnabled: true };
+  sandbox.state.account = { signedIn: true };
+  sandbox.state.license = { active: true };
+  assert.equal(sandbox.isHostedMode(), false);
+  assert.equal(sandbox.localCleanupAllowed(), false);
+  assert.equal(sandbox.activeSource(), "local");
+  sandbox.state.settings.localCleanupCloudEnabled = true;
+  assert.equal(sandbox.localCleanupAllowed(), true);
+  assert.equal(sandbox.isHostedMode(), false);
+});
+
+test("download completion updates the catalog without selecting a model or enabling cloud cleanup", () => {
+  const { sandbox } = loadUiState();
+  const original = { provider: "groq", model: "whisper-large-v3", cleanupEnabled: true };
+  sandbox.state.settings = original;
+  sandbox.state.localModels = [{ id: "whisper-base", installed: false, status: "downloading", progress: 0.4 }];
+  sandbox.applyLocalModelProgress({ id: "whisper-base", installed: true, status: "ready", progress: 1 });
+  assert.equal(sandbox.state.localModels[0].installed, true);
+  assert.equal(sandbox.state.settings, original);
+  sandbox.applyLocalModelProgress({ id: "unregistered-model", installed: true });
+  assert.equal(sandbox.state.localModels.length, 1, "Progress events must not introduce unregistered downloads");
+});
+
+test("local selection requires a verified download and explicit cleanup consent on entry", () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.settings = { provider: "openai", cleanupEnabled: true, localCleanupCloudEnabled: true, language: "auto" };
+  assert.equal(sandbox.localSelectionPatch({ id: "whisper-base", installed: false, status: "ready" }), null);
+  assert.equal(sandbox.localSelectionPatch({ id: "whisper-base", installed: true, status: "verifying" }), null);
+  const patch = sandbox.localSelectionPatch({ id: "whisper-base", installed: true, status: "ready" });
+  assert.equal(patch.provider, "local");
+  assert.equal(patch.useOwnKey, true);
+  assert.equal(patch.localCleanupCloudEnabled, false);
+  assert.equal(sandbox.state.settings.cleanupEnabled, true, "The cloud cleanup preference should be preserved");
+});
+
+test("language-specific local models select only a supported spoken language", () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.lang = "es";
+  sandbox.state.settings = { provider: "groq", language: "auto" };
+  const canary = { id: "canary-180m-flash", installed: true, status: "ready", requiresLanguage: true, languages: ["en", "de", "es", "fr"] };
+  assert.equal(sandbox.localSelectionPatch(canary).language, "es");
+  sandbox.state.localLanguages[canary.id] = "fr";
+  assert.equal(sandbox.localSelectionPatch(canary).language, "fr");
+  sandbox.state.localLanguages[canary.id] = "ja";
+  sandbox.state.lang = "ja";
+  assert.equal(sandbox.localSelectionPatch(canary).language, "en");
+});
+
+test("switching to an auto-detect model resets an unsupported language to automatic", () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.settings = { provider: "local", model: "whisper-base", language: "ja" };
+  const model = { id: "parakeet-v3", installed: true, status: "ready", requiresLanguage: false, languages: ["en", "es", "fr"] };
+  assert.equal(sandbox.localSelectionPatch(model).language, "auto");
+  sandbox.state.settings.language = "es";
+  assert.equal(Object.hasOwn(sandbox.localSelectionPatch(model), "language"), false);
+});
+
+test("selecting Local stops cloud routing immediately, before the selected model is downloaded", async () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.settings = { provider: "groq", model: "whisper-large-v3", useOwnKey: false, cleanupEnabled: true, localCleanupCloudEnabled: true, language: "auto" };
+  sandbox.state.account = { signedIn: true };
+  sandbox.state.localModels = [{ id: "parakeet-v3", installed: false, status: "not_downloaded", available: true, recommended: true, languages: ["en"] }];
+  sandbox.refreshLocalModels = async () => {};
+  sandbox.saveSettings = async patch => { Object.assign(sandbox.state.settings, patch); return true; };
+  await sandbox.chooseSource("local");
+  assert.equal(sandbox.state.settings.provider, "local");
+  assert.equal(sandbox.state.settings.model, "parakeet-v3");
+  assert.equal(sandbox.isHostedMode(), false);
+  assert.equal(sandbox.localCleanupAllowed(), false);
+  assert.equal(sandbox.state.account.signedIn, true);
+});
+
+test("returning to cloud uses a cloud provider without mutating local preferences or credentials", () => {
+  const { sandbox } = loadUiState();
+  sandbox.state.settings = { provider: "local", model: "whisper-base", language: "es", localCleanupCloudEnabled: false };
+  sandbox.state.providers = [{ id: "groq", defaultModel: "whisper-large-v3" }];
+  const patch = sandbox.cloudSourcePatch();
+  assert.equal(patch.provider, "groq");
+  assert.equal(patch.model, "whisper-large-v3");
+  assert.equal(patch.useOwnKey, false);
+  assert.equal(sandbox.state.settings.provider, "local");
+});
+
+test("a pending download remains cancellable and preserves the selected provider", async () => {
+  const calls = [];
+  const { sandbox } = loadUiState(async (command, args) => { calls.push([command, args.modelId]); });
+  sandbox.state.settings = { provider: "groq", model: "whisper-large-v3" };
+  sandbox.state.localModels = [{ id: "whisper-base", status: "downloading" }];
+  sandbox.state.localActions.add("whisper-base");
+  sandbox.renderLocalModels = () => {};
+  sandbox.refreshLocalModels = async () => {};
+  await sandbox.localModelAction("whisper-base", "cancel");
+  assert.deepEqual(calls, [["cancel_local_model_download", "whisper-base"]]);
+  assert.equal(sandbox.state.settings.provider, "groq");
+});
+
+test("the selected local model cannot be deleted from the catalog", async () => {
+  const { sandbox } = loadUiState(() => assert.fail("Active model must not be deleted"));
+  sandbox.state.settings = { provider: "local", model: "whisper-base" };
+  sandbox.state.localModels = [{ id: "whisper-base", installed: true, status: "ready" }];
+  await sandbox.localModelAction("whisper-base", "delete");
+  assert.equal(sandbox.state.localDeleteArmed, null);
+});
+
+test("provider logos are bundled SVG assets with accompanying licenses", () => {
+  for (const provider of ["groq", "openai", "mistral", "deepgram", "nvidia"]) {
+    const svg = read(`ui/providers/${provider}.svg`);
+    assert.match(svg, /<svg\b/);
+    assert.doesNotMatch(svg, /<(script|foreignObject)\b|(?:href|src)\s*=\s*["']https?:/i);
+  }
+  assert.match(read("ui/providers/LICENSE-lobe-icons.txt"), /MIT License/);
+  assert.match(read("ui/providers/LICENSE-simple-icons.txt"), /CC0/);
+});
+
+test("every local catalog description is translated in all interface languages", () => {
+  const catalog = JSON.parse(read("src-tauri/src/local_models/catalog.json"));
+  assert.ok(catalog.models.length >= 2);
+  for (const model of catalog.models) {
+    for (const language of languages) assert.ok(dictionaries[language][model.description]?.trim(), `${language}: ${model.id} description is missing`);
+  }
 });

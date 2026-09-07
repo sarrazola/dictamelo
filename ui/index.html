@@ -133,6 +133,7 @@
 
     <!-- Plan -->
     <section class="page" data-page="plan">
+      <div id="plan-local-notice" class="card" hidden><p class="desc" data-i18n="plan.local.notice"></p></div>
       <div class="plans">
         <div class="plan" id="plan-own">
           <div class="plan-head"><strong data-i18n="plan.own.name"></strong><span class="plan-badge" data-i18n="plan.current" hidden></span></div>
@@ -183,7 +184,7 @@
             <div id="account-usage" class="usage-panel" hidden>
               <p id="account-pro-note" class="footnote" data-i18n="account.pro.note" hidden></p>
               <strong id="usage-label"></strong>
-              <progress id="usage-progress" max="2000" value="0" aria-label="Weekly words used"></progress>
+              <progress id="usage-progress" max="1800" value="0" data-i18n-aria-label="account.usage.audio_label"></progress>
               <span id="usage-renews" class="footnote"></span>
               <div class="actions"><button id="btn-refresh-usage" class="ghost" data-i18n="account.refresh"></button><button id="btn-signout" class="ghost" data-i18n="account.signout"></button></div>
             </div>
@@ -208,8 +209,14 @@
 
     <!-- Models -->
     <section class="page" data-page="models">
+      <div class="source-picker" role="group" data-i18n-aria-label="models.source.title">
+        <button class="source-option" data-source="cloud"><span class="source-symbol" aria-hidden="true">☁</span><strong data-i18n="models.source.cloud"></strong><span data-i18n="models.source.cloud.desc"></span></button>
+        <button class="source-option" data-source="own"><span class="source-symbol" aria-hidden="true">⌘</span><strong data-i18n="models.source.own"></strong><span data-i18n="models.source.own.desc"></span></button>
+        <button class="source-option" data-source="local"><span class="source-symbol" aria-hidden="true">▣</span><strong data-i18n="models.source.local"></strong><span data-i18n="models.source.local.desc"></span></button>
+      </div>
       <div id="models-cloud-notice" class="card" hidden><div class="row stack"><div class="label"><strong data-i18n="models.cloud.title"></strong><span id="models-cloud-desc"></span></div><button id="btn-models-own" class="ghost" data-i18n="plan.own.choose"></button></div></div>
       <div class="card byok-models">
+        <div id="provider-choices" class="provider-choices" role="group" data-i18n-aria-label="models.provider"></div>
         <div class="provider-model-row">
           <label><span data-i18n="models.provider"></span><select id="provider-select"></select></label>
           <label><span data-i18n="models.model"></span><select id="model-select"></select></label>
@@ -227,6 +234,18 @@
         <p class="hint"><button id="link-key" class="link" data-i18n="models.getkey"></button></p>
       </div>
 
+      <div id="local-models-home" hidden>
+        <div id="local-models-panel" class="card">
+          <div class="card-head"><span class="card-title" data-i18n="models.local.title"></span><button id="btn-refresh-local-models" class="ghost small" data-i18n="models.local.refresh"></button></div>
+          <p class="desc" data-i18n="models.local.desc"></p>
+          <p class="desc" data-i18n="models.local.first_load"></p>
+          <p id="local-models-error" class="footnote error-text" role="status" hidden></p>
+          <div id="local-model-list" class="local-model-list"></div>
+          <p id="local-models-empty" class="footnote" data-i18n="models.local.loading"></p>
+          <div id="local-language-row" class="row" hidden><div class="label"><label for="local-model-language" data-i18n="general.dictlang"></label><span data-i18n="models.local.language_required"></span></div><select id="local-model-language"></select></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title" data-i18n="models.vocab"></div>
         <p class="desc" data-i18n="models.vocab.desc"></p>
@@ -238,11 +257,17 @@
           <div class="label"><strong data-i18n="models.cleanup"></strong><span data-i18n="models.cleanup.desc"></span></div>
           <div class="actions"><label class="switch"><input type="checkbox" id="cleanup-enabled"><span class="track"></span></label></div>
         </div>
+        <div id="local-cleanup-consent" class="local-cleanup-consent" hidden>
+          <label class="check"><input type="checkbox" id="local-cleanup-cloud-enabled"><span data-i18n="models.local.cleanup.optin"></span></label>
+          <p class="footnote" data-i18n="models.local.cleanup.notice"></p>
+        </div>
         <div id="cleanup-options">
+          <div id="cleanup-provider-row" class="provider-model-row"><label><span data-i18n="models.provider"></span><span class="provider-select-with-logo"><img id="cleanup-provider-logo" class="provider-logo" alt=""><select id="cleanup-provider"></select></span></label></div>
           <div class="row">
             <div class="label"><strong data-i18n="models.cleanup.model"></strong><span id="cleanup-model-desc"></span></div>
             <div class="actions"><select id="cleanup-model"></select></div>
           </div>
+          <div id="cleanup-key-form" class="row stack"><div class="label"><strong data-i18n="models.apikey"></strong><span id="cleanup-key-status" role="status"></span></div><div class="actions full"><input id="cleanup-api-key" type="password" autocomplete="off" spellcheck="false" data-i18n-aria-label="models.apikey"><button id="btn-save-cleanup-key" class="primary" data-i18n="models.save"></button><button id="btn-delete-cleanup-key" class="ghost danger" data-i18n="models.delete" hidden></button></div><button id="link-cleanup-key" class="link" data-i18n="models.getkey"></button></div>
           <div class="row" id="cleanup-prompt-row">
             <div class="label"><strong data-i18n="models.cleanup.prompt"></strong><span data-i18n="models.cleanup.prompt.desc"></span></div>
             <div class="actions">
@@ -257,7 +282,7 @@
         </div>
       </div>
 
-      <p class="footnote" data-i18n="models.privacy"></p>
+      <p id="models-privacy-note" class="footnote" data-i18n="models.privacy"></p>
     </section>
 
     <!-- Archivos -->
@@ -353,6 +378,7 @@
         <div class="card-title" data-i18n="about.permissions"></div>
         <div id="about-perm-rows"></div>
       </div>
+      <div class="card"><details id="third-party-notices"><summary data-i18n="about.notices"></summary><pre id="third-party-notices-text" class="third-party-notices-text"></pre></details></div>
       <div class="card">
         <div class="row stack">
           <div class="update-row">
@@ -389,6 +415,7 @@
     <div class="wizard-body">
       <div id="onboarding-choose" class="wizard-options">
         <button class="wizard-option" data-onboarding-mode="own"><span class="wizard-symbol">⌘</span><strong data-i18n="plan.own.name"></strong><span data-i18n="onboarding.own.desc"></span></button>
+        <button class="wizard-option" data-onboarding-mode="local"><span class="wizard-symbol" aria-hidden="true">▣</span><strong data-i18n="models.source.local"></strong><span data-i18n="onboarding.local.desc"></span></button>
         <button class="wizard-option" data-onboarding-mode="free"><span class="wizard-symbol">☁</span><strong data-i18n="plan.free.name"></strong><span data-i18n="onboarding.free.desc"></span></button>
         <button class="wizard-option" data-onboarding-mode="pro"><span class="wizard-symbol">✦</span><strong data-i18n="plan.pro.name"></strong><span data-i18n="onboarding.pro.desc"></span></button>
       </div>
@@ -405,6 +432,7 @@
         </form>
         <div id="onboarding-account"></div>
         <div id="onboarding-license"></div>
+        <div id="onboarding-local"></div>
       </div>
       <div id="onboarding-ready" hidden>
         <div class="shortcut-demo"><kbd id="onboarding-hotkey"></kbd><strong data-i18n="onboarding.try"></strong><p data-i18n="onboarding.try.desc"></p></div>

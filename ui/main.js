@@ -10,6 +10,13 @@ const ui = {
   settings: null,
   providers: [],
   cleaners: [],
+  localModels: [],
+  localModelsLoaded: false,
+  localModelsError: null,
+  localActions: new Set(),
+  localDeleteArmed: null,
+  localLanguages: {},
+  modelsSource: null,
   appInfo: null,
   lang: "es",
   page: "general",
@@ -62,6 +69,7 @@ function t(key, vars) {
 function applyStaticText() {
   document.documentElement.lang = ui.lang;
   for (const el of $$("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  for (const el of $$("[data-i18n-aria-label]")) el.setAttribute("aria-label", t(el.dataset.i18nAriaLabel));
   $("#btn-change-hotkey").textContent = t(ui.capturing ? "general.cancel" : "general.change");
   $("#api-key").placeholder = t("models.apikey.placeholder");
   $("#vocabulary").placeholder = t("models.vocab.placeholder");
@@ -105,6 +113,7 @@ function toast(message, isError = false) {
 }
 
 function currentProvider() {
+  if (isLocalMode()) return { id: "local", name: t("models.source.local"), models: ui.localModels };
   return ui.providers.find((p) => p.id === ui.settings.provider) || ui.providers[0];
 }
 
@@ -146,7 +155,7 @@ function renderGeneral() {
   $("#hotkey-display").textContent = ui.capturing ? t("general.press") : prettyHotkey(ui.settings.hotkey);
   $("#hotkey-display").classList.toggle("capturing", ui.capturing);
   $("#auto-paste").checked = ui.settings.autoPaste;
-  fillSelect($("#language"), [["auto", t("common.auto")], ...DICTATION_LANGUAGES], ui.settings.language);
+  fillSelect($("#language"), dictationLanguageChoices(), ui.settings.language);
   $("#launch-at-login").checked = ui.settings.launchAtLogin;
   $("#play-sounds").checked = ui.settings.playSounds;
 }
@@ -160,20 +169,29 @@ function modelDescription(model) {
   return t(model.description);
 }
 
-function isHostedMode() { return cloudAvailable() && !ui.settings.useOwnKey && (ui.license.active || ui.account.signedIn); }
+function isLocalMode() { return ui.settings?.provider === "local"; }
+function isHostedMode() { return !isLocalMode() && cloudAvailable() && !ui.settings.useOwnKey && (ui.license.active || ui.account.signedIn); }
+function activeSource() { return isLocalMode() ? "local" : isHostedMode() ? "cloud" : "own"; }
+function localCleanupAllowed() { return !isLocalMode() || ui.settings.localCleanupCloudEnabled === true; }
 
 function renderCleanup() {
   const hosted = isHostedMode();
   const freeCloud = hosted && !ui.license.active;
-  const enabled = ui.settings.cleanupEnabled;
-  $("#cleanup-enabled").disabled = false;
+  const enabled = ui.settings.cleanupEnabled && localCleanupAllowed();
+  $("#cleanup-enabled").disabled = !localCleanupAllowed();
   $("#cleanup-enabled").checked = enabled;
   $("#cleanup-options").hidden = !enabled;
   $("#cleanup-prompt-row").hidden = freeCloud;
   $("#cleanup-standard-note").hidden = !freeCloud;
+  $("#local-cleanup-consent").hidden = !isLocalMode();
+  $("#local-cleanup-cloud-enabled").checked = ui.settings.localCleanupCloudEnabled === true;
+  $("#cleanup-provider-row").hidden = hosted;
+  $("#cleanup-key-form").hidden = hosted;
   if (freeCloud) $("#prompt-editor").hidden = true;
   const cleaner = currentCleaner();
   if (!cleaner) return;
+  fillSelect($("#cleanup-provider"), ui.cleaners.map(item => [item.id, item.name]), cleaner.id);
+  setProviderLogo($("#cleanup-provider-logo"), cleaner.keyProvider || cleaner.id);
   fillSelect($("#cleanup-model"), cleaner.models.map((mm) => [mm.id, mm.name]), ui.settings.cleanupModel);
   const model = cleaner.models.find((mm) => mm.id === ui.settings.cleanupModel);
   $("#cleanup-model").disabled = hosted;
@@ -198,10 +216,81 @@ function fillSelect(select, entries, value) {
   select.value = value ?? "";
 }
 
-// Keep adapters and saved selections available for existing installations. Only Groq is
-// offered for new selections; changing providers is always an explicit user action.
+// Provider support comes from the native registry. Local downloads have their own picker.
 function selectableProviders() {
-  return ui.providers.filter(provider => provider.id === "groq");
+  return ui.providers.filter(provider => provider.id !== "local");
+}
+
+const PROVIDER_LOGOS = Object.freeze({ groq: "providers/groq.svg", openai: "providers/openai.svg", mistral: "providers/mistral.svg", deepgram: "providers/deepgram.svg", nvidia: "providers/nvidia.svg" });
+
+function setProviderLogo(image, provider) {
+  const source = PROVIDER_LOGOS[provider];
+  image.hidden = !source;
+  if (source) image.src = source;
+  else image.removeAttribute("src");
+}
+
+function renderProviderChoices() {
+  const container = $("#provider-choices");
+  container.replaceChildren();
+  for (const provider of selectableProviders()) {
+    const button = document.createElement("button");
+    button.className = "provider-choice";
+    button.dataset.provider = provider.id;
+    button.setAttribute("aria-pressed", String(provider.id === ui.settings.provider));
+    const logo = document.createElement("img");
+    logo.className = "provider-logo";
+    logo.alt = "";
+    setProviderLogo(logo, provider.id);
+    const label = document.createElement("span");
+    label.textContent = provider.name;
+    button.append(logo, label);
+    container.appendChild(button);
+  }
+}
+
+async function selectByokProvider(id) {
+  const provider = selectableProviders().find(item => item.id === id);
+  if (!provider) return false;
+  $("#api-key").value = "";
+  $("#onboarding-api-key").value = "";
+  ui.modelsSource = "own";
+  return saveSettings({ provider: provider.id, model: provider.defaultModel, useOwnKey: true });
+}
+
+function cloudSourcePatch() {
+  if (!isLocalMode()) return { useOwnKey: false };
+  const provider = selectableProviders().find(item => item.id === "groq") || selectableProviders()[0];
+  return { provider: provider.id, model: provider.defaultModel, useOwnKey: false };
+}
+
+async function chooseSource(source) {
+  ui.modelsSource = source;
+  if (source === "local") {
+    await refreshLocalModels();
+    const models = ui.localModels.filter(model => model.available !== false);
+    const model = models.find(item => isLocalMode() && item.id === ui.settings.model) || models.find(item => item.recommended) || models[0];
+    if (!model || ui.localModelsError) {
+      ui.modelsSource = null;
+      renderModels();
+      toast(ui.localModelsError || t("models.local.mac_only"), true);
+      return false;
+    }
+    const patch = { provider: "local", model: model.id, useOwnKey: true, ...(!isLocalMode() ? { localCleanupCloudEnabled: false } : {}) };
+    Object.assign(patch, localLanguagePatch(model));
+    if (!(await saveSettings(patch))) { ui.modelsSource = null; renderModels(); return false; }
+  } else if (source === "own") {
+    if (isLocalMode()) await selectByokProvider("groq");
+    else await saveSettings({ useOwnKey: true });
+  } else {
+    if (!(await saveSettings(cloudSourcePatch()))) return;
+    if (!ui.account.signedIn && !ui.license.active) {
+      showPage("plan");
+      setAuthMode("signup");
+      $("#account-card").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+  return true;
 }
 
 function recommendedModelName(model) {
@@ -224,10 +313,20 @@ function renderProviderSelection(providerSelect, modelSelect) {
 
 function renderModels() {
   const hosted = isHostedMode();
+  const source = ui.modelsSource || activeSource();
+  $$("[data-source]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.source === source));
+    button.hidden = button.dataset.source === "cloud" && !cloudAvailable();
+  });
+  $(".source-picker").classList.toggle("standalone", !cloudAvailable());
   $("#dropzone .formats").textContent = t(hosted && !ui.license.active ? "files.formats.free" : "files.formats");
-  $("#models-cloud-notice").hidden = !hosted;
+  $("#models-cloud-notice").hidden = source !== "cloud";
   $("#models-cloud-desc").textContent = t(ui.license.active ? "models.cloud.pro" : "models.cloud.free");
-  $$(".byok-models").forEach(el => el.hidden = hosted);
+  $$(".byok-models").forEach(el => el.hidden = source !== "own");
+  $("#local-models-home").hidden = source !== "local";
+  $("#models-privacy-note").textContent = t(isLocalMode() ? (localCleanupAllowed() && ui.settings.cleanupEnabled ? "models.local.privacy_cleanup" : "models.local.privacy") : "models.privacy");
+  renderProviderChoices();
+  renderLocalModels();
   const selected = renderProviderSelection($("#provider-select"), $("#model-select"));
   const model = selected?.models.find(item => item.id === ui.settings.model);
   $("#model-description").textContent = model ? modelDescription(model) : "";
@@ -239,6 +338,214 @@ function renderModels() {
   const vocabulary = $("#vocabulary");
   if (document.activeElement !== vocabulary) vocabulary.value = ui.settings.vocabulary || "";
   renderCleanup();
+}
+
+// Download state is authoritative in Rust; progress events never select a model or send audio.
+function applyLocalModelProgress(model) {
+  if (!model?.id || !ui.localModels.some(item => item.id === model.id)) return;
+  ui.localModels = ui.localModels.map(item => item.id === model.id ? { ...item, ...model } : item);
+}
+
+function updateLocalDownloadProgress(model) {
+  const card = [...$("#local-model-list").children].find(item => item.dataset.localCard === model.id);
+  const progress = card?.querySelector("progress");
+  const status = card?.querySelector(".local-download-status");
+  if (!progress || !status) return false;
+  progress.value = Math.min(1, Math.max(0, Number(model.progress) || 0));
+  status.textContent = model.status === "verifying" ? t("models.local.verifying") : `${Math.round(progress.value * 100)}% · ${formatModelSize(model.downloadedBytes)} / ${formatModelSize(model.sizeBytes)}`;
+  return true;
+}
+
+async function refreshLocalModels() {
+  try {
+    ui.localModels = await invoke("list_local_models");
+    ui.localModelsLoaded = true;
+    ui.localModelsError = null;
+  } catch (err) {
+    ui.localModelsError = String(err);
+  }
+  renderLocalModels();
+  renderSidebar();
+  refreshKeyStatus();
+  if ($("#onboarding-dialog").open) renderOnboardingNext();
+}
+
+function formatModelSize(bytes) {
+  const size = Number(bytes) || 0;
+  return size >= 1e9 ? `${(size / 1e9).toFixed(1)} GB` : `${Math.ceil(size / 1e6)} MB`;
+}
+
+function localLanguageChoices(model) {
+  return (model.languages || []).map(code => [code, DICTATION_LANGUAGES.find(item => item[0] === code)?.[1] || code]);
+}
+
+function dictationLanguageChoices() {
+  const model = isLocalMode() && ui.localModels.find(item => item.id === ui.settings.model);
+  if (!model) return [["auto", t("common.auto")], ...DICTATION_LANGUAGES];
+  const choices = localLanguageChoices(model);
+  return model.requiresLanguage ? choices : [["auto", t("common.auto")], ...choices];
+}
+
+function localLanguagePatch(model) {
+  if (model.requiresLanguage) return { language: localModelLanguage(model) };
+  if (ui.settings.language !== "auto" && !(model.languages || []).includes(ui.settings.language)) return { language: "auto" };
+  return {};
+}
+
+function localModelLanguage(model) {
+  const choices = (model.languages || []);
+  const preferred = ui.localLanguages[model.id] || ui.settings.language;
+  return choices.includes(preferred) ? preferred : choices.includes(ui.lang) ? ui.lang : choices[0];
+}
+
+function localSelectionPatch(model) {
+  if (!model?.installed || model.status !== "ready") return null;
+  const patch = { provider: "local", model: model.id, useOwnKey: true };
+  // Entering local mode always starts offline. Selecting a different local model
+  // retains an explicit cleanup opt-in made during this local session.
+  if (!isLocalMode()) patch.localCleanupCloudEnabled = false;
+  return { ...patch, ...localLanguagePatch(model) };
+}
+
+function renderLocalModels() {
+  const list = $("#local-model-list");
+  const focused = document.activeElement?.closest?.("[data-local-action]");
+  const focusKey = focused ? [focused.dataset.localModel, focused.dataset.localAction] : null;
+  list.replaceChildren();
+  $("#local-models-error").hidden = !ui.localModelsError;
+  $("#local-models-error").textContent = ui.localModelsError || "";
+  $("#local-models-empty").hidden = ui.localModels.length > 0 || !!ui.localModelsError;
+  $("#local-models-empty").textContent = t(ui.localModelsLoaded ? "models.local.empty" : "models.local.loading");
+  for (const model of ui.localModels) {
+    const card = document.createElement("article");
+    card.className = "local-model-card";
+    card.dataset.localCard = model.id;
+    const selected = isLocalMode() && ui.settings.model === model.id;
+    card.classList.toggle("selected", selected);
+    const header = document.createElement("div");
+    header.className = "local-model-heading";
+    const logo = document.createElement("img");
+    logo.className = "provider-logo";
+    logo.alt = "";
+    setProviderLogo(logo, model.id.startsWith("whisper") ? "openai" : "nvidia");
+    const title = document.createElement("strong");
+    title.textContent = model.name;
+    header.append(logo, title);
+    if (selected || model.recommended) {
+      const badge = document.createElement("span");
+      badge.className = "model-tag";
+      badge.textContent = t(selected ? (model.installed ? "models.local.selected" : "models.local.needs_download") : "models.recommended");
+      header.appendChild(badge);
+    }
+    const description = document.createElement("p");
+    description.className = "desc";
+    description.textContent = modelDescription(model);
+    const meta = document.createElement("p");
+    meta.className = "local-model-meta";
+    const languages = model.languages || [];
+    const languageNames = languages.length > 8 ? t("models.local.languages", { count: languages.length }) : localLanguageChoices(model).map(item => item[1]).join(", ");
+    meta.textContent = [formatModelSize(model.sizeBytes), languageNames, model.license].filter(Boolean).join(" · ");
+    card.append(header, description, meta);
+    if (model.requiresLanguage) {
+      const label = document.createElement("label");
+      label.className = "local-model-language";
+      const caption = document.createElement("span");
+      caption.textContent = t("models.local.language_required");
+      const select = document.createElement("select");
+      select.dataset.localLanguage = model.id;
+      fillSelect(select, localLanguageChoices(model), localModelLanguage(model));
+      label.append(caption, select);
+      card.appendChild(label);
+    }
+    const downloading = ["downloading", "verifying"].includes(model.status);
+    if (downloading) {
+      const progress = document.createElement("progress");
+      progress.max = 1;
+      progress.value = Math.min(1, Math.max(0, Number(model.progress) || 0));
+      progress.setAttribute("aria-label", t("models.local.progress", { name: model.name }));
+      const status = document.createElement("span");
+      status.className = "local-model-meta local-download-status";
+      status.textContent = model.status === "verifying" ? t("models.local.verifying") : `${Math.round(progress.value * 100)}% · ${formatModelSize(model.downloadedBytes)} / ${formatModelSize(model.sizeBytes)}`;
+      card.append(progress, status);
+    }
+    if (model.error) {
+      const error = document.createElement("p");
+      error.className = "footnote error-text";
+      error.setAttribute("role", "status");
+      error.textContent = model.error;
+      card.appendChild(error);
+    }
+    const actions = document.createElement("div");
+    actions.className = "local-model-actions";
+    const action = (name, label, className, disabled = false) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.dataset.localModel = model.id;
+      button.dataset.localAction = name;
+      button.textContent = label;
+      const anotherDownload = name === "download" && (ui.localActions.size > 0 || ui.localModels.some(item => ["downloading", "verifying"].includes(item.status)));
+      button.disabled = disabled || model.available === false || anotherDownload || (ui.localActions.has(model.id) && name !== "cancel");
+      actions.appendChild(button);
+    };
+    if (model.available === false) {
+      const unavailable = document.createElement("p");
+      unavailable.className = "footnote";
+      unavailable.textContent = t("models.local.mac_only");
+      card.appendChild(unavailable);
+    }
+    if (downloading) action("cancel", t("general.cancel"), "ghost small");
+    else if (model.installed && model.status === "ready") {
+      action("use", t(selected ? "models.local.selected" : "models.local.use"), selected ? "ghost small" : "primary small", selected);
+      action("delete", t(ui.localDeleteArmed === model.id ? "models.confirm" : "models.local.delete"), "ghost danger small", selected);
+    } else action("download", t(model.status === "error" ? "models.local.retry" : "models.local.download"), "primary small");
+    if (model.sourceUrl) action("source", t("models.local.details"), "link small");
+    card.appendChild(actions);
+    list.appendChild(card);
+  }
+  const selected = ui.localModels.find(model => isLocalMode() && model.id === ui.settings.model);
+  $("#local-language-row").hidden = !selected;
+  if (selected) {
+    fillSelect($("#local-model-language"), dictationLanguageChoices(), ui.settings.language);
+    $("#local-language-row .label span").textContent = t(selected.requiresLanguage ? "models.local.language_required" : "models.local.language_auto");
+  }
+  if (focusKey) [...list.querySelectorAll("[data-local-action]")].find(button => button.dataset.localModel === focusKey[0] && button.dataset.localAction === focusKey[1])?.focus({ preventScroll: true });
+}
+
+async function localModelAction(modelId, action) {
+  const model = ui.localModels.find(item => item.id === modelId);
+  if (!model || (ui.localActions.has(modelId) && action !== "cancel")) return;
+  if (action === "source") {
+    if (model.sourceUrl) invoke("open_url", { url: model.sourceUrl }).catch(err => toast(String(err), true));
+    return;
+  }
+  if (action === "use") {
+    const patch = localSelectionPatch(model);
+    if (!patch) return;
+    ui.modelsSource = "local";
+    await saveSettings(patch);
+    return;
+  }
+  if (action === "delete") {
+    if (isLocalMode() && ui.settings.model === modelId) return;
+    if (ui.localDeleteArmed !== modelId) {
+      ui.localDeleteArmed = modelId;
+      renderLocalModels();
+      return;
+    }
+  }
+  const command = { download: "download_local_model", cancel: "cancel_local_model_download", delete: "delete_local_model" }[action];
+  if (!command) return;
+  ui.localActions.add(modelId);
+  ui.localDeleteArmed = null;
+  renderLocalModels();
+  try {
+    await invoke(command, { modelId });
+  } catch (err) { toast(String(err), true); }
+  finally {
+    ui.localActions.delete(modelId);
+    await refreshLocalModels();
+  }
 }
 
 function permissionRow(kind, state) {
@@ -311,10 +618,17 @@ async function refreshPermissions() {
 }
 
 async function refreshKeyStatus() {
+  refreshCleanupKeyStatus();
+  if (isLocalMode()) {
+    const model = ui.localModels.find(item => item.id === ui.settings.model);
+    $("#foot-dot").style.background = model?.installed ? "var(--ok)" : "var(--warn)";
+    return;
+  }
   const provider = currentProvider();
   if (!provider) return;
   try {
     const status = await invoke("get_api_key_status", { provider: provider.id });
+    if (provider.id !== ui.settings.provider) return;
     $("#key-status").textContent = status.configured
       ? `${t("models.apikey.stored")}${status.hint ? ` (${status.hint})` : ""}`
       : t("models.apikey.missing", { p: provider.name });
@@ -326,6 +640,21 @@ async function refreshKeyStatus() {
   }
   ui.deleteArmed = false;
   $("#btn-delete-key").textContent = t("models.delete");
+}
+
+async function refreshCleanupKeyStatus() {
+  const cleaner = currentCleaner();
+  if (!cleaner || isHostedMode()) return;
+  const provider = cleaner.keyProvider || cleaner.id;
+  try {
+    const status = await invoke("get_api_key_status", { provider });
+    if ((currentCleaner()?.keyProvider || currentCleaner()?.id) !== provider) return;
+    $("#cleanup-key-status").textContent = status.configured ? `${t("models.apikey.stored")}${status.hint ? ` (${status.hint})` : ""}` : t("models.apikey.missing", { p: cleaner.name });
+    $("#cleanup-api-key").placeholder = t(status.configured ? "models.apikey.replace" : "models.apikey.placeholder");
+    $("#btn-delete-cleanup-key").hidden = !status.configured;
+  } catch (err) { $("#cleanup-key-status").textContent = String(err); }
+  ui.cleanupDeleteArmed = false;
+  $("#btn-delete-cleanup-key").textContent = t("models.delete");
 }
 
 // ---------- Actualizaciones ----------
@@ -400,6 +729,7 @@ function renderPlan() {
   renderAccount();
   renderSidebar();
   renderModels();
+  $("#plan-local-notice").hidden = !isLocalMode();
   const available = cloudAvailable();
   $("#plan-free").hidden = !available;
   $("#plan-pro").hidden = !available;
@@ -408,7 +738,7 @@ function renderPlan() {
   $(".plans").classList.toggle("standalone", !available);
   $(".plans + .footnote").hidden = !available;
   const active = ui.license.active;
-  const mode = !available || ui.settings.useOwnKey || (!active && !ui.account.signedIn) ? "own" : active ? "pro" : "free";
+  const mode = isLocalMode() ? "local" : !available || ui.settings.useOwnKey || (!active && !ui.account.signedIn) ? "own" : active ? "pro" : "free";
   for (const id of ["own", "free", "pro"]) {
     $(`#plan-${id}`).querySelector(".plan-badge").hidden = id !== mode;
     $(`#plan-${id}`).classList.toggle("featured", id === mode);
@@ -502,7 +832,7 @@ async function finishAccountSignIn(status) {
   ui.accountNotice = null;
   $("#account-password").value = "";
   $("#account-code").value = "";
-  if (status.signedIn) await saveSettings({ useOwnKey: false });
+  if (status.signedIn) { ui.modelsSource = "cloud"; await saveSettings(cloudSourcePatch()); }
   renderPlan();
 }
 
@@ -512,6 +842,7 @@ function restoreOnboardingCards() {
   $("#account-home").appendChild($("#account-card"));
   $("#license-home").appendChild($("#license-card"));
   $("#btn-wizard-checkout").hidden = true;
+  $("#local-models-home").appendChild($("#local-models-panel"));
 }
 
 async function showFirstRunOnboarding() {
@@ -543,7 +874,7 @@ function closeOnboarding() {
 
 function renderOnboardingNext() {
   const { step, mode, keyConfigured } = ui.onboarding;
-  const ready = mode === "own" ? keyConfigured : mode === "free" ? ui.account.signedIn : ui.license.active;
+  const ready = mode === "local" ? isLocalMode() && ui.localModels.some(model => model.id === ui.settings.model && model.installed) : mode === "own" ? keyConfigured : mode === "free" ? ui.account.signedIn : ui.license.active;
   $("#btn-onboarding-next").disabled = step === 2 && !ready;
   $("#btn-onboarding-next").textContent = t(step === 3 ? "onboarding.done" : "onboarding.next");
 }
@@ -558,7 +889,7 @@ function renderOnboarding() {
   $$(".wizard-progress i").forEach((el, index) => el.classList.toggle("active", index < step));
   $("#onboarding-choose").hidden = step !== 1;
   $("#onboarding-choose").classList.toggle("standalone", !cloudAvailable());
-  $$("[data-onboarding-mode]").forEach(el => el.hidden = !cloudAvailable() && el.dataset.onboardingMode !== "own");
+  $$("[data-onboarding-mode]").forEach(el => el.hidden = !cloudAvailable() && !["own", "local"].includes(el.dataset.onboardingMode));
   $("#onboarding-setup").hidden = step !== 2;
   $("#onboarding-ready").hidden = step !== 3;
   $("#btn-onboarding-back").hidden = step === 1;
@@ -574,8 +905,12 @@ function renderOnboarding() {
     renderProviderSelection($("#onboarding-provider"), $("#onboarding-model"));
     refreshOnboardingKey();
   }
+  if (step === 2 && mode === "local") {
+    $("#onboarding-local").appendChild($("#local-models-panel"));
+    renderLocalModels();
+  }
   $("#onboarding-hotkey").textContent = prettyHotkey(ui.settings.hotkey);
-  fillSelect($("#onboarding-language"), [["auto", t("common.auto")], ...DICTATION_LANGUAGES], ui.settings.language);
+  fillSelect($("#onboarding-language"), dictationLanguageChoices(), ui.settings.language);
   $("#btn-close-onboarding").ariaLabel = t("onboarding.close");
   renderOnboardingNext();
 }
@@ -870,16 +1205,28 @@ async function onCaptureKeydown(e) {
 function wireEvents() {
   $("#nav").addEventListener("click", (e) => {
     const item = e.target.closest(".nav-item");
-    if (item) showPage(item.dataset.page);
+    if (item) {
+      showPage(item.dataset.page);
+      if (item.dataset.page === "models") refreshLocalModels();
+    }
   });
 
-  $("#provider-select").addEventListener("change", async (e) => {
-    const provider = selectableProviders().find(item => item.id === e.target.value);
-    if (!provider) return;
-    await saveSettings({ provider: provider.id, model: provider.defaultModel });
-    await refreshKeyStatus();
-  });
+  $(".source-picker").addEventListener("click", e => { const source = e.target.closest("[data-source]"); if (source) chooseSource(source.dataset.source); });
+  $("#provider-choices").addEventListener("click", e => { const provider = e.target.closest("[data-provider]"); if (provider) selectByokProvider(provider.dataset.provider); });
+  $("#provider-select").addEventListener("change", e => selectByokProvider(e.target.value));
   $("#model-select").addEventListener("change", e => saveSettings({ model: e.target.value }));
+  $("#btn-refresh-local-models").addEventListener("click", refreshLocalModels);
+  $("#local-model-list").addEventListener("click", e => {
+    const button = e.target.closest("[data-local-action]");
+    if (button) localModelAction(button.dataset.localModel, button.dataset.localAction);
+  });
+  $("#local-model-list").addEventListener("change", e => {
+    const modelId = e.target.dataset.localLanguage;
+    if (!modelId) return;
+    ui.localLanguages[modelId] = e.target.value;
+    if (isLocalMode() && ui.settings.model === modelId) saveSettings({ language: e.target.value });
+  });
+  $("#local-model-language").addEventListener("change", e => saveSettings({ language: e.target.value }));
 
   $("#language").addEventListener("change", (e) => saveSettings({ language: e.target.value }));
   $("#auto-paste").addEventListener("change", (e) => saveSettings({ autoPaste: e.target.checked }));
@@ -893,6 +1240,40 @@ function wireEvents() {
   $("#play-sounds").addEventListener("change", (e) => saveSettings({ playSounds: e.target.checked }));
   $("#vocabulary").addEventListener("change", (e) => saveSettings({ vocabulary: e.target.value.trim() }));
   $("#cleanup-enabled").addEventListener("change", (e) => saveSettings({ cleanupEnabled: e.target.checked }));
+  $("#local-cleanup-cloud-enabled").addEventListener("change", e => saveSettings({ localCleanupCloudEnabled: e.target.checked, ...(e.target.checked ? { cleanupEnabled: true } : {}) }));
+  $("#cleanup-provider").addEventListener("change", e => {
+    const cleaner = ui.cleaners.find(item => item.id === e.target.value);
+    if (!cleaner) return;
+    $("#cleanup-api-key").value = "";
+    saveSettings({ cleanupProvider: cleaner.id, cleanupModel: cleaner.defaultModel });
+  });
+  $("#btn-save-cleanup-key").addEventListener("click", async () => {
+    const input = $("#cleanup-api-key");
+    const key = input.value.trim();
+    if (!key) return;
+    const cleaner = currentCleaner();
+    try {
+      await invoke("set_api_key", { provider: cleaner.keyProvider || cleaner.id, apiKey: key });
+      input.value = "";
+      await refreshKeyStatus();
+      toast(t("toast.key_saved"));
+    } catch (err) { toast(String(err), true); }
+  });
+  $("#cleanup-api-key").addEventListener("keydown", e => { if (e.key === "Enter") $("#btn-save-cleanup-key").click(); });
+  $("#btn-delete-cleanup-key").addEventListener("click", async () => {
+    if (!ui.cleanupDeleteArmed) { ui.cleanupDeleteArmed = true; $("#btn-delete-cleanup-key").textContent = t("models.confirm"); return; }
+    const cleaner = currentCleaner();
+    try {
+      await invoke("delete_api_key", { provider: cleaner.keyProvider || cleaner.id });
+      await refreshKeyStatus();
+      toast(t("toast.key_deleted"));
+    } catch (err) { toast(String(err), true); }
+  });
+  $("#link-cleanup-key").addEventListener("click", () => {
+    const cleaner = currentCleaner();
+    const provider = ui.providers.find(item => item.id === (cleaner.keyProvider || cleaner.id));
+    if (provider?.keyUrl) invoke("open_url", { url: provider.keyUrl }).catch(err => toast(String(err), true));
+  });
   $("#cleanup-model").addEventListener("change", (e) => saveSettings({ cleanupModel: e.target.value }));
   $("#cleanup-prompt").addEventListener("change", (e) => {
     const value = e.target.value.trim();
@@ -1017,7 +1398,12 @@ function wireEvents() {
   $("#btn-onboarding-back").addEventListener("click", () => { if (ui.googlePending) invoke("cancel_google_sign_in").catch(console.error); ui.onboarding.step--; renderOnboarding(); });
   $("#btn-onboarding-next").addEventListener("click", async () => {
     if (ui.onboarding.step === 3) { closeOnboarding(); showPage("general"); return; }
-    if (ui.onboarding.step === 1 && !(await saveSettings({ useOwnKey: ui.onboarding.mode === "own" }))) return;
+    if (ui.onboarding.step === 1) {
+      const mode = ui.onboarding.mode;
+      if (mode === "local") { if (!(await chooseSource("local"))) return; }
+      else if (mode === "own") { if (!(await (isLocalMode() ? selectByokProvider("groq") : saveSettings({ useOwnKey: true })))) return; }
+      else if (!(await saveSettings(cloudSourcePatch()))) return;
+    }
     ui.onboarding.step++;
     renderOnboarding();
     refreshPermissions();
@@ -1027,7 +1413,7 @@ function wireEvents() {
     if (!provider) return;
     $("#onboarding-api-key").value = "";
     ui.onboarding.keyConfigured = false;
-    await saveSettings({ provider: provider.id, model: provider.defaultModel });
+    await selectByokProvider(provider.id);
   });
   $("#onboarding-language").addEventListener("change", e => saveSettings({ language: e.target.value }));
   $("#onboarding-model").addEventListener("change", e => saveSettings({ model: e.target.value }));
@@ -1043,16 +1429,17 @@ function wireEvents() {
     } catch (err) { toast(String(err), true); }
   });
   $("#onboarding-get-key").addEventListener("click", () => invoke("open_url", { url: currentProvider().keyUrl }).catch(e => toast(String(e), true)));
-  $("#btn-models-own").addEventListener("click", () => saveSettings({ useOwnKey: true }));
-  $("#btn-use-own").addEventListener("click", async () => { if (await saveSettings({ useOwnKey: true })) showPage("models"); });
+  $("#btn-models-own").addEventListener("click", () => chooseSource("own"));
+  $("#btn-use-own").addEventListener("click", async () => { await chooseSource("own"); showPage("models"); });
   $("#btn-use-cloud").addEventListener("click", async () => {
-    if (!(await saveSettings({ useOwnKey: false }))) return;
+    ui.modelsSource = "cloud";
+    if (!(await saveSettings(cloudSourcePatch()))) return;
     if (!ui.account.signedIn) setAuthMode("signup");
     $("#account-card").scrollIntoView({ behavior: "smooth", block: "start" });
     if (!ui.account.signedIn) $("#account-email").focus({ preventScroll: true });
   });
   const checkout = () => invoke("open_checkout").catch(e => toast(String(e), true));
-  $("#btn-get-pro").addEventListener("click", () => ui.license.active ? saveSettings({ useOwnKey: false }) : checkout());
+  $("#btn-get-pro").addEventListener("click", () => ui.license.active ? chooseSource("cloud") : checkout());
   $("#btn-wizard-checkout").addEventListener("click", checkout);
   $("#btn-auth-create").addEventListener("click", () => setAuthMode("signup"));
   $("#btn-auth-signin").addEventListener("click", () => setAuthMode("signin"));
@@ -1115,7 +1502,8 @@ function wireEvents() {
     if (!key) return;
     try {
       ui.license = await invoke("activate_license", { key });
-      await saveSettings({ useOwnKey: false });
+      ui.modelsSource = "cloud";
+      await saveSettings(cloudSourcePatch());
       input.value = "";
       renderPlan();
       toast(t("toast.license_on"));
@@ -1193,6 +1581,16 @@ function wireEvents() {
     invoke("open_url", { url: "https://dictamelo.com" }).catch((e) => toast(String(e), true)));
   $("#btn-logs").addEventListener("click", () =>
     invoke("open_log_dir").catch((e) => toast(String(e), true)));
+  $("#third-party-notices").addEventListener("toggle", async e => {
+    const output = $("#third-party-notices-text");
+    if (!e.target.open || output.dataset.loaded) return;
+    try {
+      const response = await fetch("third-party-notices.txt");
+      if (!response.ok) throw new Error(t("about.notices.error"));
+      output.textContent = await response.text();
+      output.dataset.loaded = "true";
+    } catch (err) { output.textContent = String(err); }
+  });
 
   window.addEventListener("focus", () => {
     refreshPermissions();
@@ -1208,6 +1606,15 @@ async function init() {
   ui.settings = await invoke("get_settings");
   ui.lang = ui.settings.uiLanguage === "auto" ? resolveAutoLanguage() : ui.settings.uiLanguage;
 
+  await listen("local-model-progress", e => {
+    const previous = ui.localModels.find(item => item.id === e.payload?.id);
+    applyLocalModelProgress(e.payload);
+    if (!previous || previous.status !== e.payload?.status || !["downloading", "verifying"].includes(e.payload?.status) || !updateLocalDownloadProgress(e.payload)) renderLocalModels();
+    if (e.payload?.status === "ready") { renderSidebar(); refreshKeyStatus(); }
+    if ($("#onboarding-dialog").open) renderOnboardingNext();
+  });
+  await refreshLocalModels();
+
   renderAll();
   wireEvents();
   await showFirstRunOnboarding();
@@ -1216,9 +1623,9 @@ async function init() {
   await Promise.all([refreshKeyStatus(), refreshPermissions(), refreshHistory(), refreshDevices(), refreshFileJobs(), refreshLicense(), refreshAccount()]);
   renderStatus(await invoke("get_status"));
 
-  await listen("status", (e) => renderStatus(e.payload));
+  await listen("status", (e) => { renderStatus(e.payload); if (e.payload?.state === "error" && isLocalMode()) refreshLocalModels(); });
   await listen("history-changed", () => { refreshHistory(); refreshAccount(); });
-  await listen("file-jobs-changed", (e) => { renderFileJobs(e.payload); if (e.payload?.some(j => j.stage === "done")) refreshAccount(); });
+  await listen("file-jobs-changed", (e) => { renderFileJobs(e.payload); if (e.payload?.some(j => j.stage === "done")) refreshAccount(); if (isLocalMode() && e.payload?.some(j => j.stage === "failed")) refreshLocalModels(); });
   await listen("file-cleanup-warning", (e) => toast(String(e.payload), true));
   await listen("update-available", (e) => applyUpdateInfo(e.payload));
   await listen("update-progress", (e) => {

@@ -18,6 +18,8 @@ mod cleanup;
 mod file_transcription;
 mod clipboard;
 mod commands;
+mod local_model_commands;
+mod local_models;
 mod history;
 mod license;
 mod account;
@@ -79,6 +81,10 @@ pub fn run() {
             commands::get_status,
             commands::get_providers,
             commands::get_cleaners,
+            local_model_commands::list_local_models,
+            local_model_commands::download_local_model,
+            local_model_commands::cancel_local_model_download,
+            local_model_commands::delete_local_model,
             commands::get_account_status,
             commands::sign_up_account,
             commands::sign_in_account,
@@ -187,6 +193,13 @@ pub fn run() {
             if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
                 if code.is_none() {
                     api.prevent_exit();
+                } else if let Some(state) = _app.try_state::<state::AppState>() {
+                    state.local_models.shutdown();
+                }
+            } else if let tauri::RunEvent::Exit = event {
+                // Idempotent fallback for a runtime exit that bypassed ExitRequested.
+                if let Some(state) = _app.try_state::<state::AppState>() {
+                    state.local_models.shutdown();
                 }
             }
         });

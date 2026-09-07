@@ -66,6 +66,14 @@ Windows uses Win32 for keyboard/clipboard and Media Foundation for conversion. A
 
 ## Public source and credentials
 
+### Mac development build: 0.6.0
+
+The current Mac source adds downloadable local Whisper, Canary Flash and Parakeet models, plus personal-key OpenAI, Mistral and Deepgram alongside Groq. New installations enable launch at login by default; saved preferences are preserved. Local transcription needs no account and only sends text to a cloud cleaner after explicit opt-in. These features are not in the published 0.5.1 downloads above. Windows enablement and verification will follow separately.
+
+See [local models and catalog maintenance](docs/LOCAL_MODELS.md) and [cloud providers](docs/CLOUD_PROVIDERS.md). Mac source builds now require **CMake** in addition to Xcode Command Line Tools; users of a packaged app do not need either tool.
+
+### Shared application source
+
 This is the real application used to compile the official edition. **A clean source build uses personal keys and leaves hosted services and automatic updates disabled.** Official and self-hosted builds inject public service metadata into the same source. There is no second editable copy of the app.
 
 Free/Pro audio goes through the configured backend to Groq; personal-key mode sends it to the selected provider. Temporary audio is removed after use and history stays local. The backend records account/license usage metadata and cleanup transcript hashes, not saved audio or transcript contents. Provider retention policies still apply. Supabase Auth manages identity.

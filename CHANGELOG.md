@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 — In development, Mac first
+
+- Add downloadable local Whisper Tiny, Base, Small and Large v3, Canary 180M Flash and Parakeet v3 through a pinned native engine and extensible model catalog.
+- Verify download size and SHA-256, show progress, support cancellation/removal, and keep models outside the installer.
+- Keep local transcription independent of accounts and hosted quotas; require explicit consent for optional cloud cleanup of local text.
+- Expose personal-key OpenAI, Mistral and Deepgram alongside Groq, with provider logos and separate cleanup-provider selection.
+- Enable launch at login for new installations while preserving existing preferences.
+
+This iteration is developed and tested on Mac. No 0.6.0 Windows installer or public updater manifest is published. See `docs/TESTING.md` for actual verification results.
+
 ## 0.5.1 — September 6, 2026
 
 - Refresh the Mac disk image with a Retina installation background, large app and Applications icons, a drag arrow and clear installation instructions.

@@ -1,52 +1,31 @@
-//! Proveedor OpenAI. Comparte el cliente genérico con Groq; solo cambian URL y modelos.
-//! Nota: incluido para demostrar la extensibilidad; NO se probó de extremo a extremo.
+//! OpenAI file transcription. GPT transcription models require JSON, while Whisper supports verbose JSON.
 
+use super::cloud_catalog::OPENAI;
 use super::openai_compatible::{OpenAiCompatibleClient, ResponseFormat};
-use super::{ModelInfo, ProviderInfo, TranscriptionError, TranscriptionProvider, TranscriptionRequest, TranscriptionResult};
+use super::{
+    ProviderInfo, TranscriptionError, TranscriptionProvider, TranscriptionRequest,
+    TranscriptionResult,
+};
 use async_trait::async_trait;
 
-pub const OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
+pub const OPENAI_BASE_URL: &str = OPENAI.base_url;
 
 pub struct OpenAiProvider {
     client: OpenAiCompatibleClient,
 }
 
 impl OpenAiProvider {
-    pub const ID: &'static str = "openai";
-
     pub fn new(http: reqwest::Client) -> Self {
-        Self { client: OpenAiCompatibleClient::new(http, OPENAI_BASE_URL) }
+        Self {
+            client: OpenAiCompatibleClient::new(http, OPENAI_BASE_URL),
+        }
     }
 }
 
 #[async_trait]
 impl TranscriptionProvider for OpenAiProvider {
     fn info(&self) -> ProviderInfo {
-        ProviderInfo {
-            id: Self::ID.into(),
-            name: "OpenAI".into(),
-            requires_api_key: true,
-            key_url: "https://platform.openai.com/api-keys".into(),
-            default_model: "gpt-4o-mini-transcribe".into(),
-            verified: false,
-            models: vec![
-                ModelInfo {
-                    id: "gpt-4o-mini-transcribe".into(),
-                    name: "GPT-4o mini Transcribe".into(),
-                    description: "model.desc.gpt4o_mini".into(),
-                },
-                ModelInfo {
-                    id: "gpt-4o-transcribe".into(),
-                    name: "GPT-4o Transcribe".into(),
-                    description: "model.desc.gpt4o".into(),
-                },
-                ModelInfo {
-                    id: "whisper-1".into(),
-                    name: "Whisper".into(),
-                    description: "model.desc.whisper1".into(),
-                },
-            ],
-        }
+        OPENAI.info()
     }
 
     async fn transcribe(
@@ -54,9 +33,56 @@ impl TranscriptionProvider for OpenAiProvider {
         api_key: Option<&str>,
         request: &TranscriptionRequest,
     ) -> Result<TranscriptionResult, TranscriptionError> {
-        let key = api_key.map(str::trim).filter(|k| !k.is_empty()).ok_or(TranscriptionError::MissingApiKey)?;
-        // Los modelos gpt-4o-* solo aceptan `json`/`text`; Whisper admite `verbose_json`.
-        let format = if request.model.starts_with("whisper") { ResponseFormat::VerboseJson } else { ResponseFormat::Json };
+        let key = api_key
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
+            .ok_or(TranscriptionError::MissingApiKey)?;
+        // Do not send verbose_json to the GPT transcription models.
+        let format = if request.model.starts_with("whisper") {
+            ResponseFormat::VerboseJson
+        } else {
+            ResponseFormat::Json
+        };
         self.client.transcribe(key, request, format).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transcription::test_support::{audio_request, http_fixture};
+
+    #[tokio::test]
+    async fn sends_each_model_with_its_supported_response_format() {
+        for &(model, _, _) in OPENAI.models {
+            let (url, captured) = http_fixture(
+                200,
+                r#"{"text":"  Hola, Málaga.  ","language":"es","duration":4.2}"#,
+            )
+            .await;
+            let provider = OpenAiProvider {
+                client: OpenAiCompatibleClient::new(reqwest::Client::new(), &url),
+            };
+            let result = provider
+                .transcribe(Some(" test-token "), &audio_request(model))
+                .await
+                .unwrap();
+            assert_eq!(result.text, "Hola, Málaga.");
+            assert_eq!(result.duration_secs, Some(4.2));
+            let request = captured.await.unwrap();
+            assert_eq!(request.method, "POST");
+            assert_eq!(request.path, "/audio/transcriptions");
+            assert_eq!(request.headers["authorization"], "Bearer test-token");
+            let body = String::from_utf8_lossy(&request.body);
+            assert!(body.contains(&format!("name=\"model\"\r\n\r\n{model}\r\n")));
+            let expected = if model == "whisper-1" {
+                "verbose_json"
+            } else {
+                "json"
+            };
+            assert!(body.contains(&format!("name=\"response_format\"\r\n\r\n{expected}\r\n")));
+            assert!(body.contains("name=\"language\"\r\n\r\nes\r\n"));
+            assert!(body.contains("name=\"prompt\"\r\n\r\nMálaga, Acme Corp; Málaga\r\n"));
+        }
     }
 }

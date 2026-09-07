@@ -42,6 +42,8 @@ pub struct Settings {
     /// Duración máxima de una grabación, en segundos.
     pub max_recording_secs: u32,
     /// Abrir Dictámelo al iniciar sesión.
+    // Missing fields in older settings keep the former opt-in behavior.
+    #[serde(default)]
     pub launch_at_login: bool,
     /// Sonido sutil al empezar y terminar de grabar.
     pub play_sounds: bool,
@@ -49,6 +51,8 @@ pub struct Settings {
     pub vocabulary: String,
     /// Limpiar el texto con un modelo de lenguaje (muletillas, puntuación, autocorrecciones).
     pub cleanup_enabled: bool,
+    /// Explicit permission to send locally transcribed text to a personal cloud cleaner.
+    pub local_cleanup_cloud_enabled: bool,
     /// Proveedor del modelo de limpieza (por ahora solo "groq").
     pub cleanup_provider: String,
     /// Modelo de limpieza dentro del proveedor.
@@ -73,10 +77,11 @@ impl Default for Settings {
             input_device: None,
             max_history: 50,
             max_recording_secs: 300,
-            launch_at_login: false,
+            launch_at_login: true,
             play_sounds: true,
             vocabulary: String::new(),
             cleanup_enabled: false,
+            local_cleanup_cloud_enabled: false,
             cleanup_provider: "groq".to_string(),
             cleanup_model: "openai/gpt-oss-120b".to_string(),
             cleanup_prompt: String::new(),
@@ -92,7 +97,7 @@ impl Settings {
                 Ok(settings) => settings.sanitized(),
                 Err(e) => {
                     log::warn!("settings.json inválido ({e}); se usan valores por defecto");
-                    Settings { onboarding_seen: true, ..Settings::default() }
+                    Settings { onboarding_seen: true, launch_at_login: false, ..Settings::default() }
                 }
             },
             Err(_) => Settings::default(),
@@ -131,6 +136,14 @@ impl Settings {
         } else {
             Some(lang.to_lowercase())
         }
+    }
+
+    pub fn uses_local_transcription(&self) -> bool {
+        self.provider == "local"
+    }
+
+    pub fn should_clean_transcript(&self) -> bool {
+        self.cleanup_enabled && (!self.uses_local_transcription() || self.local_cleanup_cloud_enabled)
     }
 
     /// Normaliza valores fuera de rango o vacíos.
@@ -186,7 +199,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("settings.json");
         std::fs::write(&path, "{ esto no es json").unwrap();
-        assert_eq!(Settings::load(&path), Settings { onboarding_seen: true, ..Settings::default() });
+        assert_eq!(Settings::load(&path), Settings { onboarding_seen: true, launch_at_login: false, ..Settings::default() });
         std::fs::remove_dir_all(dir).ok();
     }
 
@@ -222,6 +235,27 @@ mod tests {
         assert_eq!(s.language_code(), None);
         s.language = "ES".into();
         assert_eq!(s.language_code(), Some("es".into()));
+    }
+
+    #[test]
+    fn startup_default_preserves_existing_preferences() {
+        assert!(Settings::default().launch_at_login);
+        let legacy: Settings = serde_json::from_str("{}").unwrap();
+        assert!(!legacy.launch_at_login);
+        for choice in [true, false] {
+            let saved: Settings = serde_json::from_value(serde_json::json!({"launchAtLogin": choice})).unwrap();
+            assert_eq!(saved.launch_at_login, choice);
+        }
+    }
+
+    #[test]
+    fn local_cleanup_requires_separate_explicit_permission() {
+        let mut settings = Settings { provider: "local".into(), cleanup_enabled: true, ..Settings::default() };
+        assert!(!settings.should_clean_transcript());
+        settings.local_cleanup_cloud_enabled = true;
+        assert!(settings.should_clean_transcript());
+        settings.cleanup_enabled = false;
+        assert!(!settings.should_clean_transcript());
     }
 
     #[test]

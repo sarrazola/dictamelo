@@ -3,6 +3,9 @@
 # The updater archive is created AFTER stapling, then signed with the existing Tauri key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Packaged CPU fallback must run across supported Macs, not only on the build host.
+export TRANSCRIBE_CMAKE_ARGS="-DGGML_NATIVE=OFF"
+command -v cmake >/dev/null || { echo 'CMake is required to build the native speech engine.' >&2; exit 1; }
 # Keep packaging dependencies outside the application and fail before building.
 DMG_PYTHON="${DICTAMELO_DMG_PYTHON:-$PWD/dist/dmg-tools/bin/python}"
 [[ -x "$DMG_PYTHON" ]] || { echo 'Set up the DMG build virtualenv described in docs/RELEASING.md.' >&2; exit 1; }

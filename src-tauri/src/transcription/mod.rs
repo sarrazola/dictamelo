@@ -6,10 +6,17 @@
 //!
 //! Nada más cambia: la UI lista los proveedores/modelos a partir de `ProviderInfo`.
 
+pub mod cloud_catalog;
+pub mod deepgram;
 pub mod dictamelo;
 pub mod groq;
+pub mod local;
+pub mod mistral;
 pub mod openai;
 pub mod openai_compatible;
+
+#[cfg(test)]
+pub(crate) mod test_support;
 
 use async_trait::async_trait;
 use serde::Serialize;
@@ -40,6 +47,10 @@ pub struct TranscriptionResult {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranscriptionError {
+    #[error("Transcription cancelled")]
+    Cancelled,
+    #[error("Local transcription failed")]
+    Local(String),
     #[error("Falta la API key del proveedor")]
     MissingApiKey,
     #[error("API key inválida o sin autorización")]
@@ -65,6 +76,8 @@ impl TranscriptionError {
     pub fn localized(&self, lang: &str) -> String {
         use crate::i18n::{t, tf};
         match self {
+            TranscriptionError::Cancelled => t(lang, "msg.cancelled").into(),
+            TranscriptionError::Local(error) => crate::local_models::messages::localize(error, lang),
             TranscriptionError::MissingApiKey => t(lang, "tr.missing_key").into(),
             TranscriptionError::Unauthorized => t(lang, "tr.unauthorized").into(),
             TranscriptionError::RateLimited => t(lang, "tr.rate").into(),
@@ -132,7 +145,9 @@ impl ProviderRegistry {
         let http = shared_http_client();
         let mut registry = ProviderRegistry { providers: Vec::new() };
         registry.register(Arc::new(groq::GroqProvider::new(http.clone())));
-        registry.register(Arc::new(openai::OpenAiProvider::new(http)));
+        registry.register(Arc::new(openai::OpenAiProvider::new(http.clone())));
+        registry.register(Arc::new(mistral::MistralProvider::new(http.clone())));
+        registry.register(Arc::new(deepgram::DeepgramProvider::new(http)));
         registry
     }
 

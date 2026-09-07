@@ -22,6 +22,7 @@ pub const KEYCHAIN_SERVICE: &str = "com.dictamelo.desktop";
 pub struct PendingTranscription {
     pub audio: PreparedAudio,
     pub attempts: u32,
+    pub plan: crate::pipeline::TranscriptionPlan,
 }
 
 pub struct AppState {
@@ -30,6 +31,7 @@ pub struct AppState {
     pub history: Mutex<History>,
     pub secrets: Arc<dyn SecretStore>,
     pub providers: ProviderRegistry,
+    pub local_models: Arc<crate::local_models::LocalModelManager>,
     pub cleaners: CleanerRegistry,
     /// Proveedor y limpiador del plan Pro: van por nuestro servidor y no se eligen a mano.
     pub backend_provider: Arc<dyn TranscriptionProvider>,
@@ -38,6 +40,10 @@ pub struct AppState {
     pub license: RwLock<LicenseStatus>,
     pub account: crate::account::Account,
     pub recorder: Recorder,
+    /// Destination and privacy preferences captured when microphone recording begins.
+    pub recording_plan: Mutex<Option<crate::pipeline::TranscriptionPlan>>,
+    /// Unique local voice WAV; Escape must not cancel unrelated file transcription.
+    pub active_voice_transcription: Mutex<Option<PathBuf>>,
     pub status: Mutex<Status>,
     /// Se incrementa en cada cambio de estado; permite descartar temporizadores obsoletos.
     pub status_generation: AtomicU64,
@@ -73,18 +79,26 @@ impl AppState {
 
         log::info!("Configuración: {}", settings_path.display());
         let secrets: Arc<dyn SecretStore> = Arc::new(KeyringSecretStore::new(KEYCHAIN_SERVICE));
+        let local_models = Arc::new(crate::local_models::LocalModelManager::new(data_dir.join("models"))
+            .map_err(anyhow::Error::msg)?);
+        let mut providers = ProviderRegistry::with_defaults();
+        #[cfg(target_os = "macos")]
+        providers.register(Arc::new(crate::transcription::local::LocalProvider::new(local_models.clone())));
         Ok(AppState {
             settings: RwLock::new(settings),
             settings_path,
             history: Mutex::new(history),
             account: crate::account::Account::new(secrets.clone()),
             secrets,
-            providers: ProviderRegistry::with_defaults(),
+            providers,
+            local_models,
             cleaners: CleanerRegistry::with_defaults(shared_http_client()),
             backend_provider: Arc::new(crate::transcription::dictamelo::DictameloProvider::new(shared_http_client())),
             backend_cleaner: Arc::new(crate::cleanup::dictamelo::DictameloCleaner::new(shared_http_client())),
             license: RwLock::new(LicenseStatus::default()),
             recorder: Recorder::spawn(),
+            recording_plan: Mutex::new(None),
+            active_voice_transcription: Mutex::new(None),
             status: Mutex::new(Status::Idle),
             status_generation: AtomicU64::new(0),
             last_failed: Mutex::new(None),
@@ -103,19 +117,6 @@ impl AppState {
     /// `true` si esta instalación tiene Pro activo (usa nuestro servidor y no la clave del usuario).
     pub fn is_pro(&self) -> bool {
         read(&self.license).active
-    }
-
-    pub fn is_free_cloud(&self) -> bool {
-        crate::cloud_config::configured()
-            && !self.is_pro()
-            && !self.settings().use_own_key
-            && self.account.signed_in()
-    }
-
-    pub fn uses_cloud(&self) -> bool {
-        crate::cloud_config::configured()
-            && !self.settings().use_own_key
-            && (self.is_pro() || self.is_free_cloud())
     }
 
     /// API key del proveedor indicado (`None` si no está configurada).

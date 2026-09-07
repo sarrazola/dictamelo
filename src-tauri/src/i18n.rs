@@ -400,6 +400,101 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "Impossibile leggere l'audio: {e}",
         ]),
 
+        // Local inference and model management use safe, translated messages.
+        "local.error.missing" => pick(lang, [
+            "Descarga primero el modelo local seleccionado.", "Download the selected local model first.",
+            "Baixe primeiro o modelo local selecionado.", "Téléchargez d'abord le modèle local sélectionné.",
+            "Lade zuerst das ausgewählte lokale Modell herunter.", "Scarica prima il modello locale selezionato.",
+        ]),
+        "local.error.unknown" => pick(lang, [
+            "Este modelo local ya no está disponible. Selecciona otro.", "This local model is no longer available. Select another one.",
+            "Este modelo local não está mais disponível. Selecione outro.", "Ce modèle local n'est plus disponible. Sélectionnez-en un autre.",
+            "Dieses lokale Modell ist nicht mehr verfügbar. Wähle ein anderes.", "Questo modello locale non è più disponibile. Selezionane un altro.",
+        ]),
+        "local.error.mac_only" => pick(lang, [
+            "Los modelos locales están disponibles por ahora en macOS.", "Local models are currently available on macOS.",
+            "Os modelos locais estão disponíveis por enquanto no macOS.", "Les modèles locaux sont actuellement disponibles sur macOS.",
+            "Lokale Modelle sind derzeit unter macOS verfügbar.", "I modelli locali sono attualmente disponibili su macOS.",
+        ]),
+        "local.error.language_required" => pick(lang, [
+            "Selecciona el idioma del audio en las opciones de este modelo.", "Select the audio language in this model's options.",
+            "Selecione o idioma do áudio nas opções deste modelo.", "Sélectionnez la langue de l'audio dans les options de ce modèle.",
+            "Wähle die Audiosprache in den Optionen dieses Modells.", "Seleziona la lingua dell'audio nelle opzioni di questo modello.",
+        ]),
+        "local.error.language_unsupported" => pick(lang, [
+            "Este modelo no admite el idioma seleccionado. Cambia el idioma o el modelo.", "This model does not support the selected language. Change the language or model.",
+            "Este modelo não aceita o idioma selecionado. Altere o idioma ou o modelo.", "Ce modèle ne prend pas en charge la langue sélectionnée. Changez de langue ou de modèle.",
+            "Dieses Modell unterstützt die ausgewählte Sprache nicht. Ändere die Sprache oder das Modell.", "Questo modello non supporta la lingua selezionata. Cambia lingua o modello.",
+        ]),
+        "local.error.disk_space" => pick(lang, [
+            "No hay suficiente espacio en disco. Libera espacio e intenta descargar de nuevo.", "There is not enough disk space. Free up space and try downloading again.",
+            "Não há espaço suficiente no disco. Libere espaço e tente baixar novamente.", "L'espace disque est insuffisant. Libérez de l'espace puis réessayez le téléchargement.",
+            "Nicht genügend Speicherplatz. Gib Speicherplatz frei und versuche den Download erneut.", "Spazio su disco insufficiente. Libera spazio e riprova il download.",
+        ]),
+        "local.error.download_busy" => pick(lang, [
+            "Ya hay una descarga en curso. Espera a que termine o cancélala.", "A download is already in progress. Wait for it to finish or cancel it.",
+            "Já há um download em andamento. Aguarde ou cancele-o.", "Un téléchargement est déjà en cours. Attendez la fin ou annulez-le.",
+            "Ein Download läuft bereits. Warte auf den Abschluss oder brich ihn ab.", "Un download è già in corso. Attendi che finisca o annullalo.",
+        ]),
+        "local.error.inference_busy" => pick(lang, [
+            "El modelo local está transcribiendo. Espera a que termine e inténtalo de nuevo.", "The local model is transcribing. Wait for it to finish and try again.",
+            "O modelo local está transcrevendo. Aguarde e tente novamente.", "Le modèle local effectue une transcription. Attendez la fin puis réessayez.",
+            "Das lokale Modell transkribiert gerade. Warte auf den Abschluss und versuche es erneut.", "Il modello locale sta trascrivendo. Attendi che finisca e riprova.",
+        ]),
+        "local.error.cancel_download" => pick(lang, [
+            "Cancela la descarga antes de eliminar este modelo.", "Cancel the download before removing this model.",
+            "Cancele o download antes de remover este modelo.", "Annulez le téléchargement avant de supprimer ce modèle.",
+            "Brich den Download ab, bevor du dieses Modell entfernst.", "Annulla il download prima di rimuovere questo modello.",
+        ]),
+        "local.error.store_busy" => pick(lang, [
+            "Otra instancia de Dictámelo está usando los modelos locales. Ciérrala e inténtalo de nuevo.", "Another Dictámelo instance is using the local models. Close it and try again.",
+            "Outra instância do Dictámelo está usando os modelos locais. Feche-a e tente novamente.", "Une autre instance de Dictámelo utilise les modèles locaux. Fermez-la puis réessayez.",
+            "Eine andere Dictámelo-Instanz verwendet die lokalen Modelle. Schließe sie und versuche es erneut.", "Un'altra istanza di Dictámelo sta usando i modelli locali. Chiudila e riprova.",
+        ]),
+        "local.error.download_failed" => pick(lang, [
+            "No se pudo descargar el modelo. Revisa tu conexión e inténtalo de nuevo.", "The model could not be downloaded. Check your connection and try again.",
+            "Não foi possível baixar o modelo. Verifique sua conexão e tente novamente.", "Le modèle n'a pas pu être téléchargé. Vérifiez votre connexion puis réessayez.",
+            "Das Modell konnte nicht heruntergeladen werden. Prüfe deine Verbindung und versuche es erneut.", "Impossibile scaricare il modello. Controlla la connessione e riprova.",
+        ]),
+        "local.error.damaged" => pick(lang, [
+            "El archivo del modelo está incompleto o dañado. Vuelve a descargarlo desde Modelos.", "The model file is incomplete or damaged. Download it again from Models.",
+            "O arquivo do modelo está incompleto ou danificado. Baixe-o novamente em Modelos.", "Le fichier du modèle est incomplet ou endommagé. Téléchargez-le à nouveau depuis Modèles.",
+            "Die Modelldatei ist unvollständig oder beschädigt. Lade sie unter Modelle erneut herunter.", "Il file del modello è incompleto o danneggiato. Scaricalo di nuovo da Modelli.",
+        ]),
+        "local.error.save_failed" => pick(lang, [
+            "No se pudo guardar el modelo. Revisa el espacio disponible y los permisos de la carpeta.", "The model could not be saved. Check available space and folder permissions.",
+            "Não foi possível salvar o modelo. Verifique o espaço disponível e as permissões da pasta.", "Le modèle n'a pas pu être enregistré. Vérifiez l'espace disponible et les autorisations du dossier.",
+            "Das Modell konnte nicht gespeichert werden. Prüfe den freien Speicherplatz und die Ordnerberechtigungen.", "Impossibile salvare il modello. Controlla lo spazio disponibile e i permessi della cartella.",
+        ]),
+        "local.error.load_failed" => pick(lang, [
+            "No se pudo cargar el modelo. Cierra otras aplicaciones o prueba un modelo más pequeño.", "The model could not be loaded. Close other apps or try a smaller model.",
+            "Não foi possível carregar o modelo. Feche outros aplicativos ou tente um modelo menor.", "Le modèle n'a pas pu être chargé. Fermez d'autres applications ou essayez un modèle plus petit.",
+            "Das Modell konnte nicht geladen werden. Schließe andere Apps oder versuche ein kleineres Modell.", "Impossibile caricare il modello. Chiudi altre app o prova un modello più piccolo.",
+        ]),
+        "local.error.audio_invalid" => pick(lang, [
+            "No se pudo leer el audio para la transcripción local. Selecciona de nuevo el archivo.", "The audio could not be read for local transcription. Select the file again.",
+            "Não foi possível ler o áudio para transcrição local. Selecione o arquivo novamente.", "L'audio n'a pas pu être lu pour la transcription locale. Sélectionnez à nouveau le fichier.",
+            "Die Audiodatei konnte nicht für die lokale Transkription gelesen werden. Wähle sie erneut aus.", "Impossibile leggere l'audio per la trascrizione locale. Seleziona di nuovo il file.",
+        ]),
+        "local.error.audio_long" => pick(lang, [
+            "Este audio es demasiado largo para una sola transcripción local. Súbelo desde Archivos para dividirlo automáticamente.", "This audio is too long for a single local transcription. Add it through Files to split it automatically.",
+            "Este áudio é longo demais para uma única transcrição local. Adicione-o em Arquivos para dividi-lo automaticamente.", "Cet audio est trop long pour une seule transcription locale. Ajoutez-le depuis Fichiers pour le diviser automatiquement.",
+            "Diese Aufnahme ist für eine einzelne lokale Transkription zu lang. Füge sie unter Dateien hinzu, um sie automatisch aufzuteilen.", "Questo audio è troppo lungo per una singola trascrizione locale. Aggiungilo da File per dividerlo automaticamente.",
+        ]),
+        "local.error.inference_failed" => pick(lang, [
+            "No se pudo completar la transcripción local. Inténtalo de nuevo o elige otro modelo.", "Local transcription could not finish. Try again or select another model.",
+            "Não foi possível concluir a transcrição local. Tente novamente ou selecione outro modelo.", "La transcription locale n'a pas pu aboutir. Réessayez ou sélectionnez un autre modèle.",
+            "Die lokale Transkription konnte nicht abgeschlossen werden. Versuche es erneut oder wähle ein anderes Modell.", "Impossibile completare la trascrizione locale. Riprova o seleziona un altro modello.",
+        ]),
+        "local.error.cancelled" => pick(lang, [
+            "Operación cancelada.", "Operation cancelled.", "Operação cancelada.", "Opération annulée.", "Vorgang abgebrochen.", "Operazione annullata.",
+        ]),
+        "local.error.generic" => pick(lang, [
+            "No se pudo completar la operación con el modelo local. Inténtalo de nuevo.", "The local model operation could not finish. Please try again.",
+            "Não foi possível concluir a operação com o modelo local. Tente novamente.", "L'opération sur le modèle local n'a pas pu aboutir. Veuillez réessayer.",
+            "Der Vorgang mit dem lokalen Modell konnte nicht abgeschlossen werden. Bitte versuche es erneut.", "Impossibile completare l'operazione con il modello locale. Riprova.",
+        ]),
+
         other => other,
     }
 }

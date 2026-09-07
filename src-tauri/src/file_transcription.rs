@@ -7,7 +7,7 @@
 use crate::audio::{self, wav, RawRecording, TARGET_SAMPLE_RATE};
 use crate::i18n::{t, tf};
 use crate::platform::{self, PlatformError};
-use crate::pipeline::TranscriptionRoute;
+use crate::pipeline::{TranscriptionPlan, TranscriptionRoute};
 use crate::settings::Settings;
 use crate::state::AppState;
 use crate::transcription::{TranscriptionError, TranscriptionRequest, TranscriptionResult};
@@ -62,6 +62,8 @@ pub struct FileJob {
 /// Añade archivos a la cola y arranca su procesamiento en orden.
 pub fn enqueue(app: &AppHandle, paths: Vec<PathBuf>) {
     let state = app.state::<AppState>();
+    // Every file in this batch keeps the destination chosen when the user added it.
+    let plan = TranscriptionPlan::capture(&state, state.settings());
     let mut ids = Vec::new();
     {
         let mut jobs = lock(&state.file_jobs);
@@ -90,7 +92,7 @@ pub fn enqueue(app: &AppHandle, paths: Vec<PathBuf>) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         for id in ids {
-            process(&app, &id).await;
+            process(&app, &id, &plan).await;
         }
     });
 }
@@ -128,12 +130,11 @@ fn update(app: &AppHandle, id: &str, f: impl FnOnce(&mut FileJob)) -> bool {
     found
 }
 
-async fn process(app: &AppHandle, id: &str) {
+async fn process(app: &AppHandle, id: &str, plan: &TranscriptionPlan) {
     let job = lock(&app.state::<AppState>().file_jobs).iter().find(|j| j.id == id).cloned();
     let Some(job) = job else { return }; // lo quitaron antes de empezar
-    let settings = app.state::<AppState>().settings();
     log::info!("Transcribiendo archivo «{}» ({} bytes)", job.name, job.size_bytes);
-    match run(app, &settings, Path::new(&job.path), id).await {
+    match run(app, plan, Path::new(&job.path), id).await {
         Ok((text, duration_secs)) => {
             log::info!("Archivo «{}» listo: {} caracteres, {:.0}s de audio", job.name, text.chars().count(), duration_secs);
             update(app, id, |j| {
@@ -153,11 +154,12 @@ async fn process(app: &AppHandle, id: &str) {
     }
 }
 
-async fn run(app: &AppHandle, settings: &Settings, path: &Path, id: &str) -> Result<(String, f32), String> {
+async fn run(app: &AppHandle, plan: &TranscriptionPlan, path: &Path, id: &str) -> Result<(String, f32), String> {
+    let settings = &plan.settings;
     let lang = settings.ui_lang();
     let (source, temp_dir) = {
         let state = app.state::<AppState>();
-        (crate::pipeline::transcription_source(&state, settings).await?, state.temp_dir.clone())
+        (crate::pipeline::transcription_source(&state, plan).await?, state.temp_dir.clone())
     };
     let extension = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
     let size = std::fs::metadata(path).map(|m| m.len()).map_err(|e| tf(&lang, "file.read_failed", &[("e", &e.to_string())]))?;
@@ -237,7 +239,7 @@ async fn finish_transcript(
     result: &TranscriptionResult,
     id: &str,
 ) -> Result<String, String> {
-    if !settings.cleanup_enabled || result.text.trim().is_empty() {
+    if !settings.should_clean_transcript() || result.text.trim().is_empty() {
         return Ok(result.text.trim().to_string());
     }
     if !update(app, id, |job| job.stage = Stage::Cleaning) {
@@ -277,7 +279,7 @@ fn direct_upload(route: TranscriptionRoute, extension: &str, size: u64) -> Resul
         // PCM encoding and actual duration are independently validated by the server.
         return Ok(true);
     }
-    Ok(route != TranscriptionRoute::ProCloud
+    Ok(route == TranscriptionRoute::OwnKey
         && NATIVE_FORMATS.contains(&extension)
         && size <= DIRECT_UPLOAD_MAX_BYTES)
 }
@@ -337,6 +339,9 @@ mod route_tests {
 
     #[test]
     fn pro_always_converts_and_personal_keys_keep_native_uploads() {
+        // Local engines always receive normalized 16 kHz mono PCM, even for WAV inputs.
+        assert_eq!(direct_upload(TranscriptionRoute::Local, "mp3", 1024), Ok(false));
+        assert_eq!(direct_upload(TranscriptionRoute::Local, "wav", 1024), Ok(false));
         assert_eq!(direct_upload(TranscriptionRoute::ProCloud, "mp3", 1024), Ok(false));
         assert_eq!(direct_upload(TranscriptionRoute::ProCloud, "wav", 1024), Ok(false));
         assert_eq!(direct_upload(TranscriptionRoute::OwnKey, "mp3", 1024), Ok(true));
