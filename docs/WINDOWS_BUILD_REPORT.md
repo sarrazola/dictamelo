@@ -1,5 +1,43 @@
 # Windows build report
 
+## 0.5.1 release
+
+Application source: `ee71115a4c4ddf36208fc6a73d1dd097824114b6`. Both official-cloud installers came from [Actions run 34074580032](https://github.com/sarrazola/dictamelo/actions/runs/34074580032), whose two jobs passed. The final EXE bytes were signed with the existing Tauri updater key on macOS and downloaded from the v0.5.1 draft into the Windows VM. Nothing was rebuilt in the VM. Tauri updater signatures are not Microsoft Authenticode signatures.
+
+### Installer and installed-payload identity
+
+| | ARM64 | x86_64 |
+| --- | --- | --- |
+| Published asset name | `Dictamelo_0.5.1_aarch64-setup.exe` | `Dictamelo_0.5.1_x86_64-setup.exe` |
+| Installer bytes | 3,343,867 | 3,718,298 |
+| Installer SHA-256 | `291cdb510c0ed4f2dd1c10657c94917afafb8ac94cf6346ddb9969f6831d175c` | `49043f13d365e2c44151931a069dea945e63a65b1387513a649850bffedc5c96` |
+| Installed executable bytes | 11,385,344 | 12,990,976 |
+| Installed executable SHA-256 | `5377ff536abc40f2f57c119810af48d1910b68044f9599a3c1ea17d1d678fab9` | `94fabb8f559553b49532d3c786a3a1ead8fe558431b97992ed7c07d527a1b45a` |
+| Installed PE machine | `0xaa64` | `0x8664` |
+| Installed ProductVersion | 0.5.1 | 0.5.1 |
+| Runtime environment | Native ARM64, Windows 11 VM | ARM64 Windows emulation; `xtajit64se.dll` loaded |
+
+Both installer hashes match the reviewed CI artifacts. Both installed executable hashes match CI's `packagedPayloadSha256`. The improved CI gate extracted the NSIS payload, verified its PE and version, and proved its only difference from the restored compiler output was the documented `UNK` to `NSS` marker change. ARM64 has zero pre-existing `NSS` markers; x64 has one, preserved unchanged. The installer bootstrap's own x86 PE header is not the application's architecture.
+
+### Installed smoke tests, September 6, 2026
+
+Guest: Windows 11 ARM64 in VMware Fusion, 8,187 MB RAM and four logical processors. Tests used the existing personal Groq credential through the installed application's self-test hooks and separate native paste target; these are real binary/provider checks, not UI mocks. They do not establish physical Intel/AMD or real-microphone behavior.
+
+| Check | Result |
+| --- | --- |
+| ARM64 upgrade over 0.5.0 | Same install path; exact 0.5.1 payload above. Startup logged `first_run=false`, recognized `Control+Shift+KeyQ`, and showed no onboarding wizard. Settings and history remained byte-identical. |
+| Stored credential preservation | Both credential entries remained present. The fixture transcribed immediately without entering a key. No credential values were printed. |
+| Licensed speech fixture, both architectures | `tests/fixtures/english-speech.wav` produced “Mr. Quilter is the apostle of the middle classes, and we are glad to welcome his gospel.”, matching the corpus words. |
+| WMA conversion, ARM64 | Media Foundation converted the existing WMA fixture to 16 kHz mono PCM, 121,679 samples; transcription succeeded and no temporary audio remained. |
+| AI cleanup, ARM64 | Same synthetic audio and application: cleanup off retained “Um, so, send the email to Andres on Thursday, no wait, on Friday, and, uh, tell him that the meeting is at 3.” Cleanup on returned “Send the email to Andres on Friday and tell him that the meeting is at 3.” Original settings were restored afterward. |
+| Paste into a separate window, both architectures | After explicitly verifying target focus, the transcript reached the target, which logged `Ctrl` and `V`; the previous clipboard was restored. |
+| Settings-window behavior, ARM64 | Window stayed open across Alt+Tab and back. Explicit close hid the window while leaving the same process alive. |
+| Final restoration | ARM64 0.5.1 installed and running with the exact hash above. Original `settings.json` (`14c5974a…3655`) and `history.json` (`e64af3a8…f0f0`) restored byte-for-byte; both credentials retained. Original 0.5.0 installers preserved for the updater test. |
+
+**Harness observations.** An initial paste attempt was invalid because host-driven Windows Search took focus. The final runs explicitly checked focus and passed on both architectures. Unstable taskbar/tray coordinates also opened unrelated applications during exploration; no settings or account setup was submitted in those applications. An initial cleanup test wrote a UTF-8 BOM into temporary test settings through PowerShell; the app rejected that JSON, logged the warning and used defaults. Rewriting the test settings without a BOM enabled the intended cleanup test. These discarded attempts are not application failures or passing test evidence.
+
+**Not repeated or not covered at this checkpoint.** Fresh-profile Skip/restart, physical microphone speech, physical Intel/AMD hardware, Windows cloud-account/free-quota/Pro flows, and a click-by-click Files/export UI run were not revalidated for 0.5.1. Previous 0.5.0 results remain labeled below. The actual in-app 0.5.0 to 0.5.1 updater remains pending until the stable release is public; an installer upgrade alone does not verify the updater.
+
 ## 0.5.0 release
 
 Application source: `097551f9582fce8c17d6f4a539192d89b80236d8`. Both official-cloud installers came from [Actions run 34008710129](https://github.com/sarrazola/dictamelo/actions/runs/34008710129). Each matrix job passed 63 native x64 Rust tests (three explicit opt-in tests ignored), sixteen Python checks and eleven UI contract/behavior checks. ARM64 was cross-compiled on x64.
