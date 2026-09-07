@@ -36,7 +36,44 @@ Guest: Windows 11 ARM64 in VMware Fusion, 8,187 MB RAM and four logical processo
 
 **Harness observations.** An initial paste attempt was invalid because host-driven Windows Search took focus. The final runs explicitly checked focus and passed on both architectures. Unstable taskbar/tray coordinates also opened unrelated applications during exploration; no settings or account setup was submitted in those applications. An initial cleanup test wrote a UTF-8 BOM into temporary test settings through PowerShell; the app rejected that JSON, logged the warning and used defaults. Rewriting the test settings without a BOM enabled the intended cleanup test. These discarded attempts are not application failures or passing test evidence.
 
-**Not repeated or not covered at this checkpoint.** Fresh-profile Skip/restart, physical microphone speech, physical Intel/AMD hardware, Windows cloud-account/free-quota/Pro flows, and a click-by-click Files/export UI run were not revalidated for 0.5.1. Previous 0.5.0 results remain labeled below. The actual in-app 0.5.0 to 0.5.1 updater remains pending until the stable release is public; an installer upgrade alone does not verify the updater.
+**Not repeated or not covered.** Fresh-profile Skip/restart, physical microphone speech, physical Intel/AMD hardware, Windows cloud-account/free-quota/Pro flows, and a click-by-click Files/export UI run were not revalidated for 0.5.1. Previous 0.5.0 results remain labeled below. Real published-updater execution was verified on native ARM64 and emulated x64 as recorded next; the first x64 attempt required manual Retry and is preserved separately from the successful clean UI repeat.
+
+### Published updater: installed ARM64 0.5.0 to 0.5.1
+
+After v0.5.1 became the public stable Latest release, the preserved ARM64 0.5.0 installer was used only to establish the starting version. Its installer hash matched `f0b50145…cd51`; the installed old executable was verified as 0.5.0, PE `0xaa64`, 11,385,344 bytes, SHA-256 `b47092f1c9cb7cffb6f3c2a4d0e46872092984bfa6a94e59745cdad408d401e2`.
+
+That installed executable was launched with its existing `DICTAMELO_SELFTEST_UPDATE=1` hook. The hook invokes the production `updates.rs` check, download, signature verification and installation functions. The 0.5.1 installer was **not** run manually for this result; this is an actual installed-updater execution, not a visual click test.
+
+The application log recorded the following sequence (timestamps as printed in the log):
+
+```text
+20:51:02  Dictámelo 0.5.0 iniciado
+20:51:05  updates: Instalando la versión 0.5.1
+20:51:06  updates: Descarga completa; aplicando
+20:51:10  Dictámelo 0.5.1 iniciado
+```
+
+The public endpoint returned version 0.5.1 with all three platforms and the correct `windows-aarch64` EXE URL. Tauri verified the downloaded package's signature before applying it. NSIS ran in passive mode, completed and relaunched the application. The installed result was 0.5.1, PE `0xaa64`, 11,385,344 bytes, SHA-256 `5377ff536abc40f2f57c119810af48d1910b68044f9599a3c1ea17d1d678fab9`, exactly matching the reviewed public payload.
+
+`settings.json` (`14c5974a…3655`) and `history.json` (`e64af3a8…f0f0`) remained byte-identical **through the update**, without restoring them to obtain that result. Both stored credential entries remained intact. A subsequent licensed-fixture transcription succeeded using the stored key; only the history entry added by that post-update test was removed by restoring the original history backup.
+
+**Self-test environment caveat.** The process relaunched by NSIS inherited `DICTAMELO_SELFTEST_UPDATE` from the test process. It therefore ran the diagnostic again, found no newer version and exited. This was a test-launch artifact, not an updater failure; the application was then relaunched without any diagnostic environment variables. Final state: one normal ARM64 0.5.1 instance running, exact payload hash, `Control+Shift+KeyQ` registered, `first_run=false`, original settings/history and both credentials intact. Backups and the 0.5.0 installers were retained.
+
+### Published updater: installed x64 0.5.0 to 0.5.1 under ARM emulation
+
+The preserved official x64 0.5.0 installer matched SHA-256 `dba093828f4adf58ee8046c1270632d6cee9cf91d37b4d30fb651d690cc2ee29`. Before testing, the installed starting executable was verified as 0.5.0, PE `0x8664`, 12,990,976 bytes, SHA-256 `d2b0a0f19fd2e5f1ed4d70fd89419d29565f06282a30f42cd02c69245d5842f7`.
+
+**First attempt: completed with manual Retry.** The installed application's `DICTAMELO_SELFTEST_UPDATE=1` hook downloaded and verified the correct public x64 package, then started NSIS with `/P /UPDATE /R /ARGS`. NSIS PID 9752 remained alive at an `Error opening file for writing: …\Dictámelo\dictamelo.exe` dialog with Abort, Retry and Ignore buttons. This was an installer waiting for input, not an observed process failure or a successful unattended update. At diagnosis there were no `dictamelo.exe` processes and the destination could be opened for writing, but the lock owner at the time of the first write was not captured. The cause remains unproven.
+
+The application log contains one startup in the original test window, at `20:57:39`, with the primary shortcut registered. The harness explicitly stopped any processes after installing 0.5.0 and waited before starting the self-test. A separate ten-sample census over 20 seconds on the clean repeat found zero auto-launched instances after the 0.5.0 installer ran with `/S`. These observations do not support attributing the first dialog to a second application instance, and they do not prove another cause.
+
+After confirming that no application process remained and the file was writable, **Retry was clicked once on the same waiting installer** at 16:09:20.877 guest local time. NSIS exited in under three seconds and relaunched 0.5.1 (application-log timestamp `21:09:23`). The resulting x64 payload matched `94fabb8f559553b49532d3c786a3a1ead8fe558431b97992ed7c07d527a1b45a`, PE `0x8664`, 12,990,976 bytes, FileVersion and ProductVersion 0.5.1. Settings and history remained byte-identical. The original dialog text, button IDs, process information and launch arguments were retained in the VM scratch report `x64-update-dialog-evidence.txt`. This result is explicitly **manually assisted**, although download, signature verification and NSIS execution came from the real updater.
+
+**Clean repeat: passed from the normal application's About page.** The official 0.5.0 x64 starting payload was restored and one normal instance was allowed to finish starting, without a self-test environment variable. Through the existing tray instance, Settings → About visibly showed 0.5.0 and an available 0.5.1 update. The **Install** button was clicked once; the interface showed downloading and closed within ten seconds. No Retry, Abort, Ignore or manually launched 0.5.1 installer was used on this repeat.
+
+Post-update verification found the exact x64 0.5.1 payload above, a single new application process (PID 12168, started at 16:17:59 guest local time), the old PID 11476 gone, no running installers, no pending installer dialogs and no residual updater payloads in the checked local application-data location. The NSIS exit code was not captured because the app launched the installer and it had already exited when inspected; the exact replaced executable and installer-driven relaunch establish completion. `settings.json` (517 bytes) and `history.json` (6,003 bytes, 18 entries) stayed byte-identical to their preflight backups, and both stored credential entries remained present. No fixture or credential-value read was repeated for this final updater-only check.
+
+**Final environment restoration.** After recording the x64 result, the already verified ARM64 0.5.1 installer was run solely to leave the VM in its normal architecture; this manual restoration is not updater evidence. The final executable is PE `0xaa64`, 11,385,344 bytes, version 0.5.1, SHA-256 `5377ff536abc40f2f57c119810af48d1910b68044f9599a3c1ea17d1d678fab9`. One normal instance (PID 9900) was running with the primary shortcut registered, no `DICTAMELO_SELFTEST_UPDATE` or `DICTAMELO_SELFTEST_WAV` environment values at process/user/machine scope, original settings/history unchanged and both credentials intact. No source or published artifact was modified during these tests.
 
 ## 0.5.0 release
 
