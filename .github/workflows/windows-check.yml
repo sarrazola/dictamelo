@@ -167,7 +167,7 @@ jobs:
           $metadata.installerFilename = $installer.Name
           $metadata.installerBytes = $installer.Length
           $metadata.installerSha256 = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          $metadata.testsExecutedOn = 'native x64 Windows runner'
+          $metadata.testsExecutedOn = if ('${{ matrix.arch }}' -eq 'x86_64') { 'native x64 Windows runner' } else { 'not executed in this cross-compilation job; native x64 tests run in the matrix peer' }
           $metadata.targetExecution = '${{ matrix.arch }}' -eq 'x86_64'
           $metadata.officialCloud = Test-Path '.env.cloud-build'
           $metadata.nativeImports = $nativeImports

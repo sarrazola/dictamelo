@@ -35,6 +35,9 @@ if ($env:CARGO_ENCODED_RUSTFLAGS) { throw 'Unset CARGO_ENCODED_RUSTFLAGS: it wou
 # static-VCRuntime override leaves C++'s MSVCP140.dll dynamically imported.
 $env:RUSTFLAGS = '-C target-feature=+crt-static'
 $env:STATIC_VCRUNTIME = 'false'
+# CMake's Ninja generator has a separate runtime-library property, whose default
+# remains MultiThreadedDLL even when cmake-rs supplies /MT via compiler flags.
+$env:TRANSCRIBE_CMAKE_ARGS += ' -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'
 
 if ($Target -eq 'aarch64-pc-windows-msvc') {
     if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) { throw 'Ninja is required for the ARM64 Clang build. Install the Visual Studio C++ CMake tools component.' }
