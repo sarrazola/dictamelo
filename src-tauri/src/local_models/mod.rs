@@ -77,6 +77,23 @@ pub struct LocalModelManager {
     runtime: Arc<runtime::Runtime>,
 }
 
+fn store_lock_is_contended(error: &std::io::Error) -> bool {
+    error.raw_os_error() == fs2::lock_contended_error().raw_os_error()
+}
+
+fn retry_store_lock(timeout: Duration, mut try_lock: impl FnMut() -> std::io::Result<()>) -> std::io::Result<()> {
+    let started = Instant::now();
+    loop {
+        match try_lock() {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                if !store_lock_is_contended(&error) || started.elapsed() >= timeout { return Err(error); }
+                std::thread::sleep(Duration::from_millis(25).min(timeout.saturating_sub(started.elapsed())));
+            }
+        }
+    }
+}
+
 impl LocalModelManager {
     pub fn new(root: PathBuf) -> Result<Self, String> {
         let catalog: Catalog = serde_json::from_str(include_str!("catalog.json")).map_err(|e| e.to_string())?;
@@ -85,7 +102,12 @@ impl LocalModelManager {
         std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
         let store_lock = std::fs::OpenOptions::new().read(true).write(true).create(true).truncate(false)
             .open(root.join(".model-store.lock")).map_err(|e| e.to_string())?;
-        fs2::FileExt::try_lock_exclusive(&store_lock).map_err(|_| "Another running app is using this local model folder".to_string())?;
+        // Tauri spawns the replacement before exiting the old process. Wait briefly
+        // for that owner's OS lock to close; never unlock a manager still in use.
+        retry_store_lock(Duration::from_secs(3), || fs2::FileExt::try_lock_exclusive(&store_lock))
+            .map_err(|error| if store_lock_is_contended(&error) {
+                "Another running app is using this local model folder".to_string()
+            } else { format!("Could not lock the local model folder: {error}") })?;
         // An interrupted download is never a usable model. Only our own temporary suffix is cleaned.
         for entry in std::fs::read_dir(&root).map_err(|e| e.to_string())?.flatten() {
             if entry.file_name().to_string_lossy().ends_with(".download-part") && entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
@@ -377,6 +399,58 @@ mod tests {
         assert!(LocalModelManager::new(root.clone()).is_err());
         drop(manager); assert!(LocalModelManager::new(root.clone()).is_ok());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn model_store_lock_waits_for_a_departing_owner() {
+        let root = std::env::temp_dir().join(format!("dictamelo-lock-restart-{}", uuid::Uuid::new_v4()));
+        let owner = LocalModelManager::new(root.clone()).unwrap();
+        let contender = std::fs::OpenOptions::new().read(true).write(true).open(root.join(".model-store.lock")).unwrap();
+        let (release, departing) = std::sync::mpsc::channel();
+        let owner_thread = std::thread::spawn(move || { departing.recv().unwrap(); drop(owner); });
+        let mut attempts = 0;
+        retry_store_lock(Duration::from_secs(3), || {
+            attempts += 1;
+            let result = fs2::FileExt::try_lock_exclusive(&contender);
+            if attempts == 1 {
+                assert!(store_lock_is_contended(result.as_ref().unwrap_err()));
+                release.send(()).unwrap();
+            }
+            result
+        }).unwrap();
+        owner_thread.join().unwrap();
+        assert!(attempts >= 2);
+        drop(contender); std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn model_store_lock_rejects_a_persistent_owner_after_shutdown() {
+        let root = std::env::temp_dir().join(format!("dictamelo-lock-owner-{}", uuid::Uuid::new_v4()));
+        let owner = LocalModelManager::new(root.clone()).unwrap();
+        owner.shutdown();
+        let contender = std::fs::OpenOptions::new().read(true).write(true).open(root.join(".model-store.lock")).unwrap();
+        let mut attempts = 0;
+        let started = Instant::now();
+        let error = retry_store_lock(Duration::from_millis(75), || {
+            attempts += 1;
+            fs2::FileExt::try_lock_exclusive(&contender)
+        }).unwrap_err();
+        assert!(store_lock_is_contended(&error));
+        assert!(attempts >= 2 && started.elapsed() >= Duration::from_millis(75));
+        drop(owner);
+        fs2::FileExt::try_lock_exclusive(&contender).unwrap();
+        drop(contender); std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn model_store_lock_does_not_retry_non_contention_errors() {
+        let mut attempts = 0;
+        let error = retry_store_lock(Duration::from_secs(3), || {
+            attempts += 1;
+            Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"))
+        }).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(attempts, 1);
     }
 
     #[cfg(target_os = "windows")]

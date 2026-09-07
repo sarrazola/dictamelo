@@ -127,6 +127,9 @@ async fn run_restart_file(app: &AppHandle, fixture: &Path, marker: &Path) -> Res
     if !settings.uses_local_transcription() || settings.should_clean_transcript() {
         return Err("Restart selftest requires a local model with cloud cleanup disabled".into());
     }
+    // Keep the canonical path for parent/child identity checks, but decode the
+    // original path: Windows Media Foundation rejects canonical verbatim paths.
+    let input_fixture = fixture;
     let fixture = fixture.canonicalize().map_err(|error| error.to_string())?;
     let pid = std::process::id();
     let request = restart_request(marker, &fixture, &settings.model, pid)?;
@@ -140,7 +143,7 @@ async fn run_restart_file(app: &AppHandle, fixture: &Path, marker: &Path) -> Res
     } else if claimed.try_exists().map_err(|error| error.to_string())? {
         return Err("Restart evidence already exists; choose a fresh marker path".into());
     }
-    let text = run_file(app, &fixture).await?;
+    let text = run_file(app, input_fixture).await?;
     if let Some(request) = request {
         write_new_evidence(&completed, &serde_json::json!({
             "schemaVersion": 1, "parentPid": request.parent_pid, "childPid": pid,
