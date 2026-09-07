@@ -50,9 +50,26 @@ if ($Target -eq 'aarch64-pc-windows-msvc') {
 # architecture was built in this shell. An x64 host toolchain also runs on ARM Windows.
 $nativeVcvars = Join-Path $nativeVs 'VC\Auxiliary\Build\vcvarsall.bat'
 $nativeVcarch = if ($Target -eq 'aarch64-pc-windows-msvc') { 'x64_arm64' } else { 'x64' }
-$nativeEnv = & $env:ComSpec /d /s /c "`"`"$nativeVcvars`" $nativeVcarch >nul && set`""
-if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the selected Visual Studio/Windows SDK environment.' }
-foreach ($nativeLine in $nativeEnv) {
+# Pass cmd.exe its raw command string through .NET. PowerShell's native-argument
+# quoting differs between 5.1 and 7 and can double the quotes around Program Files.
+$nativeEnvStart = New-Object System.Diagnostics.ProcessStartInfo
+$nativeEnvStart.FileName = $env:ComSpec
+$nativeEnvStart.Arguments = "/d /u /s /c `"`"$nativeVcvars`" $nativeVcarch >nul && set`""
+$nativeEnvStart.UseShellExecute = $false
+$nativeEnvStart.RedirectStandardOutput = $true
+$nativeEnvStart.RedirectStandardError = $true
+$nativeEnvStart.StandardOutputEncoding = [Text.Encoding]::Unicode
+$nativeEnvProcess = [Diagnostics.Process]::Start($nativeEnvStart)
+$nativeEnvError = $nativeEnvProcess.StandardError.ReadToEndAsync()
+$nativeEnv = $nativeEnvProcess.StandardOutput.ReadToEnd()
+$nativeEnvProcess.WaitForExit()
+[void]$nativeEnvError.GetAwaiter().GetResult()
+$nativeEnvExitCode = $nativeEnvProcess.ExitCode
+$nativeEnvProcess.Dispose()
+# Captured environment and diagnostics can contain private process variables;
+# never print them to the build log, even when setup fails.
+if ($nativeEnvExitCode -ne 0) { throw 'Could not initialize the selected Visual Studio/Windows SDK environment.' }
+foreach ($nativeLine in ($nativeEnv -split "`r?`n")) {
     if ($nativeLine -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process') }
 }
 Write-Host "Native speech build: $Target, static portable CPU backend"
