@@ -1,5 +1,142 @@
 # Windows build report
 
+## 1.0.0 release
+
+The final application source is `3d7974f5bf0996075573294a2cf163287cb559f5`. Both Windows jobs passed in [run 34174273542](https://github.com/sarrazola/dictamelo/actions/runs/34174273542), including the native Whisper Base long-audio regression. Whisper uses segment timestamps internally to preserve long-file speech while returning plain text. The artifact identities and current installed ARM64/x64-emulated results below belong to this final source; earlier `1c9b38d` installed measurements remain separately labeled superseded candidate evidence.
+
+### Final build provenance and artifact identity
+
+Both official-cloud Windows installers were built from application source `3d7974f5bf0996075573294a2cf163287cb559f5` in [Actions run 34174273542](https://github.com/sarrazola/dictamelo/actions/runs/34174273542), completed successfully on September 8, 2026 UTC (September 7 in Colombia). This source fixes Whisper long-file decoding and retains the bounded startup retry for the model-store lock and the original diagnostic fixture path for Windows decoding. Both Windows jobs ran on native x64 `windows-2022` runners. The ARM64 application was cross-compiled; that job did not execute an ARM64 payload.
+
+The final packages statically link the Rust and C++ runtimes. Earlier verification builds that depended on `MSVCP140.dll`, the unsuccessful mixed-runtime build, the `5098dfc` restart candidate and the `1c9b38d` long-audio candidate are superseded and excluded from these final hashes. No installer was rebuilt locally to obtain the final Windows artifacts.
+
+| | ARM64 | x86_64 |
+| --- | --- | --- |
+| Release asset name | `Dictamelo_1.0.0_aarch64-setup.exe` | `Dictamelo_1.0.0_x86_64-setup.exe` |
+| Installer bytes | 4,334,858 | 4,833,853 |
+| Installer SHA-256 | `41c3bb36eac5992e20d64372d39202b441d04b9c676ba97941bde2cd5128caca` | `d512528bd6e0b4ef8b28cb89db8f6ee201bd6311509aaa99f0572de901f48bf3` |
+| Packaged executable bytes | 14,573,568 | 16,531,968 |
+| Packaged executable SHA-256 | `6585557f6c0d4f55da41180e057e53f15731989390d391cbe1c8dda47843909b` | `94bf0569e9b4931a2598cbf0e1d783ce3ce5a3c054b85a74cca2ae51c522eb17` |
+| Restored compiler-output SHA-256 | `a5bc0ee97d8bc903a168b91f98c1df6a64e8ddbecfd52eaaa605af46192e0274` | `31cb7139e98f8660c8214091fa521f74a1c1407f73e628d1b8c33ce04b789c27` |
+| Actual application PE machine | `0xaa64` | `0x8664` |
+| FileVersion / ProductVersion | 1.0.0.0 / 1.0.0.0 | 1.0.0.0 / 1.0.0.0 |
+| GitHub artifact ID | `10036915329` | `10037087994` |
+| GitHub artifact ZIP bytes | 4,318,290 | 4,818,331 |
+| GitHub artifact ZIP SHA-256 | `b1f497ec8599ce9d0fe7b44bff8a299c9a770662f07ea09ff6eef3b8c61305ac` | `7cf1b152907c81d955e828b1f847e34d01776196b4ac84d899539a2a970a940f` |
+
+Each downloaded artifact ZIP matched GitHub's recorded digest and byte size. Independent inspection on macOS extracted the actual application from each NSIS installer, verified the installer and payload hashes against preserved CI metadata, parsed the PE architecture and version resources, and compared imported DLLs against CI's `dumpbin` result. The documented Tauri bundle-marker transformation was reproduced in memory to recover the exact restored compiler-output hash; no artifact was rewritten. ARM64 has zero pre-existing `NSS` markers and x64 has one, preserved unchanged. Compare an installed application with the **packaged executable** hash above, not the restored compiler-output hash or the installer bootstrap's PE header.
+
+Both final payloads import only Windows system libraries and API sets. Neither imports an external MSVC C/C++ runtime, transcribe, ggml, OpenMP, BLAS or GPU runtime DLL. CI verified this for both the compiled and packaged executables, recording the matching `nativeImports` and `requiresExternalNativeRuntime=false`. The inference engine does not require users to install Python, a model server or an additional Visual C++ redistributable. CI produced unsigned NSIS installers; their exact bytes were then signed with the existing Tauri updater key and both detached signatures passed the public-key verifier. This does not provide Microsoft Authenticode signing.
+
+### Native x64 CI execution
+
+The native x64 job passed 103 release-mode Rust tests, with seven opt-in tests skipped in that general run. These include the application-registry regression that routes all six catalog models to the local provider without a cloud key, and three new store-lock tests: a departing owner permits acquisition, a persistent owner remains exclusive after shutdown, and non-contention errors are not retried. The manager retains its lifetime lock; startup retries only the operating system's contention error for up to three seconds at 25-millisecond intervals. Each matrix job also passed 25 Python fixture/build-configuration tests and 38 UI contract tests; these are unit/contract checks, not interactive Windows UI testing.
+
+The x64 job then explicitly ran the native licensed-audio test through the same provider registry used by `AppState`. It downloaded and verified four models spanning all three engine families and transcribed the committed 5.855-second English fixture twice, covering initial and already-loaded inference. All four returned the expected middle-classes/gospel sentence; the preserved initial transcripts matched the reference with zero normalized word errors. No account, API key or hosted transcription request was used.
+
+| Model | First inference | Already loaded | Result |
+| --- | ---: | ---: | --- |
+| Whisper Tiny | 6.98 s | 6.75 s | Passed |
+| Whisper Base | 15.19 s | 14.63 s | Passed |
+| Canary 180M Flash | 4.54 s | 3.70 s | Passed |
+| Parakeet v3 | 16.51 s | 13.84 s | Passed |
+
+These timings describe this shared CI runner and portable CPU build, not performance guarantees. The separate Windows Unicode-path test also passed: it loaded a verified Whisper Tiny model from a Unicode directory, transcribed the fixture, released the engine and removed the model file. The native speech test report is included in the x64 artifact as `native-local-models.json`.
+
+The x64 job also explicitly ran the Whisper Base long-audio regression before packaging. It transcribed a 41.13-second WAV containing six copies of the licensed phrase separated by silence, retained all six middle-classes/gospel passages and matched the repeated reference with zero normalized word errors. The call took 33.37 seconds including model verification/loading. A separate five-second digital-silence input returned empty text. This regression catches the earlier missing-window behavior; it is a targeted Base test, not an accuracy guarantee for every model or repeated recording. The x64 artifact preserves `silence-and-windowing.json` alongside the short-fixture report.
+
+### Installed VM checkpoint — final ARM64, emulated x64 and offline verified
+
+The final `3d7974f` ARM64 installer was installed in the existing Windows 11 ARM64 VMware guest. Its installer SHA-256 was `41c3bb36eac5992e20d64372d39202b441d04b9c676ba97941bde2cd5128caca` (4,334,858 bytes); the installed executable matched the final artifact table: SHA-256 `6585557f6c0d4f55da41180e057e53f15731989390d391cbe1c8dda47843909b`, 14,573,568 bytes, PE `0xaa64` and version 1.0.0. The payload identity was checked against both preserved metadata records, distinguishing it from all superseded candidates.
+
+All six models passed the licensed English fixture through this exact installed application's file pipeline. Verdicts required transcript evidence containing the expected middle/classes/gospel words, not an exit code alone. These probes do not establish zero word error rate for the complete ARM64 transcripts.
+
+| Model | ARM64 wall time | Peak process memory | Result |
+| --- | ---: | ---: | --- |
+| Whisper Tiny | 19.4 s | 124.9 MB | Passed |
+| Whisper Base | 9.1 s | 186.3 MB | Passed |
+| Canary 180M Flash | 14.2 s | 403.6 MB | Passed |
+| Whisper Small | 27.2 s | 424.1 MB | Passed |
+| Parakeet v3 | 21.9 s | 1,148.4 MB | Passed |
+| Whisper Large v3 | 142.0 s | 1,545.6 MB | Passed |
+
+The final x64 installer was then installed in the same ARM64 guest. Its installer SHA-256 was `d512528bd6e0b4ef8b28cb89db8f6ee201bd6311509aaa99f0572de901f48bf3` (4,833,853 bytes); the installed executable matched SHA-256 `94bf0569e9b4931a2598cbf0e1d783ce3ce5a3c054b85a74cca2ae51c522eb17`, 16,531,968 bytes, PE `0x8664` and version 1.0.0. Both metadata records agreed on the final source. The running process loaded `xtajit64se.dll`, confirming x64 emulation. All six models passed the same licensed-fixture transcript probes through the installed x64 file pipeline:
+
+| Model | Emulated x64 wall time | Peak process memory | Result |
+| --- | ---: | ---: | --- |
+| Whisper Tiny | 26.6 s | 152.3 MB | Passed |
+| Whisper Base | 41.0 s | 201.3 MB | Passed |
+| Canary 180M Flash | 17.0 s | 416.9 MB | Passed |
+| Whisper Small | 103.8 s | 437.1 MB | Passed |
+| Parakeet v3 | 36.2 s | 1,168.1 MB | Passed |
+| Whisper Large v3 | 610.4 s | 1,560.6 MB | Passed |
+
+Both tables contain whole-app measurements from a shared VM, including startup and model verification/loading, not inference-only benchmarks or physical Intel/AMD performance claims. Transcript-probe success is not a complete WER measurement for either architecture. Emulation overhead varies by model; the recorded Large v3 time is 610.4 seconds under x64 emulation versus 142.0 seconds for native ARM64 in this sweep.
+
+Whisper Base also passed both long-file content checks on both final installed architectures. On the 41.13-second repeated licensed fixture, each retained six `gospel` and six `middle class` occurrences; the prior `1c9b38d` ARM64 candidate retained three and two respectively. On the separate 70.671-second distinct synthetic recording, each retained the beginning/middle/end markers `blue compass`, `green harbor` and `silver lantern`, plus all six paragraph probes. In particular, `we have now reached the last part of this test`, absent from the earlier ARM64 candidate's transcript, was recovered on both targets. The distinct recording took 16.7 seconds on native ARM64 and 66.5 seconds under x64 emulation. Each recognized 201 words against 197 reference words, with eight tokens missing from an ordered-sequence comparison; that comparison is not a full WER calculation. Recognition substitutions and word-boundary errors remained, including `measures flour` becoming `mesher's flower`; this is evidence of recovered speech across the file, not perfect recognition or proof that every word was retained. The distinct synthetic recording remains local-only diagnostic material.
+
+Fresh installed restart probes passed for Tiny and Parakeet on native ARM64 and Tiny under x64 emulation:
+
+| Target | Model | Parent PID | Child PID | Wall time | Result |
+| --- | --- | ---: | ---: | ---: | --- |
+| Native ARM64 | Whisper Tiny | 3488 | 8572 | 9.3 s | Passed |
+| Native ARM64 | Parakeet v3 | 412 | 12272 | 45.6 s | Passed |
+| Emulated x64 | Whisper Tiny | 14028 | 8220 | 24.2 s | Passed |
+
+Each used a fresh GUID-suffixed completion marker and an ordinary absolute drive path. Success required a newly written completion JSON, distinct parent/child PIDs, the parent process gone and an explicit post-restart transcript containing the expected three words. These are installed diagnostic restart tests, not visual button clicks or public updater execution.
+
+After the x64 sweep, the final ARM64 app was reinstalled and its payload hash, byte count, PE and version reverified against the final table. Original settings were restored byte-for-byte; history remained unchanged. All six downloaded models remained present, and credential entries were untouched and never read. Evidence: ignored `dist/v1.0.0-verification/guest-final-3d-arm.md` and the consolidated `dist/v1.0.0-verification/guest-final-3d-all-windows.md`. Coordinated adapter-disconnected inference subsequently passed as described below; actual public updater execution is checked after publication. Earlier candidate sections below retain their historical checkpoint results and pending status; they do not override these final installed results. No physical Intel/AMD desktop or real-microphone result is claimed.
+
+### Final native ARM64 offline proof
+
+Root disconnected the VMware network adapter after the autonomous diagnostic confirmed a successful connected-adapter query and TCP connection to the known host endpoint. With that adapter disconnected, Tiny, Canary and Parakeet each transcribed the licensed sentence correctly, with whole-app times of 5.1, 6.8 and 11.6 seconds. Each explicit `PASS-OFFLINE` required successful queries locating the known adapter in a disconnected state and failed TCP probes before and after inference; unknown adapter states could not pass. DNS was advisory. Cloud cleanup was disabled.
+
+The visible console confirmed settings restoration and DONE before root reconnected the adapter. Refreshed VMware accessibility state independently confirmed disconnected and then connected. The guest's observed inference interval was 30.6 seconds, which excludes the initial grace period and is not the full host disconnection duration. Evidence: ignored `root-offline-observation.md` and the guest's local probe/summary files. The harness used bounded process/stream waits, fresh live-settings preservation and diagnostic-PID cleanup. A prior unexecuted harness with incomplete timeout/restoration and adapter-error handling was corrected before this run; it supplies no offline evidence.
+
+### Superseded `1c9b38d` candidate: installed ARM64 evidence
+
+The prior `1c9b38d` ARM64 installer was downloaded separately from the superseded candidate and installed in the existing Windows 11 ARM64 VMware guest. The installed executable matched its preserved candidate metadata: SHA-256 `f40a1cfac7efe6334b0212ec24bda7aee567b3ef05f239b246ed73b11f3d5a2a`, 14,573,568 bytes, PE `0xaa64` and version 1.0.0. Settings and history remained byte-identical immediately after upgrading; all six downloaded models remained present.
+
+All six local models then passed the licensed English fixture through the exact installed ARM64 file pipeline. Whole-app times were Tiny 9.2 s, Base 8.3 s, Canary 17.4 s, Small 27.5 s, Parakeet 23.9 s and Large v3 80.0 s. Each transcript contained the expected reference content; these shared-VM times are observations, not comparative benchmarks.
+
+Fresh Tiny and Parakeet restart probes also passed: parent/child PIDs were 1372 → 9532 and 4148 → 2480. Each required a new completion file, distinct PIDs, the parent gone and a correct post-restart transcript. The canonical fixture identity was retained in evidence while decoding used the original drive path, closing the old diagnostic-path failure. Original settings/history were restored byte-for-byte; credentials and six model downloads were preserved. Evidence: ignored `guest-final-1c9-arm-six-restarts.md`.
+
+This candidate subsequently passed native compact rows, Settings persistence across Alt+Tab, close/tray/reopen, fresh-configuration Skip persistence and actual launch-at-login registration. Original settings/history and startup registration were restored. WMA conversion and Tiny/Canary/Parakeet digital silence passed. Canary/Parakeet retained all six repeated phrases; Base retained three, prompting the final regression check. Final `3d7974f` installed execution and adapter-disconnected inference remain pending. Actual public updater execution is also pending. Native x64 CI, ARM64 VM execution, x64 emulation and physical Intel/AMD hardware are separate evidence categories; no physical desktop or real-microphone result is claimed.
+
+### Superseded `5098dfc` candidate: installed ARM64 and x64 VM evidence
+
+The earlier `5098dfcae082699610fa11442437083ccab2b34c` ARM64 candidate was installed in the existing Windows 11 ARM64 VMware guest (8 GB RAM, four virtual processors). Its installed executable was SHA-256 `9e51449259af7c98d32b3f158dbad59902a9e815b19b9d7dd35d665e262ec3c3`, 14,573,056 bytes, PE `0xaa64` and version 1.0.0. This is a different payload from the final artifact table. Settings/history remained byte-identical immediately after installation. Neither stored credential value was read or exported. Results from the even earlier dynamic-runtime candidate are excluded.
+
+That superseded installed ARM64 executable imported the committed 5.855-second licensed English fixture through all six local models, one process at a time, with personal/provider cleanup disabled. Media Foundation decoded to 16 kHz mono and every model used CPU inference. Each produced the expected middle-classes/gospel sentence; `mister` versus `Mr.` is a formatting variation. These are candidate packaged file-pipeline tests, not native file-picker clicks or microphone speech, and do not certify the final installer bytes.
+
+| Model | ARM64 wall time | Peak process memory | Result |
+| --- | ---: | ---: | --- |
+| Whisper Tiny | 5.9 s | 128.8 MB | Passed |
+| Whisper Base | 7.9 s | 186.2 MB | Passed |
+| Canary 180M Flash | 11.8 s | 401.9 MB | Passed |
+| Whisper Small | 13.2 s | 424.2 MB | Passed |
+| Parakeet v3 | 24.4 s | 1,149.1 MB | Passed |
+| Whisper Large v3 | 77.8 s | 1,545.6 MB | Passed |
+
+These are single-run VM measurements including application startup, model verification/loading and shutdown, not inference-only or general performance promises. Verdicts require explicit transcript success, not merely exit zero. Original settings/history were restored byte-for-byte after the sweep. Safe detailed evidence remains in ignored `dist/v1.0.0-verification/guest-final-arm64-six-models.md`.
+
+The superseded `5098dfc` x64 application also completed all six packaged model transcriptions in the same Windows ARM64 VM, with `xtajit64se.dll` confirming x64 emulation in the running process. Every transcript contained the expected middle/classes/gospel words. Settings were restored byte-for-byte after the sweep; only the already observed Chromium teardown message appeared on stderr.
+
+| Model | Emulated x64 wall time | Peak process memory | Result |
+| --- | ---: | ---: | --- |
+| Whisper Tiny | 24.7 s | 154.7 MB | Passed |
+| Whisper Base | 34.3 s | 203.8 MB | Passed |
+| Canary 180M Flash | 16.5 s | 419.4 MB | Passed |
+| Whisper Small | 109.6 s | 438.9 MB | Passed |
+| Parakeet v3 | 51.6 s | 1,165.3 MB | Passed |
+| Whisper Large v3 | 865.7 s | 1,558.0 MB | Passed |
+
+Emulation overhead varied substantially by model: Large v3 took about eleven times its recorded native ARM64 wall time of 77.8 seconds. Do not generalize a single slowdown factor or use these emulated timings to predict physical Intel/AMD performance. This sweep remains superseded-candidate evidence; it does not replace final `3d7974f` execution. Safe phase evidence, including the separate new ARM64 installation identity, remains in ignored `dist/v1.0.0-verification/guest-old-x64-new-arm-install.md`.
+
+**Candidate diagnostic limitations.** The old packaged restart-marker probe canonicalized its fixture to a Windows extended-length path. Media Foundation rejected that path before a restart was requested; ordinary drive paths worked. The final source preserves the original diagnostic input path, but general extended-length imports remain a separate edge case. Source review also identified Tauri's spawn-before-exit restart overlapping the old process's model-store lock; the final source adds the bounded contention retry described above. Both changes passed the installed `1c9b38d` candidate's Tiny/Parakeet restart probes recorded above; repeating those checks on the final `3d7974f` artifacts remains pending. Separately, the pinned Tauri runtime discards the requested diagnostic failure exit code on Windows; automation must require explicit success content. A single WebView2 `Failed to unregister class Chrome_WidgetWin_0`/1412 message appeared during teardown after successful candidate runs; no inference failure or native-engine assertion occurred. The normal application intentionally starts hidden after onboarding; only the tray Settings action establishes whether its settings window opens correctly.
+
+These superseded candidate measurements remain a historical diagnostic record. Final installed results belong in the separate verification section above.
+
 ## 0.5.1 release
 
 Application source: `ee71115a4c4ddf36208fc6a73d1dd097824114b6`. Both official-cloud installers came from [Actions run 34074580032](https://github.com/sarrazola/dictamelo/actions/runs/34074580032), whose two jobs passed. The final EXE bytes were signed with the existing Tauri updater key on macOS and downloaded from the v0.5.1 draft into the Windows VM. Nothing was rebuilt in the VM. Tauri updater signatures are not Microsoft Authenticode signatures.

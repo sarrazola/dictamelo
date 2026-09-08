@@ -33,7 +33,7 @@ Only one local transcription runs at a time. An overlapping recording or separat
 
 The native engine is `transcribe-cpp` 0.2.3, built from pinned Cargo dependencies. On Mac it includes Metal support and the embedded Metal library. End users do not need Python, CMake, Homebrew or an external server. Mac developers need CMake and Xcode Command Line Tools to compile the native dependency. Windows builds use the static CPU backend and the toolchain helper in `scripts/windows-native-toolchain.ps1`: MSVC/Windows SDK, CMake and Ninja, with Clang for ARM64. The x64 build disables host-specific SIMD requirements. Packaged users do not need a Python environment or separate model server.
 
-Canary and Parakeet use the CPU backend, which performed better for short recordings on the tested M4 Max. Whisper uses automatic backend selection with Metal acceleration and a CPU fallback. Loading and checking a model takes longer than a subsequent recording; hardware-specific measurements are recorded separately from general compatibility claims.
+Canary and Parakeet use the CPU backend, which performed better for short recordings on the tested M4 Max. On macOS, Whisper uses automatic backend selection with Metal acceleration and a CPU fallback. All six models use the CPU backend on Windows. Loading and checking a model takes longer than a subsequent recording; hardware-specific measurements are recorded separately from general compatibility claims.
 
 `src-tauri/build.rs` links the selected Apple toolchain's compiler runtime so native availability checks work with the declared macOS 12 deployment target. It discovers the archive through `xcrun`, without embedding a developer-specific path in source.
 

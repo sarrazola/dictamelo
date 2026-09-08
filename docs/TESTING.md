@@ -1,5 +1,58 @@
 # Verification record
 
+## Version 1.0.0 — final verification, September 7, 2026
+
+Application source: `3d7974f5bf0996075573294a2cf163287cb559f5`. It adds compact local-model rows, native inference on both desktop platforms, bounded model-store handoff during restart and decodable Windows restart fixtures. Whisper uses internal segment timestamps to preserve speech across long-audio windows while returning plain text. Earlier `9072`, `5098` and `1c9b38d` installers are superseded; their signatures do not certify the final artifacts.
+
+### Regression and interface checks
+
+- Mac release preflight: 98 Rust tests passed (nine explicit native/live tests ignored in the general run), 38 UI contracts, licensed-fixture validation and JavaScript syntax checks passed. Store-lock regressions cover a departing owner, a persistent owner after shutdown and immediate rejection of unrelated errors. The provider-registry test uses the same registry as application state.
+- Clean-checkout [Mac/backend run 34174265932](https://github.com/sarrazola/dictamelo/actions/runs/34174265932) and [Windows run 34174273542](https://github.com/sarrazola/dictamelo/actions/runs/34174273542) cover this exact source. Mac/backend passed strict Clippy, Deno tests/type checks and all five migrations/three SQL suites, including legacy-data preservation and independent-connection races in an isolated PostgreSQL cluster. Both Windows jobs passed: native x64 ran 103 Rust tests, real cold/warm Tiny, Base, Canary and Parakeet inference, Unicode model-path/removal and the focused Base silence/41.13-second regression before packaging. The long fixture retained all 102 words and six repetitions. The ARM64 payload was cross-compiled and requires separate installed execution. Hosted databases are not modified by CI.
+- Browser preview: all six interface languages passed at 960 × 680. Six models occupy about 354 vertical pixels, one row each, without horizontal overflow. Downloaded/mixed/verifying/error/unavailable states, inline language selection, active-model protection, confirmed deletion, cancellation, first-run local setup/Skip, persistent expanded details, Enter/Space and focus restoration passed. No page errors or external asset requests occurred. These are Chromium tests with mocked native commands; they are separate from installed execution. Evidence: ignored `dist/release-1.0.0-ui/`.
+- The unchanged UI assets were also exercised in the installed Mac and Windows ARM64 candidates: compact rows, real tray/settings visibility and masked saved keys. Windows additionally verified real download/cancel/delete and first-run startup/Skip, preserving the original settings and startup registration. The exact build and scope of each native check remain in [Windows verification](WINDOWS_BUILD_REPORT.md).
+
+### Final Mac artifacts and installed execution
+
+Apple accepted app submission `68f6d52a-1a9b-4432-af56-e19a5d4a1b4f` and DMG submission `33bd0971-7f14-4be9-a562-d0b003872c1e`. Built, installed, read-only mounted-DMG and updater bundles contain the same five files. Strict signing, stapled tickets, Gatekeeper (`Notarized Developer ID`) and the existing public-key updater verifier passed: all 16 artifact checks, with the verification mount detached.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Installed ARM64 executable, version 1.0.0 | — | `17c2863f48bd7b6762246e9223b78728eb281f282b73df856eb0c3ee587c71a0` |
+| Mac DMG | 7,737,121 | `21f54aa6640583bf2a29defaf4793413a9986e16bfe9b344f0b0c96fb4ee61b2` |
+| Mac updater archive | 6,346,436 | `1019afbf08618c2ea4ae5da28022a6e5c1b854ef488d10ea25dece2d86d760e9` |
+
+All six models passed the exact installed file pipeline using the committed 5.855-second English WAV. Every result retained all 17 reference words, normalized WER 0.000, and exited normally.
+
+| Model | Whole installed-app test time | Result |
+| --- | ---: | --- |
+| Canary 180M Flash | 5.293 s | WER 0.000 |
+| Parakeet v3 | 8.684 s | WER 0.000 |
+| Whisper Tiny | 4.165 s | WER 0.000 |
+| Whisper Base | 4.114 s | WER 0.000 |
+| Whisper Small | 5.159 s | WER 0.000 |
+| Whisper Large v3 | 10.436 s | WER 0.000 |
+
+These single-run M4 Max/36 GiB measurements include startup, model verification/loading and shutdown. They are not inference-only benchmarks or hardware-independent speed promises. WER normalization ignores punctuation and `Mr.`/`mister` spelling.
+
+- Real restart: fresh Tiny and Parakeet probes invoked `commands::restart_app`, observed distinct PIDs (63152 → 63190 and 63223 → 63268), and verified each child's repeated transcription with WER 0.000 and a new completion marker. All processes exited without a native-destructor assertion. This is application restart, separate from public updating.
+- OS-enforced offline execution: a normal direct TCP probe to `1.1.1.1:443` succeeded; the same probe under `(version 1) (allow default) (deny network-outbound)` failed with `EPERM`. With proxies removed, the exact final Tiny, Canary and Parakeet app processes each returned WER 0.000 under that sandbox. `cleanupEnabled=true` and `localCleanupCloudEnabled=false` confirmed that local speech works without cloud-cleanup consent. This denies network access to the tested process; it does not claim that the entire Mac was disconnected.
+- Base long files: the final installed app retained all beginning/middle/end markers and opening paragraphs in a local 70.671-second synthetic recording (196 recognized/197 reference words, WER 4.57%). It also retained all six repetitions of the licensed phrase in a 41.13-second recording (102/102 words, WER 0.000).
+- Original settings/history were restored byte-for-byte, credentials were untouched and the app was left closed. Evidence: ignored `mac-segment-summary.json`, `mac-segment-installed-runtime.json`, `mac-segment-offline-and-long.json` and `mac-segment-artifact-verification.json` under `dist/v1.0.0-verification/`.
+
+### Long-audio regression and accuracy boundaries
+
+The prior `1c9b38d` Mac Base candidate omitted most opening speech in that 70-second recording (47.21% WER), while the identical isolated first 30 seconds recovered 82/83 words. Same-model/backend experiments showed that segment timestamps preserved the decoder's completed boundaries and reduced WER to 4.57%; no silence threshold was weakened. The prior Windows ARM64 CPU candidate retained the opening on the distinct recording, so the Mac symptom is not presented as a reproduced Windows failure. Windows did lose repetitions on the separate 41-second case; the final Base regression passed native x64 CI; the final installed ARM64 VM repeat also retained all six phrases. The final x64-emulated repeat also retained all six phrases.
+
+On the corrected production provider path, cold/warm short and distinct-long tests passed for Tiny, Base, Small, Canary and Parakeet; long WER was 4.57%, 4.57%, 2.03%, 0.51% and 0.51%. All five returned empty text for digital silence. Base, Canary and Parakeet retained all six phrases in the repeated licensed fixture, including a separate Base CPU check. Small retained five identical copies on that artificial repeated sample while preserving the distinct recording; repeat counts are not a universal model-accuracy guarantee. Earlier Canary Spanish tests also omitted two `ñ` characters; Parakeet and Whisper preserved those words. Parakeet remains the recommended local model.
+
+The synthetic diagnostic is local-only and is not represented as an open-license corpus or microphone benchmark. The committed licensed fixture is the repeatable release-CI input. Digital-silence tests do not prove rejection of background noise. Evidence: ignored `whisper-timestamps-experiment.json` and `segment-production-regression-report.json`.
+
+### Cloud and distribution boundaries
+
+- Live Free Cloud: the existing deployed service transcribed the licensed fixture with WER 0.000 and completed real GPT-OSS 20B cleanup. Auth/owner/hash/privileged-RPC rejection created no provider attempts. Concurrent cleanup returned 200/409, replay returned 409, one attempt settled and 5.855 seconds were charged once. The last accepted recording was delivered and cleanable at 1804.855/1800 weekly seconds; the next transcription returned 429. Both temporary accounts and dependent records were removed and removal verified. No email, customer account or backend deployment was part of this test. Evidence: ignored `live-free.log`.
+- Read-only cloud availability: official public build metadata validated; email/Google Auth and signup were enabled, with email confirmation required. Auth settings and checkout returned HTTP 200. Official automatic updates were enabled; the unverified trial remained disabled. This is not a new Google consent, inbox, purchase or trial-lifecycle test. Pro's detailed usage meter remains unavailable; no telemetry endpoint was deployed. Evidence: ignored `public-cloud-metadata.json`.
+- Final installed Windows ARM64: all six packaged file pipelines passed. Fresh Tiny/Parakeet restart probes used distinct PIDs, correct post-restart transcripts and a departed parent. Base retained all six repetitions over 41.13 seconds and all distinct-file markers/opening paragraphs over 70.671 seconds, including the previously missing final-paragraph lead-in. Recognition substitutions remain; no zero-WER claim is made for the VM. Original settings/history were restored and credentials/models preserved. Final x64-emulated execution also passed all six models, the two Base long files and a fresh Tiny restart (14028 → 8220). Large v3 took 610.4 seconds under emulation; this is not a native x64 performance estimate. The distinct long result had the same six paragraph probes and recognition substitutions as ARM64. The final ARM64 executable was reinstalled and verified afterward. Adapter-disconnected inference then passed with Tiny, Canary and Parakeet: root disconnected the VMware adapter after a successful connected baseline, observed correct transcripts and explicit offline verdicts with successful adapter queries plus failed TCP probes before/after inference, and reconnected only after DONE and settings restoration. Whole-app times were 5.1, 6.8 and 11.6 seconds. Anonymous public downloads, genuine old-version updates and website deployment are the remaining distribution checks. [Windows verification](WINDOWS_BUILD_REPORT.md) separates native x64 CI, ARM64 VM execution, x64 emulation and untested physical Intel/AMD hardware.
+
 ## Version 0.6.0 — Mac-first implementation, September 7, 2026
 
 ### Cloud/account and saved-key follow-up

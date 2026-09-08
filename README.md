@@ -126,7 +126,7 @@ scripts/                     Checks, configuration, building and release tools
 docs/                        Setup, operations and verification records
 ```
 
-Groq is the visible provider choice for this release. Existing OpenAI settings, credentials and adapters remain compatible, but new setup does not expose that unverified choice. Add a provider through `TranscriptionProvider` or `TextCleaner`, register it, and verify it with the speech fixture.
+Personal-key setup offers Groq, OpenAI, Mistral and Deepgram. The additional OpenAI, Mistral and Deepgram adapters have offline request/response contract coverage; live calls with their respective provider accounts remain pending. Existing credentials and settings remain compatible. Add a provider through `TranscriptionProvider` or `TextCleaner`, register it, and verify it with the speech fixture.
 
 ## Releasing a version
 
