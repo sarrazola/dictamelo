@@ -1108,7 +1108,7 @@ async function showFirstRunOnboarding() {
   // Missing flags belong to older clients and should never interrupt their setup.
   if (ui.settings.onboardingSeen !== false) return;
   try {
-    ui.settings = await invoke("save_settings", { settings: { ...ui.settings, onboardingSeen: true } });
+    await persistSettings({ onboardingSeen: true });
     openOnboarding();
   } catch (err) {
     toast(String(err), true);
@@ -1229,12 +1229,13 @@ function renderFileJobs(jobs) {
     head.append(name, meta, state);
     li.appendChild(head);
 
-    if (job.stage === "done") {
+    if (job.text) {
       const text = document.createElement("div");
       text.className = "text";
       text.textContent = job.text;
       li.appendChild(text);
-    } else if (job.stage === "failed") {
+    }
+    if (job.stage === "failed") {
       const err = document.createElement("div");
       err.className = "error";
       err.textContent = job.error || t("files.failed");
@@ -1250,7 +1251,7 @@ function renderFileJobs(jobs) {
 
     const tools = document.createElement("div");
     tools.className = "tools";
-    if (job.stage === "done") {
+    if (job.text) {
       const copy = document.createElement("button");
       copy.className = "ghost small";
       copy.dataset.fileCopy = job.id;
@@ -1363,10 +1364,22 @@ function renderAll() {
 
 // ---------- Acciones ----------
 
+let settingsSaveQueue = Promise.resolve();
+
+function persistSettings(patch) {
+  const pending = settingsSaveQueue.then(async () => {
+    const settings = await invoke("save_settings", { settings: { ...ui.settings, ...patch } });
+    ui.settings = settings;
+    return settings;
+  });
+  // A rejected save must not poison subsequent independent edits.
+  settingsSaveQueue = pending.catch(() => {});
+  return pending;
+}
+
 async function saveSettings(patch) {
-  const next = { ...ui.settings, ...patch };
   try {
-    ui.settings = await invoke("save_settings", { settings: next });
+    await persistSettings(patch);
     ui.lang = ui.settings.uiLanguage === "auto"
       ? resolveAutoLanguage()
       : ui.settings.uiLanguage;
@@ -1441,7 +1454,7 @@ async function onCaptureKeydown(e) {
   const combo = [...mods, code].join("+");
   try {
     await invoke("validate_hotkey", { hotkey: combo });
-    ui.settings = await invoke("save_settings", { settings: { ...ui.settings, hotkey: combo } });
+    await persistSettings({ hotkey: combo });
     setHint("");
     endCapture();
     renderAll();

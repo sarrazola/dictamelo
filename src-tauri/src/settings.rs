@@ -109,7 +109,7 @@ impl Settings {
             std::fs::create_dir_all(dir)?;
         }
         let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
-        std::fs::write(path, json)
+        crate::util::atomic_write(path, json.as_bytes())
     }
 
     /// Vocabulario listo para enviar como contexto (`None` si está vacío).

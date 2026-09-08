@@ -27,6 +27,8 @@ pub struct PendingTranscription {
 
 pub struct AppState {
     pub settings: RwLock<Settings>,
+    /// Serialize persistence and native settings side effects across UI/tray writers.
+    pub settings_update: Mutex<()>,
     pub settings_path: PathBuf,
     pub history: Mutex<History>,
     pub secrets: Arc<dyn SecretStore>,
@@ -50,6 +52,8 @@ pub struct AppState {
     pub last_failed: Mutex<Option<PendingTranscription>>,
     /// Archivos de audio en cola o ya transcritos (solo en memoria).
     pub file_jobs: Mutex<Vec<FileJob>>,
+    /// One worker across batches; each batch still retains its captured route.
+    pub file_worker: tokio::sync::Mutex<()>,
     /// Directorio para los WAV temporales (se limpian al arrancar y tras cada uso).
     pub temp_dir: PathBuf,
     pub log_dir: PathBuf,
@@ -84,6 +88,7 @@ impl AppState {
         let providers = provider_registry(local_models.clone());
         Ok(AppState {
             settings: RwLock::new(settings),
+            settings_update: Mutex::new(()),
             settings_path,
             history: Mutex::new(history),
             account: crate::account::Account::new(secrets.clone()),
@@ -101,6 +106,7 @@ impl AppState {
             status_generation: AtomicU64::new(0),
             last_failed: Mutex::new(None),
             file_jobs: Mutex::new(Vec::new()),
+            file_worker: tokio::sync::Mutex::new(()),
             temp_dir,
             log_dir,
             config_dir,

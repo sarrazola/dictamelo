@@ -86,15 +86,37 @@ pub fn enqueue(app: &AppHandle, paths: Vec<PathBuf>) {
             ids.push(job.id.clone());
             jobs.insert(0, job);
         }
-        jobs.truncate(MAX_JOBS);
+        prune_completed_jobs(&mut jobs);
     }
     emit(app);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let _worker = state.file_worker.lock().await;
         for id in ids {
             process(&app, &id, &plan).await;
         }
     });
+}
+
+fn prune_completed_jobs(jobs: &mut Vec<FileJob>) {
+    let mut completed = 0;
+    jobs.retain(|job| {
+        if matches!(job.stage, Stage::Done | Stage::Failed) {
+            completed += 1;
+            completed <= MAX_JOBS
+        } else {
+            true // A display-history limit must never discard accepted work.
+        }
+    });
+}
+
+fn append_completed_text(job: &mut FileJob, text: &str) {
+    let text = text.trim();
+    if !text.is_empty() {
+        if !job.text.is_empty() { job.text.push(' '); }
+        job.text.push_str(text);
+    }
 }
 
 pub fn remove(app: &AppHandle, id: &str) {
@@ -119,6 +141,7 @@ fn update(app: &AppHandle, id: &str, f: impl FnOnce(&mut FileJob)) -> bool {
         match jobs.iter_mut().find(|j| j.id == id) {
             Some(job) => {
                 f(job);
+                prune_completed_jobs(&mut jobs);
                 true
             }
             None => false,
@@ -188,20 +211,24 @@ async fn run(app: &AppHandle, plan: &TranscriptionPlan, path: &Path, id: &str) -
 
     // 2) Conversión local a WAV 16 kHz mono.
     update(app, id, |j| j.stage = Stage::Converting);
-    let wav_path = wav::new_temp_path(&temp_dir);
-    let (input, output) = (path.to_path_buf(), wav_path.clone());
-    let converted = tokio::task::spawn_blocking(move || platform::decode_audio_to_wav(&input, &output))
+    let (input, conversion_dir) = (path.to_path_buf(), temp_dir.clone());
+    // Keep the guard in the blocking task too: cancellation of its async waiter
+    // must not remove the file early while the decoder is still writing it.
+    let (converted_audio, converted) = tokio::task::spawn_blocking(move || {
+        let output = wav::TempAudio::new(&conversion_dir);
+        let result = platform::decode_audio_to_wav(&input, output.path());
+        (output, result)
+    })
         .await
         .map_err(|e| e.to_string())?;
     if let Err(e) = converted {
-        let _ = std::fs::remove_file(&wav_path);
         return Err(match e {
             PlatformError::Unsupported(_) => t(&lang, "file.unsupported").into(),
             other => tf(&lang, "file.convert_failed", &[("e", &other.to_string())]),
         });
     }
-    let samples = read_wav_as_16k_mono(&wav_path);
-    let _ = std::fs::remove_file(&wav_path);
+    let samples = read_wav_as_16k_mono(converted_audio.path());
+    drop(converted_audio);
     let samples = samples.map_err(|e| tf(&lang, "file.read_failed", &[("e", &e)]))?;
     if samples.is_empty() {
         return Err(t(&lang, "file.empty").into());
@@ -220,12 +247,13 @@ async fn run(app: &AppHandle, plan: &TranscriptionPlan, path: &Path, id: &str) -
         }) {
             return Err("cancelado".into());
         }
-        let chunk_path = wav::new_temp_path(&temp_dir);
-        wav::write_wav_mono_i16(&chunk_path, &samples[range], TARGET_SAMPLE_RATE).map_err(|e| e.to_string())?;
-        let result = crate::pipeline::transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request(chunk_path.clone())).await;
-        let _ = std::fs::remove_file(&chunk_path);
+        let chunk_audio = wav::TempAudio::new(&temp_dir);
+        wav::write_wav_mono_i16(chunk_audio.path(), &samples[range], TARGET_SAMPLE_RATE).map_err(|e| e.to_string())?;
+        let result = crate::pipeline::transcribe_with_retry(source.provider.as_ref(), source.api_key.as_deref(), &request(chunk_audio.path().to_path_buf())).await;
         let result = result.map_err(|e| e.localized(&lang))?;
-        texts.push(finish_transcript(app, settings, &source, &result, id).await?);
+        let text = finish_transcript(app, settings, &source, &result, id).await?;
+        update(app, id, |job| append_completed_text(job, &text));
+        texts.push(text);
     }
     Ok((texts.join(" ").trim().to_string(), duration_secs))
 }
@@ -306,6 +334,45 @@ fn read_wav_as_16k_mono(path: &Path) -> Result<Vec<i16>, String> {
 #[cfg(test)]
 mod route_tests {
     use super::*;
+
+    fn job(index: usize, stage: Stage) -> FileJob {
+        FileJob {
+            id: index.to_string(), name: "fixture.wav".into(), path: "fixture.wav".into(),
+            size_bytes: 0, stage, chunk: 0, chunks: 2, text: String::new(),
+            error: None, cleanup_warning: None, duration_secs: 0.0,
+        }
+    }
+
+    #[test]
+    fn history_limit_never_discards_accepted_or_active_jobs() {
+        let mut jobs = (0..60).map(|i| job(i, Stage::Queued)).collect::<Vec<_>>();
+        jobs[30].stage = Stage::Converting;
+        jobs[31].stage = Stage::Transcribing;
+        jobs[32].stage = Stage::Cleaning;
+        jobs.extend((60..90).map(|i| job(i, Stage::Done)));
+        jobs.extend((90..100).map(|i| job(i, Stage::Failed)));
+        prune_completed_jobs(&mut jobs);
+        assert_eq!(jobs.len(), 60 + MAX_JOBS);
+        for (i, job) in jobs.iter().take(60).enumerate() { assert_eq!(job.id, i.to_string()); }
+        assert_eq!(jobs.last().unwrap().id, "79");
+        // The limit must also hold when queued jobs become completed.
+        jobs[59].stage = Stage::Done;
+        prune_completed_jobs(&mut jobs);
+        assert_eq!(jobs.len(), 59 + MAX_JOBS);
+        assert_eq!(jobs.last().unwrap().id, "78");
+    }
+
+    #[test]
+    fn later_chunk_failure_retains_completed_text() {
+        let mut result = job(0, Stage::Transcribing);
+        append_completed_text(&mut result, " First chunk. ");
+        append_completed_text(&mut result, " ");
+        append_completed_text(&mut result, " Second chunk. ");
+        result.stage = Stage::Failed;
+        result.error = Some("later chunk failed".into());
+        assert_eq!(result.text, "First chunk. Second chunk.");
+        assert_eq!(result.stage, Stage::Failed);
+    }
 
     #[test]
     fn free_original_formats_cannot_bypass_limits_through_conversion() {

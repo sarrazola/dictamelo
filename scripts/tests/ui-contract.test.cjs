@@ -158,6 +158,54 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+test("queued settings patches merge with the latest successful settings", async () => {
+  const first = deferred();
+  const saves = [];
+  const { sandbox } = loadUiState(async (command, { settings }) => {
+    assert.equal(command, "save_settings");
+    saves.push({ ...settings });
+    if (saves.length === 1) await first.promise;
+    return { ...settings };
+  });
+  sandbox.state.settings = { language: "auto", playSounds: true, provider: "local" };
+  const language = sandbox.persistSettings({ language: "es" });
+  const sounds = sandbox.persistSettings({ playSounds: false });
+  await new Promise(setImmediate);
+  assert.equal(saves.length, 1, "the second write must wait for the first result");
+  first.resolve();
+  await Promise.all([language, sounds]);
+  assert.deepEqual(saves[1], { language: "es", playSounds: false, provider: "local" });
+  assert.equal(sandbox.state.settings.language, "es");
+});
+
+test("a failed settings patch does not poison the next edit", async () => {
+  let attempts = 0;
+  const { sandbox } = loadUiState(async (_command, { settings }) => {
+    if (++attempts === 1) throw new Error("storage unavailable");
+    return settings;
+  });
+  sandbox.state.settings = { language: "auto", playSounds: true };
+  const failed = sandbox.persistSettings({ language: "es" });
+  const next = sandbox.persistSettings({ playSounds: false });
+  await assert.rejects(failed, /storage unavailable/);
+  await next;
+  assert.equal(sandbox.state.settings.language, "auto");
+  assert.equal(sandbox.state.settings.playSounds, false);
+});
+
+test("failed file jobs show partial text, the error and copy/save actions together", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.renderFileJobs([{ id: "partial", name: "fixture.wav", path: "fixture.wav", stage: "failed", durationSecs: 0, sizeBytes: 10, text: "First completed chunk.", error: "Later chunk failed", chunk: 2, chunks: 3 }]);
+  const rendered = control("#file-jobs").children[0];
+  assert.equal(rendered.children.find(child => child.className === "text").textContent, "First completed chunk.");
+  assert.equal(rendered.children.find(child => child.className === "error").textContent, "Later chunk failed");
+  const actions = rendered.children.find(child => child.className === "tools").children;
+  assert.ok(actions.some(action => action.dataset.fileCopy === "partial"));
+  assert.ok(actions.some(action => action.dataset.fileSave === "partial"));
+  assert.match(read("src-tauri/src/file_transcription.rs"), /let _worker = state\.file_worker\.lock\(\)\.await/);
+  assert.doesNotMatch(read("src-tauri/src/file_transcription.rs"), /jobs\.truncate\(MAX_JOBS\)/);
+});
+
 test("first-run setup persists its seen flag before opening and never restarts", async () => {
   let saves = 0;
   const { sandbox, calls } = loadUiState(async (command, { settings }) => {
