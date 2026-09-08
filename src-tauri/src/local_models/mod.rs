@@ -597,21 +597,27 @@ mod tests {
             for _ in 0..16_000 { writer.write_sample(0_i16).unwrap(); }
         }
         writer.finalize().unwrap();
+        let ids = std::env::var("DICTAMELO_LOCAL_TEST_MODELS").unwrap_or_else(|_| manager.catalog().iter().map(|model| model.id.as_str()).collect::<Vec<_>>().join(","));
         let mut report = Vec::new();
-        for model in manager.catalog() {
+        let mut silence_models_passed = 0;
+        for id in ids.split(',') {
+            let model = manager.catalog().iter().find(|model| model.id == id).unwrap_or_else(|| panic!("unknown local test model: {id}"));
             let request = TranscriptionRequest { audio_path: silence.clone(), model: model.id.clone(), language: Some("en".into()), prompt: None };
             let result = manager.transcribe(&request).await.unwrap(); assert!(result.text.is_empty(), "{} hallucinated on digital silence", model.id);
-            if matches!(model.engine.as_str(), "canary" | "parakeet") {
-                let started = Instant::now();
-                let result = manager.transcribe(&TranscriptionRequest { audio_path: repeated.clone(), ..request }).await.unwrap();
-                let text = result.text.to_lowercase();
-                assert_eq!(text.matches("gospel").count(), 6, "{} lost a repetition: {}", model.id, result.text);
-                assert_eq!(text.matches("middle classes").count(), 6, "{} lost words: {}", model.id, result.text);
-                eprintln!("{} preserved all six speech repetitions across local model windows", model.id);
-                report.push(serde_json::json!({"id":model.id,"audioSeconds":result.duration_secs,"inferenceSeconds":started.elapsed().as_secs_f64(),"repetitions":6,"text":result.text,"passed":true}));
-            }
+            silence_models_passed += 1;
+            // Base lost whole speech windows when Whisper timestamps were disabled.
+            // Keep the repeated-content regression focused on that model and the two
+            // bounded-window engine families; other model accuracy is checked separately.
+            if model.engine == "whisper" && model.id != "whisper-base" { continue; }
+            let started = Instant::now();
+            let result = manager.transcribe(&TranscriptionRequest { audio_path: repeated.clone(), ..request }).await.unwrap();
+            let text = result.text.to_lowercase();
+            assert_eq!(text.matches("gospel").count(), 6, "{} lost a repetition: {}", model.id, result.text);
+            assert_eq!(text.matches("middle classes").count(), 6, "{} lost words: {}", model.id, result.text);
+            eprintln!("{} preserved all six speech repetitions across local model windows", model.id);
+            report.push(serde_json::json!({"id":model.id,"audioSeconds":result.duration_secs,"inferenceSeconds":started.elapsed().as_secs_f64(),"repetitions":6,"text":result.text,"passed":true}));
         }
-        std::fs::write(parent.join("silence-and-windowing.json"),serde_json::to_vec_pretty(&serde_json::json!({"silenceModelsPassed":manager.catalog().len(),"longAudio":report})).unwrap()).unwrap();
+        std::fs::write(parent.join("silence-and-windowing.json"),serde_json::to_vec_pretty(&serde_json::json!({"silenceModelsPassed":silence_models_passed,"longAudio":report})).unwrap()).unwrap();
     }
 
     #[cfg(any(target_os = "macos", target_os = "windows"))]

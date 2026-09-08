@@ -104,13 +104,16 @@ jobs:
         run: |
           . ./scripts/windows-native-toolchain.ps1 -Target x86_64-pc-windows-msvc
           $env:DICTAMELO_LOCAL_TESTS = '1'
-          $env:DICTAMELO_LOCAL_TEST_MODELS = 'whisper-tiny,canary-180m-flash,parakeet-v3'
+          $env:DICTAMELO_LOCAL_TEST_MODELS = 'whisper-tiny,whisper-base,canary-180m-flash,parakeet-v3'
           $env:DICTAMELO_LOCAL_TEST_DIR = Join-Path $env:RUNNER_TEMP 'dictamelo-local-models/models'
           $env:DICTAMELO_LOCAL_TEST_REPORT = 'native-local-models.json'
           cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc local_models_transcribe_the_licensed_english_fixture -- --ignored --nocapture
           if ($LASTEXITCODE -ne 0) { throw 'Native x64 speech inference failed' }
           cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc windows_native_model_loads_from_unicode_path_and_releases_file -- --ignored --nocapture
           if ($LASTEXITCODE -ne 0) { throw 'Native Windows Unicode path/model removal failed' }
+          $env:DICTAMELO_LOCAL_TEST_MODELS = 'whisper-base'
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc local_models_handle_silence_and_bounded_window_audio -- --ignored --nocapture
+          if ($LASTEXITCODE -ne 0) { throw 'Native Whisper Base silence/long-audio regression failed' }
       - name: Build an unsigned verification installer
         shell: pwsh
         run: |
@@ -182,5 +185,6 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/build-verification.json
             ${{ runner.temp }}/dictamelo-local-models/native-local-models.json
+            ${{ runner.temp }}/dictamelo-local-models/silence-and-windowing.json
           retention-days: 7
           if-no-files-found: error

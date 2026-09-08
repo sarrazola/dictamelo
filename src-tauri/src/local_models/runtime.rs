@@ -176,7 +176,9 @@ impl Runtime {
             }).map_err(|e| format!("Could not start local transcription: {e}"))?;
             session.set_cancel_token(&job.token);
             let options = RunOptions {
-                timestamps: TimestampKind::None,
+                // Whisper needs timestamp boundaries to resume after partial decoder windows.
+                // We still return plain text; forcing None can silently omit long-file speech.
+                timestamps: if catalog.engine == "whisper" { TimestampKind::Segment } else { TimestampKind::None },
                 // Parakeet performs multilingual recognition without a language-selection input.
                 language: if catalog.engine == "parakeet" { None } else { request.language.clone().filter(|l| !l.is_empty() && l != "auto") },
                 family: if model.supports(Feature::InitialPrompt) { Some(RunExtension::Whisper(WhisperRunOptions {
