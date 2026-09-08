@@ -1,5 +1,14 @@
 # Verification record
 
+## Unreleased — file-job and settings reliability, September 8, 2026
+
+Based on upstream `6aa114aa430dc9cbf2330683b8060b7eb7887d65`. This contribution preserves accepted file jobs beyond the completed-history limit, serializes file batches without changing their captured transcription routes, retains completed chunks on later failure, cleans app-generated temporary audio and makes settings/history replacement safer. UI settings patches are queued against the latest successful state; the native settings command and tray writer share a persistence lock.
+
+- macOS source checks: 104 Rust tests passed; nine explicitly opt-in native/live tests remained ignored. Six new regressions cover pending-job retention, partial text, temporary-file ownership during errors/cancellation, replacement failure and Unix permission preservation. Strict all-target Clippy and `npm run check` passed.
+- UI: 41 contract/behavior tests passed, including queued edits, recovery after a rejected save and partial failed-job text/error/copy/save controls. Chromium preview checks at 960 × 680 passed in all six languages and both light/dark modes, with no horizontal overflow, page errors or external requests. Copy/save were exercised through mocked native commands, not the system clipboard or a native save dialog.
+- Supporting checks: 25 Python tests, 16 Deno tests and type checks for the three backend endpoints passed. The backend was not changed; SQL and live-account/provider tests were not rerun for this contribution.
+- Boundaries: no Windows runtime, physical microphone, installed-app, notarization or updater test was performed for this patch. No installer or backend deployment is included. File jobs remain in memory and completed history remains bounded; retained partial text is not crash recovery. Atomic replacement protects the previous file on write/rename failures but is not a power-loss durability guarantee.
+
 ## Version 1.0.0 — final verification, September 7, 2026
 
 Application source: `3d7974f5bf0996075573294a2cf163287cb559f5`. It adds compact local-model rows, native inference on both desktop platforms, bounded model-store handoff during restart and decodable Windows restart fixtures. Whisper uses internal segment timestamps to preserve speech across long-audio windows while returning plain text. Earlier `9072`, `5098` and `1c9b38d` installers are superseded; their signatures do not certify the final artifacts.

@@ -67,7 +67,7 @@ impl History {
             std::fs::create_dir_all(dir)?;
         }
         let json = serde_json::to_string_pretty(&self.entries).map_err(std::io::Error::other)?;
-        std::fs::write(&self.path, json)
+        crate::util::atomic_write(&self.path, json.as_bytes())
     }
 }
 

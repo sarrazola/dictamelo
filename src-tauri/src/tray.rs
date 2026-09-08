@@ -3,7 +3,7 @@
 use crate::i18n::{t, tf};
 use crate::state::AppState;
 use crate::status::Status;
-use crate::util::write;
+use crate::util::{lock, write};
 use crate::{app_windows, pipeline};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
@@ -118,14 +118,15 @@ fn handle_menu(app: &AppHandle, id: &str) {
         }
         "autopaste" => {
             let state = app.state::<AppState>();
-            let updated = {
-                let mut settings = write(&state.settings);
-                settings.auto_paste = !settings.auto_paste;
-                settings.clone()
-            };
+            let _update = lock(&state.settings_update);
+            let mut updated = state.settings();
+            updated.auto_paste = !updated.auto_paste;
             if let Err(e) = updated.save(&state.settings_path) {
                 log::error!("No se pudo guardar la configuración: {e}");
+                set_autopaste_checked(app, !updated.auto_paste);
+                return;
             }
+            *write(&state.settings) = updated.clone();
             set_autopaste_checked(app, updated.auto_paste);
             let _ = app.emit("settings-changed", &updated);
         }
