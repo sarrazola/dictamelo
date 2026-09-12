@@ -142,6 +142,7 @@ function renderStatus(status) {
   $("#status-text").textContent = known.includes(status.state)
     ? t(`status.${status.state}`)
     : status.message || status.state;
+  renderShortcutControls();
 }
 
 function renderSidebar() {
@@ -152,9 +153,26 @@ function renderSidebar() {
   $("#foot-version").textContent = ui.appInfo.version;
 }
 
+function recordingInstructions() {
+  return t(ui.settings?.recordingMode === "toggle" ? "general.mode.toggle.help" : "general.mode.hold.help");
+}
+
+function renderShortcutControls() {
+  const recording = ui.lastStatus?.state === "recording";
+  for (const id of ["#hotkey-display", "#btn-change-hotkey", "#btn-reset-hotkey", "#btn-fn-hotkey", "#recording-mode"]) $(id).disabled = recording;
+}
+
 function renderGeneral() {
   $("#hotkey-display").textContent = ui.capturing ? t("general.press") : prettyHotkey(ui.settings.hotkey);
   $("#hotkey-display").classList.toggle("capturing", ui.capturing);
+  $("#shortcut-description").textContent = recordingInstructions();
+  $("#recording-mode").value = ui.settings.recordingMode || "hold";
+  $("#recording-mode").disabled = ui.capturing;
+  $("#btn-fn-hotkey").hidden = ui.appInfo.platform !== "macos";
+  $("#btn-fn-hotkey").setAttribute("aria-pressed", String(ui.settings.hotkey?.toLowerCase() === "fn"));
+  $("#fn-hotkey-help").hidden = ui.appInfo.platform !== "macos" || ui.settings.hotkey?.toLowerCase() !== "fn";
+  renderShortcutControls();
+  $("#recording-mode").disabled ||= ui.capturing;
   $("#auto-paste").checked = ui.settings.autoPaste;
   fillSelect($("#language"), dictationLanguageChoices(), ui.settings.language);
   $("#launch-at-login").checked = ui.settings.launchAtLogin;
@@ -1168,6 +1186,7 @@ function renderOnboarding() {
     renderLocalModels();
   }
   $("#onboarding-hotkey").textContent = prettyHotkey(ui.settings.hotkey);
+  $("#onboarding-try").textContent = recordingInstructions();
   fillSelect($("#onboarding-language"), dictationLanguageChoices(), ui.settings.language);
   $("#btn-close-onboarding").ariaLabel = t("onboarding.close");
   renderOnboardingNext();
@@ -1409,21 +1428,24 @@ function setHint(message, isError = false) {
   el.classList.toggle("error", isError);
 }
 
-function beginCapture() {
-  if (ui.capturing) return;
+async function beginCapture() {
+  if (ui.capturing || ui.captureStarting) return;
+  ui.captureStarting = true;
+  try { await invoke("begin_hotkey_capture"); }
+  catch (err) { setHint(String(err), true); return; }
+  finally { ui.captureStarting = false; }
   ui.capturing = true;
-  invoke("begin_hotkey_capture").catch(console.error);
   renderGeneral();
   $("#btn-change-hotkey").textContent = t("general.cancel");
   setHint(t("general.hint"));
   window.addEventListener("keydown", onCaptureKeydown, true);
 }
 
-function endCapture() {
+async function endCapture() {
   if (!ui.capturing) return;
   ui.capturing = false;
   window.removeEventListener("keydown", onCaptureKeydown, true);
-  invoke("end_hotkey_capture").catch(console.error);
+  await invoke("end_hotkey_capture").catch(console.error);
   renderGeneral();
   $("#btn-change-hotkey").textContent = t("general.change");
 }
@@ -1541,7 +1563,21 @@ function wireEvents() {
     }
   });
   $("#hotkey-display").addEventListener("click", () => !ui.capturing && beginCapture());
-  $("#btn-reset-hotkey").addEventListener("click", () => saveSettings({ hotkey: ui.appInfo.defaultHotkey }));
+  $("#btn-reset-hotkey").addEventListener("click", async () => {
+    if (ui.capturing) await endCapture();
+    await saveSettings({ hotkey: ui.appInfo.defaultHotkey });
+  });
+  $("#btn-fn-hotkey").addEventListener("click", async () => {
+    if (ui.appInfo.platform !== "macos") return;
+    try {
+      await persistSettings({ hotkey: "Fn" });
+      await endCapture();
+      setHint("");
+      renderAll();
+      toast(t("toast.hotkey"));
+    } catch (err) { setHint(String(err), true); }
+  });
+  $("#recording-mode").addEventListener("change", e => saveSettings({ recordingMode: e.target.value }));
 
   document.addEventListener("click", async (e) => {
     const grant = e.target.closest("[data-grant]");

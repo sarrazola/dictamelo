@@ -30,7 +30,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let hint_item = MenuItem::with_id(
         app,
         "hint",
-        tf(&lang, "tray.hint", &[("k", &pretty_hotkey(&settings.hotkey))]),
+        tf(&lang, settings.recording_mode.hint_key(), &[("k", &pretty_hotkey(&settings.hotkey))]),
         false,
         None::<&str>,
     )?;
@@ -152,7 +152,7 @@ pub fn relabel(app: &AppHandle) {
     let Some(handles) = app.try_state::<TrayHandles>() else { return };
     let settings = app.state::<AppState>().settings();
     let lang = settings.ui_lang();
-    let _ = handles.hint_item.set_text(tf(&lang, "tray.hint", &[("k", &pretty_hotkey(&settings.hotkey))]));
+    let _ = handles.hint_item.set_text(tf(&lang, settings.recording_mode.hint_key(), &[("k", &pretty_hotkey(&settings.hotkey))]));
     let _ = handles.open_item.set_text(t(&lang, "tray.settings"));
     let _ = handles.retry_item.set_text(t(&lang, "tray.retry"));
     #[cfg(target_os = "macos")]

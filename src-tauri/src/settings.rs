@@ -7,6 +7,21 @@ pub const DEFAULT_HOTKEY: &str = "Alt+Shift+Space";
 pub const DEFAULT_PROVIDER: &str = "groq";
 pub const DEFAULT_MODEL: &str = "whisper-large-v3";
 
+/// Microphone shortcut behavior; missing settings preserve hold-to-talk.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RecordingMode {
+    #[default]
+    Hold,
+    Toggle,
+}
+
+impl RecordingMode {
+    pub fn hint_key(self) -> &'static str {
+        match self { Self::Hold => "tray.hint", Self::Toggle => "tray.hint.toggle" }
+    }
+}
+
 fn existing_installation_has_seen_onboarding() -> bool {
     true
 }
@@ -19,6 +34,7 @@ pub struct Settings {
     pub onboarding_seen: bool,
     /// Atajo global en el formato del plugin (p. ej. "Alt+Shift+Space").
     pub hotkey: String,
+    pub recording_mode: RecordingMode,
     /// Identificador del proveedor de transcripción ("groq", "openai", ...).
     pub provider: String,
     /// Use a personal provider key instead of the signed-in free allowance.
@@ -66,6 +82,7 @@ impl Default for Settings {
         Self {
             onboarding_seen: false,
             hotkey: DEFAULT_HOTKEY.to_string(),
+            recording_mode: RecordingMode::Hold,
             provider: DEFAULT_PROVIDER.to_string(),
             use_own_key: false,
             model: DEFAULT_MODEL.to_string(),
@@ -181,6 +198,19 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recording_mode_defaults_and_round_trips_without_changing_provider() {
+        let legacy: Settings = serde_json::from_str(r#"{"provider":"openai","model":"whisper-1","useOwnKey":true}"#).unwrap();
+        assert_eq!(legacy.recording_mode, RecordingMode::Hold);
+        for mode in [RecordingMode::Hold, RecordingMode::Toggle] {
+            let settings = Settings { recording_mode: mode, hotkey: "Fn".into(), ..legacy.clone() };
+            let saved: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+            assert_eq!(saved, settings);
+            assert_eq!(saved.provider, "openai");
+            assert!(saved.use_own_key);
+        }
+    }
 
     #[test]
     fn roundtrip_json() {

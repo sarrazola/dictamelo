@@ -1,4 +1,4 @@
-//! Registro del atajo global (mantener presionado = grabar) con `tauri-plugin-global-shortcut`.
+//! Global shortcuts share hold/toggle controls; macOS also supports standalone Fn.
 
 use crate::i18n::tf;
 use crate::pipeline;
@@ -11,21 +11,52 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Comprueba que el atajo sea válido y devuelve su forma normalizada.
 pub fn validate(hotkey: &str) -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    if hotkey.trim().eq_ignore_ascii_case("fn") { return Ok("Fn".into()); }
     let shortcut = Shortcut::from_str(hotkey.trim()).map_err(|e| format!("Atajo inválido: {e}"))?;
     Ok(shortcut.into_string())
 }
 
 /// Sustituye el atajo registrado por `hotkey`.
 pub fn apply(app: &AppHandle, hotkey: &str) -> Result<(), String> {
+    let normalized = validate(hotkey)?;
+    let state = app.state::<AppState>();
+    let mut registered = crate::util::lock(&state.registered_hotkey);
     let shortcuts = app.global_shortcut();
-    shortcuts.unregister_all().map_err(|e| e.to_string())?;
-    let shortcut = Shortcut::from_str(hotkey.trim()).map_err(|e| format!("Atajo inválido: {e}"))?;
-    shortcuts
-        .on_shortcut(shortcut, |app, _shortcut, event| match event.state {
+    #[cfg(target_os = "macos")]
+    if normalized == "Fn" {
+        let state = app.state::<AppState>();
+        state.fn_hotkey.enable(app).map_err(|_| crate::i18n::t(&state.settings().ui_lang(), "err.fn_permission").to_string())?;
+        if let Err(error) = shortcuts.unregister_all() {
+            state.fn_hotkey.disable();
+            return Err(error.to_string());
+        }
+        *registered = Some(normalized);
+        pipeline::enqueue_control(app, crate::recording_control::Event::Reset);
+        return Ok(());
+    }
+    let shortcut = Shortcut::from_str(&normalized).map_err(|e| e.to_string())?;
+    // Keep the old shortcut alive if the replacement is already owned by another app.
+    if !shortcuts.is_registered(shortcut) {
+        shortcuts.on_shortcut(shortcut, |app, _shortcut, event| match event.state {
             ShortcutState::Pressed => pipeline::hotkey_pressed(app),
             ShortcutState::Released => pipeline::hotkey_released(app),
-        })
-        .map_err(|e| format!("No se pudo registrar el atajo «{hotkey}»: {e}"))?;
+        }).map_err(|e| format!("No se pudo registrar el atajo «{hotkey}»: {e}"))?;
+    }
+    if let Some(old) = registered.as_deref() {
+        if let Ok(previous) = Shortcut::from_str(old) {
+            if previous != shortcut {
+                if let Err(error) = shortcuts.unregister(previous) {
+                    let _ = shortcuts.unregister(shortcut);
+                    return Err(error.to_string());
+                }
+            }
+        }
+    }
+    *registered = Some(normalized);
+    #[cfg(target_os = "macos")]
+    app.state::<AppState>().fn_hotkey.disable();
+    pipeline::enqueue_control(app, crate::recording_control::Event::Reset);
     log::info!("Atajo global registrado: {hotkey}");
     Ok(())
 }
@@ -54,14 +85,23 @@ pub fn apply_from_settings(app: &AppHandle) {
 
 /// Desregistra el atajo mientras la UI captura uno nuevo.
 pub fn suspend(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut registered = crate::util::lock(&state.registered_hotkey);
+    #[cfg(target_os = "macos")]
+    app.state::<AppState>().fn_hotkey.disable();
+    pipeline::enqueue_control(app, crate::recording_control::Event::Reset);
     if let Err(e) = app.global_shortcut().unregister_all() {
         log::warn!("No se pudo suspender el atajo: {e}");
-    }
+    } else { *registered = None; }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn validates_standalone_fn() { assert_eq!(validate(" fn ").unwrap(), "Fn"); }
 
     #[test]
     fn validates_hotkeys() {

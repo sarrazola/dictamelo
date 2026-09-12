@@ -94,10 +94,11 @@
     <section class="page" data-page="general">
       <div class="card">
         <div class="row">
-          <div class="label"><strong data-i18n="general.shortcut"></strong><span data-i18n="general.shortcut.desc"></span></div>
+          <div class="label"><strong data-i18n="general.shortcut"></strong><span id="shortcut-description"></span></div>
           <div class="actions">
             <button id="hotkey-display" class="keycap"></button>
             <button id="btn-change-hotkey" class="ghost"></button>
+            <button id="btn-fn-hotkey" class="ghost" data-i18n="general.fn" hidden></button>
             <button id="btn-reset-hotkey" class="ghost icon" title="reset">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
                 <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/>
@@ -106,6 +107,14 @@
           </div>
         </div>
         <p class="hint" id="hotkey-hint"></p>
+        <p class="hint" id="fn-hotkey-help" data-i18n="general.fn.help" hidden></p>
+        <div class="row">
+          <label class="label" for="recording-mode"><strong data-i18n="general.recording_mode"></strong><span data-i18n="general.recording_mode.desc"></span></label>
+          <div class="actions"><select id="recording-mode">
+            <option value="hold" data-i18n="general.mode.hold"></option>
+            <option value="toggle" data-i18n="general.mode.toggle"></option>
+          </select></div>
+        </div>
       </div>
 
       <div class="card">
@@ -467,7 +476,7 @@
         <div id="onboarding-local"></div>
       </div>
       <div id="onboarding-ready" hidden>
-        <div class="shortcut-demo"><kbd id="onboarding-hotkey"></kbd><strong data-i18n="onboarding.try"></strong><p data-i18n="onboarding.try.desc"></p></div>
+        <div class="shortcut-demo"><kbd id="onboarding-hotkey"></kbd><strong id="onboarding-try"></strong><p data-i18n="onboarding.try.desc"></p></div>
         <div class="card"><div class="row"><label for="onboarding-language" data-i18n="general.dictlang"></label><select id="onboarding-language"></select></div></div>
         <div id="onboarding-permissions" class="card"></div>
         <p class="footnote" data-i18n="onboarding.permissions.note"></p>

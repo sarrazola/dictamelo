@@ -26,6 +26,7 @@ mod account;
 mod cloud_config;
 mod i18n;
 mod hotkey;
+mod recording_control;
 mod paste;
 mod pipeline;
 mod platform;
@@ -144,6 +145,7 @@ pub fn run() {
             // it presents setup, which must not race the native window's visibility.
             let first_run = !state.settings().onboarding_seen;
             app.manage(state);
+            pipeline::install_recording_controls(&handle);
 
             app_windows::create_windows(&handle)?;
             tray::create(&handle)?;

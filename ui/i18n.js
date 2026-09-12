@@ -1863,3 +1863,67 @@ for (const [lang, labels] of Object.entries({
   it: ["La prima trascrizione carica il modello e può richiedere più tempo delle registrazioni successive.", "È selezionata la modalità locale. La trascrizione non richiede account o API key e non consuma la quota cloud."],
 })) Object.assign(window.I18N[lang], { "models.local.first_load": labels[0], "plan.local.notice": labels[1] });
 for (const [lang, label] of Object.entries({ en: "Weekly audio usage", es: "Consumo semanal de audio", pt: "Consumo semanal de áudio", fr: "Utilisation audio hebdomadaire", de: "Wöchentliche Audionutzung", it: "Utilizzo audio settimanale" })) window.I18N[lang]["account.usage.audio_label"] = label;
+
+// Recording controls share behavior across the six interface languages.
+for (const [lang, copy] of Object.entries({
+  "es": {
+    "general.fn": "Usar Fn",
+    "general.recording_mode": "Forma de grabar",
+    "general.recording_mode.desc": "Esc cancela. El límite de duración se aplica en ambos modos.",
+    "general.mode.hold": "Mantener pulsado",
+    "general.mode.toggle": "Pulsar para iniciar y detener",
+    "general.mode.hold.help": "Mantén el atajo mientras hablas. Suéltalo para transcribir.",
+    "general.mode.toggle.help": "Pulsa el atajo y suéltalo para grabar. Vuelve a pulsarlo para transcribir; puedes cambiar de pestaña o app.",
+    "general.fn.help": "Fn (o 🌐) queda reservado para dictar. Si macOS abre emojis o su dictado, en Ajustes del Sistema → Teclado elige «No hacer nada» para Fn/🌐."
+  },
+  "en": {
+    "general.fn": "Use Fn",
+    "general.recording_mode": "Recording mode",
+    "general.recording_mode.desc": "Esc cancels. The duration limit applies to both modes.",
+    "general.mode.hold": "Hold to talk",
+    "general.mode.toggle": "Press to start / stop",
+    "general.mode.hold.help": "Hold the shortcut while speaking. Release it to transcribe.",
+    "general.mode.toggle.help": "Press and release the shortcut to record. Press again to transcribe; you can switch tabs or apps.",
+    "general.fn.help": "Fn (or 🌐) is reserved for dictation. If macOS opens emoji or its dictation, choose “Do Nothing” for Fn/🌐 in System Settings → Keyboard."
+  },
+  "pt": {
+    "general.fn": "Usar Fn",
+    "general.recording_mode": "Modo de gravação",
+    "general.recording_mode.desc": "Esc cancela. O limite de duração vale nos dois modos.",
+    "general.mode.hold": "Manter pressionado",
+    "general.mode.toggle": "Pressionar para iniciar / parar",
+    "general.mode.hold.help": "Segure o atalho enquanto fala. Solte para transcrever.",
+    "general.mode.toggle.help": "Pressione e solte o atalho para gravar. Pressione novamente para transcrever; você pode trocar de aba ou app.",
+    "general.fn.help": "Fn (ou 🌐) fica reservado para ditar. Se o macOS abrir emojis ou seu ditado, escolha “Não fazer nada” para Fn/🌐 em Ajustes do Sistema → Teclado."
+  },
+  "fr": {
+    "general.fn": "Utiliser Fn",
+    "general.recording_mode": "Mode d’enregistrement",
+    "general.recording_mode.desc": "Échap annule. La limite de durée s’applique aux deux modes.",
+    "general.mode.hold": "Maintenir pour parler",
+    "general.mode.toggle": "Appuyer pour démarrer / arrêter",
+    "general.mode.hold.help": "Maintenez le raccourci en parlant. Relâchez pour transcrire.",
+    "general.mode.toggle.help": "Appuyez puis relâchez pour enregistrer. Appuyez à nouveau pour transcrire ; vous pouvez changer d’onglet ou d’app.",
+    "general.fn.help": "Fn (ou 🌐) est réservé à la dictée. Si macOS ouvre les emoji ou sa dictée, choisissez « Ne rien faire » pour Fn/🌐 dans Réglages Système → Clavier."
+  },
+  "de": {
+    "general.fn": "Fn verwenden",
+    "general.recording_mode": "Aufnahmemodus",
+    "general.recording_mode.desc": "Esc bricht ab. Die Zeitbegrenzung gilt für beide Modi.",
+    "general.mode.hold": "Zum Sprechen halten",
+    "general.mode.toggle": "Drücken zum Starten / Stoppen",
+    "general.mode.hold.help": "Halte den Kurzbefehl beim Sprechen. Zum Transkribieren loslassen.",
+    "general.mode.toggle.help": "Drücke den Kurzbefehl kurz zum Aufnehmen. Drücke erneut zum Transkribieren; du kannst Tabs oder Apps wechseln.",
+    "general.fn.help": "Fn (oder 🌐) wird zum Diktieren verwendet. Falls macOS Emojis oder seine Diktierfunktion öffnet, wähle „Keine Aktion“ für Fn/🌐 unter Systemeinstellungen → Tastatur."
+  },
+  "it": {
+    "general.fn": "Usa Fn",
+    "general.recording_mode": "Modalità di registrazione",
+    "general.recording_mode.desc": "Esc annulla. Il limite di durata vale per entrambe le modalità.",
+    "general.mode.hold": "Tieni premuto per parlare",
+    "general.mode.toggle": "Premi per avviare / fermare",
+    "general.mode.hold.help": "Tieni premuta la scorciatoia mentre parli. Rilascia per trascrivere.",
+    "general.mode.toggle.help": "Premi e rilascia la scorciatoia per registrare. Premi di nuovo per trascrivere; puoi cambiare scheda o app.",
+    "general.fn.help": "Fn (o 🌐) è riservato alla dettatura. Se macOS apre emoji o la sua dettatura, scegli “Nessuna azione” per Fn/🌐 in Impostazioni di Sistema → Tastiera."
+  }
+})) Object.assign(window.I18N[lang], copy);

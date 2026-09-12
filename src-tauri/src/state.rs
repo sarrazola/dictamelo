@@ -11,7 +11,7 @@ use crate::status::Status;
 use crate::transcription::{shared_http_client, ProviderRegistry, TranscriptionProvider};
 use crate::util::read;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 use std::sync::{Arc, Mutex, RwLock};
 use tauri::{AppHandle, Manager};
 
@@ -29,6 +29,7 @@ pub struct AppState {
     pub settings: RwLock<Settings>,
     /// Serialize persistence and native settings side effects across UI/tray writers.
     pub settings_update: Mutex<()>,
+    pub registered_hotkey: Mutex<Option<String>>,
     pub settings_path: PathBuf,
     pub history: Mutex<History>,
     pub secrets: Arc<dyn SecretStore>,
@@ -42,6 +43,12 @@ pub struct AppState {
     pub license: RwLock<LicenseStatus>,
     pub account: crate::account::Account,
     pub recorder: Recorder,
+    pub recording_controls: tokio::sync::mpsc::UnboundedSender<crate::recording_control::Event>,
+    pub recording_controls_receiver: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<crate::recording_control::Event>>>,
+    pub pending_recording_controls: AtomicUsize,
+    #[cfg(target_os = "macos")]
+    pub fn_hotkey: crate::platform::FnHotkey,
+
     /// Destination and privacy preferences captured when microphone recording begins.
     pub recording_plan: Mutex<Option<crate::pipeline::TranscriptionPlan>>,
     /// Unique local voice WAV; Escape must not cancel unrelated file transcription.
@@ -86,9 +93,11 @@ impl AppState {
         let local_models = Arc::new(crate::local_models::LocalModelManager::new(data_dir.join("models"))
             .map_err(anyhow::Error::msg)?);
         let providers = provider_registry(local_models.clone());
+        let (recording_controls, recording_controls_receiver) = tokio::sync::mpsc::unbounded_channel();
         Ok(AppState {
             settings: RwLock::new(settings),
             settings_update: Mutex::new(()),
+            registered_hotkey: Mutex::new(None),
             settings_path,
             history: Mutex::new(history),
             account: crate::account::Account::new(secrets.clone()),
@@ -100,6 +109,11 @@ impl AppState {
             backend_cleaner: Arc::new(crate::cleanup::dictamelo::DictameloCleaner::new(shared_http_client())),
             license: RwLock::new(LicenseStatus::default()),
             recorder: Recorder::spawn(),
+            recording_controls,
+            recording_controls_receiver: Mutex::new(Some(recording_controls_receiver)),
+            pending_recording_controls: AtomicUsize::new(0),
+            #[cfg(target_os = "macos")]
+            fn_hotkey: crate::platform::FnHotkey::default(),
             recording_plan: Mutex::new(None),
             active_voice_transcription: Mutex::new(None),
             status: Mutex::new(Status::Idle),

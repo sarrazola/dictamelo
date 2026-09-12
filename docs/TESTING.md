@@ -1,5 +1,14 @@
 # Verification record
 
+## Unreleased — Mac Fn and recording modes, September 12, 2026
+
+Based on `main` at `908bed01091baf74edb1fdfab74e35e5ed001d47`. General settings now offer Hold and Press to start/stop; macOS also offers standalone Fn/Globe. Existing settings keep Hold. See [recording controls](RECORDING_CONTROLS.md) for behavior and the manual test matrix.
+
+- macOS source checks: 112 Rust tests passed, nine explicit live/native tests ignored; strict all-target Clippy passed. Tests cover modifier-only Fn filtering, duplicate edges, release handling, toggle rearming, queued fast taps, and settings migration.
+- UI: 44 contract/state tests passed, including Mac-only Fn visibility, Hold defaults, mode instructions, disabling controls while recording and native capture rejection. These are DOM-boundary tests, not physical keyboard tests.
+- Installed Mac: the app is Developer ID signed, notarized (Apple Accepted), stapled and Gatekeeper accepted. Its designated requirement matches the previous installed app. The native UI preserved the old shortcut/Hold default, saved Fn/Toggle, and retained those choices after quit/relaunch without a Keychain prompt. Fn event-tap registration succeeded with the existing Accessibility permission. The original history is unchanged. Physical-key recording remains pending: the remote UI tool cannot generate Fn, and its regular-shortcut attempt produced no recording event. These observations do not claim a successful physical microphone/hotkey test.
+- Windows: no build, installer, VM or hardware test was run for this change, as requested. Only the recording state machine is shared; the Fn event tap and button are macOS-specific. No public release or website deployment is included.
+
 ## Unreleased — file-job and settings reliability, September 8, 2026
 
 Based on upstream `6aa114aa430dc9cbf2330683b8060b7eb7887d65`. This contribution preserves accepted file jobs beyond the completed-history limit, serializes file batches without changing their captured transcription routes, retains completed chunks on later failure, cleans app-generated temporary audio and makes settings/history replacement safer. UI settings patches are queued against the latest successful state; the native settings command and tray writer share a persistence lock.

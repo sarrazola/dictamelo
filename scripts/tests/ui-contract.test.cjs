@@ -716,3 +716,45 @@ test("rendering cloud account details cannot enable cloud routing for a local mo
   sandbox.renderCloudPlan();
   assert.equal(sandbox.cloudPlanView().available, false);
 });
+
+test("recording controls preserve Hold for upgrades and expose standalone Fn only on macOS", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.hotkey = "Alt+Shift+Space";
+  for (const platform of ["macos", "windows"]) {
+    sandbox.state.appInfo = { platform };
+    sandbox.renderGeneral();
+    assert.equal(control("#recording-mode").value, "hold");
+    assert.equal(control("#btn-fn-hotkey").hidden, platform !== "macos");
+    assert.equal(control("#shortcut-description").textContent, dictionaries.en["general.mode.hold.help"]);
+  }
+  sandbox.state.appInfo.platform = "macos";
+  sandbox.state.settings.hotkey = "Fn";
+  sandbox.state.settings.recordingMode = "toggle";
+  sandbox.renderGeneral();
+  assert.equal(control("#hotkey-display").textContent, "Fn");
+  assert.equal(control("#recording-mode").value, "toggle");
+  assert.equal(control("#fn-hotkey-help").hidden, false);
+  assert.equal(control("#btn-fn-hotkey").getAttribute("aria-pressed"), "true");
+  assert.equal(control("#shortcut-description").textContent, dictionaries.en["general.mode.toggle.help"]);
+});
+
+test("recording disables shortcut edits and finishing re-enables them", () => {
+  const { sandbox, control } = loadRenderedUi();
+  for (const state of ["recording", "transcribing", "idle"]) {
+    sandbox.renderStatus({ state });
+    for (const id of ["#recording-mode", "#btn-change-hotkey", "#btn-fn-hotkey", "#hotkey-display", "#btn-reset-hotkey"]) {
+      assert.equal(control(id).disabled, state === "recording");
+    }
+  }
+});
+
+test("failed native capture never leaves the interface intercepting key presses", async () => {
+  const { sandbox, control } = loadRenderedUi(async command => {
+    assert.equal(command, "begin_hotkey_capture");
+    throw new Error("Finish recording first");
+  });
+  await sandbox.beginCapture();
+  assert.equal(sandbox.state.capturing, false);
+  assert.equal(sandbox.state.captureStarting, false);
+  assert.match(control("#hotkey-hint").textContent, /Finish recording first/);
+});

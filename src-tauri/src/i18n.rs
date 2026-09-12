@@ -63,6 +63,27 @@ pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
             "{k} halten und sprechen",
             "Tieni premuto {k} e parla",
         ]),
+        "tray.hint.toggle" => pick(lang, [
+            "Pulsa {k} para iniciar o detener", "Press {k} to start or stop",
+            "Pressione {k} para iniciar ou parar", "Appuyez sur {k} pour démarrer ou arrêter",
+            "{k} zum Starten oder Stoppen drücken", "Premi {k} per avviare o fermare",
+        ]),
+        "err.fn_permission" => pick(lang, [
+            "Para usar Fn, permite Accesibilidad a Dictámelo en Ajustes del Sistema y vuelve a intentarlo.",
+            "To use Fn, allow Dictámelo in System Settings → Accessibility and try again.",
+            "Para usar Fn, permita Acessibilidade para Dictámelo nos Ajustes do Sistema e tente novamente.",
+            "Pour utiliser Fn, autorisez Dictámelo dans Réglages Système → Accessibilité, puis réessayez.",
+            "Erlaube Dictámelo unter Systemeinstellungen → Bedienungshilfen und versuche Fn erneut.",
+            "Per usare Fn, autorizza Dictámelo in Impostazioni di Sistema → Accessibilità e riprova.",
+        ]),
+        "err.hotkey_recording" => pick(lang, [
+            "Termina o cancela la grabación antes de cambiar el atajo o el modo.",
+            "Finish or cancel recording before changing the shortcut or mode.",
+            "Termine ou cancele a gravação antes de alterar o atalho ou o modo.",
+            "Terminez ou annulez l’enregistrement avant de modifier le raccourci ou le mode.",
+            "Beende die Aufnahme, bevor du den Kurzbefehl oder Modus änderst.",
+            "Termina o annulla la registrazione prima di cambiare scorciatoia o modalità.",
+        ]),
         "tray.settings" => pick(lang, ["Configuración…", "Settings…", "Configurações…", "Réglages…", "Einstellungen…", "Impostazioni…"]),
         "tray.check_updates" => pick(lang, [
             "Buscar actualizaciones…", "Check for Updates…", "Buscar atualizações…",

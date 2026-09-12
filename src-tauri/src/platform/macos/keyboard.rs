@@ -44,6 +44,18 @@ pub fn install_cancel_key_monitor(on_escape: std::sync::Arc<dyn Fn() + Send + Sy
     use objc2_app_kit::{NSEvent, NSEventMask};
     use std::ptr::NonNull;
 
+    let local_escape = on_escape.clone();
+    let local = block2::RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
+        // SAFETY: AppKit supplies a live event for this synchronous callback.
+        if unsafe { event.as_ref() }.keyCode() == KEY_ESCAPE { local_escape(); }
+        event.as_ptr()
+    });
+    // SAFETY: The block passes the original event through unchanged. Its monitor
+    // token and block remain alive for the application lifetime.
+    if let Some(token) = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &local) } {
+        std::mem::forget(token);
+        std::mem::forget(local);
+    }
     let block = block2::RcBlock::new(move |event: NonNull<NSEvent>| {
         // SAFETY: AppKit garantiza un NSEvent válido durante la llamada.
         if unsafe { event.as_ref() }.keyCode() == KEY_ESCAPE {

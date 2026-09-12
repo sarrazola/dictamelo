@@ -1,5 +1,4 @@
-//! Flujo principal: pulsar atajo → grabar → soltar → transcribir → pegar, con recuperación
-//! de errores (red, permisos, micrófono) y limpieza de temporales.
+//! Microphone recording, transcription and delivery with ordered shortcut controls.
 
 use crate::audio::{self, wav, PreparedAudio};
 use crate::history::HistoryEntry;
@@ -24,14 +23,47 @@ const ERROR_VISIBLE: Duration = Duration::from_secs(6);
 const LEVEL_INTERVAL: Duration = Duration::from_millis(80);
 const RETRY_DELAY: Duration = Duration::from_millis(1500);
 
-pub fn hotkey_pressed(app: &AppHandle) {
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move { start_recording(&app).await });
+// Queue edges before starting any asynchronous microphone work. A release or second
+// press during device startup must be handled after that startup, never lost.
+pub fn hotkey_pressed(app: &AppHandle) { enqueue_control(app, crate::recording_control::Event::Pressed); }
+pub fn hotkey_released(app: &AppHandle) { enqueue_control(app, crate::recording_control::Event::Released); }
+pub fn cancel_recording(app: &AppHandle) { enqueue_control(app, crate::recording_control::Event::Cancel); }
+
+pub(crate) fn enqueue_control(app: &AppHandle, event: crate::recording_control::Event) {
+    let state = app.state::<AppState>();
+    if state.hotkey_suspended.load(Ordering::SeqCst) && matches!(event, crate::recording_control::Event::Pressed) { return; }
+    state.pending_recording_controls.fetch_add(1, Ordering::SeqCst);
+    if state.recording_controls.send(event).is_err() {
+        state.pending_recording_controls.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
-pub fn hotkey_released(app: &AppHandle) {
+pub fn install_recording_controls(app: &AppHandle) {
+    use crate::recording_control::{Action, Edges, Event};
+    let mut receiver = lock(&app.state::<AppState>().recording_controls_receiver).take().expect("recording controls installed once");
     let app = app.clone();
-    tauri::async_runtime::spawn(async move { stop_and_transcribe(&app).await });
+    tauri::async_runtime::spawn(async move {
+        let mut edges = Edges::default();
+        while let Some(event) = receiver.recv().await {
+            let state = app.state::<AppState>();
+            let status = current_status(&app);
+            let mode = lock(&state.recording_plan).as_ref().map(|p| p.settings.recording_mode)
+                .unwrap_or_else(|| state.settings().recording_mode);
+            match event {
+                Event::Cancel => cancel_recording_now(&app),
+                Event::Deadline(generation) => {
+                    if state.status_generation.load(Ordering::SeqCst) == generation { stop_and_transcribe(&app).await; }
+                }
+                Event::Reset => edges = Edges::default(),
+                edge => match edges.handle(edge, mode, &status) {
+                    Action::Start => start_recording(&app).await,
+                    Action::Stop => stop_and_transcribe(&app).await,
+                    Action::None => {}
+                }
+            }
+            state.pending_recording_controls.fetch_sub(1, Ordering::SeqCst);
+        }
+    });
 }
 
 /// Cambia el estado y lo propaga (evento, bandeja, indicador). Devuelve la "generación".
@@ -86,27 +118,24 @@ fn sound(app: &AppHandle, kind: SoundKind) {
 }
 
 /// Esc durante la grabación: descarta el audio sin transcribir.
-pub fn cancel_recording(app: &AppHandle) {
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let state = app.state::<AppState>();
-        let status = lock(&state.status).clone();
-        if matches!(status, Status::Transcribing) {
-            let path = lock(&state.active_voice_transcription).clone();
-            if let Some(path) = path { state.local_models.cancel_transcription_for(&path); }
-            return;
-        }
-        if !matches!(status, Status::Recording) {
-            return;
-        }
-        let lang = state.settings().ui_lang();
-        lock(&state.recording_plan).take();
-        log::info!("Grabación cancelada con Esc");
-        // Primero el estado, para que al soltar el atajo no se intente transcribir.
-        set_status(&app, Status::Done { message: t(&lang, "msg.cancelled").into() });
-        state.recorder.cancel();
-        sound(&app, SoundKind::Stop);
-    });
+fn cancel_recording_now(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let status = lock(&state.status).clone();
+    if matches!(status, Status::Transcribing) {
+        let path = lock(&state.active_voice_transcription).clone();
+        if let Some(path) = path { state.local_models.cancel_transcription_for(&path); }
+        return;
+    }
+    if !matches!(status, Status::Recording) {
+        return;
+    }
+    let lang = state.settings().ui_lang();
+    lock(&state.recording_plan).take();
+    log::info!("Grabación cancelada con Esc");
+    // Primero el estado, para que al soltar el atajo no se intente transcribir.
+    set_status(app, Status::Done { message: t(&lang, "msg.cancelled").into() });
+    state.recorder.cancel();
+    sound(app, SoundKind::Stop);
 }
 
 async fn start_recording(app: &AppHandle) {
@@ -228,7 +257,7 @@ fn spawn_watchdog(app: AppHandle, generation: u64, max_secs: u32) {
         tokio::time::sleep(Duration::from_secs(u64::from(max_secs))).await;
         if app.state::<AppState>().status_generation.load(Ordering::SeqCst) == generation {
             log::info!("Duración máxima ({max_secs}s) alcanzada; se detiene la grabación");
-            stop_and_transcribe(&app).await;
+            enqueue_control(&app, crate::recording_control::Event::Deadline(generation));
         }
     });
 }
@@ -262,7 +291,8 @@ async fn stop_and_transcribe(app: &AppHandle) {
         return;
     }
     set_status(app, Status::Transcribing);
-    transcribe_with_plan(app, prepared, plan).await;
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move { transcribe_with_plan(&app, prepared, plan).await; });
 }
 
 /// Transcribe y entrega el audio. Devuelve el texto si la transcripción tuvo éxito.

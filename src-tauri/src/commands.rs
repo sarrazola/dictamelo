@@ -40,20 +40,24 @@ pub fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Setti
     }
 
     let old = state.settings();
+    if old.hotkey != new.hotkey || old.recording_mode != new.recording_mode {
+        ensure_shortcut_editable(&state)?;
+    }
+    if old.hotkey != new.hotkey { hotkey::apply(&app, &new.hotkey)?; }
     if old.launch_at_login != new.launch_at_login {
         crate::autostart::set_enabled(&app, new.launch_at_login)?;
     }
-    new.save(&state.settings_path).map_err(|e| format!("No se pudo guardar la configuración: {e}"))?;
+    if let Err(error) = new.save(&state.settings_path) {
+        if old.hotkey != new.hotkey { let _ = hotkey::apply(&app, &old.hotkey); }
+        return Err(format!("No se pudo guardar la configuración: {error}"));
+    }
     *write(&state.settings) = new.clone();
 
-    if old.hotkey != new.hotkey && !state.hotkey_suspended.load(Ordering::SeqCst) {
-        hotkey::apply(&app, &new.hotkey)?;
-    }
     if old.auto_paste != new.auto_paste {
         tray::set_autopaste_checked(&app, new.auto_paste);
     }
     // El menú de la barra muestra el atajo y usa el idioma de la interfaz.
-    if old.ui_language != new.ui_language || old.hotkey != new.hotkey {
+    if old.ui_language != new.ui_language || old.hotkey != new.hotkey || old.recording_mode != new.recording_mode {
         tray::relabel(&app);
     }
     if !new.show_overlay {
@@ -187,10 +191,20 @@ pub fn validate_hotkey(hotkey: String) -> Result<String, String> {
     hotkey::validate(&hotkey)
 }
 
+fn ensure_shortcut_editable(state: &AppState) -> Result<(), String> {
+    if state.pending_recording_controls.load(Ordering::SeqCst) > 0 || matches!(*lock(&state.status), Status::Recording) {
+        return Err(crate::i18n::t(&state.settings().ui_lang(), "err.hotkey_recording").into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
-pub fn begin_hotkey_capture(app: AppHandle, state: State<'_, AppState>) {
+pub fn begin_hotkey_capture(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let _update = lock(&state.settings_update);
+    ensure_shortcut_editable(&state)?;
     state.hotkey_suspended.store(true, Ordering::SeqCst);
     hotkey::suspend(&app);
+    Ok(())
 }
 
 #[tauri::command]

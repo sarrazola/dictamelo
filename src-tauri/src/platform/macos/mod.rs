@@ -4,6 +4,8 @@ mod audio_decode;
 mod clipboard;
 mod locale;
 mod keyboard;
+mod fn_hotkey;
+pub use fn_hotkey::FnHotkey;
 mod permissions;
 mod sound;
 mod window;
