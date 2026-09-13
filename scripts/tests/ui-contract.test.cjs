@@ -722,6 +722,7 @@ test("recording controls preserve Hold for upgrades and expose standalone Fn onl
   sandbox.state.settings.hotkey = "Alt+Shift+Space";
   for (const platform of ["macos", "windows"]) {
     sandbox.state.appInfo = { platform };
+    sandbox.state.capturing = true;
     sandbox.renderGeneral();
     assert.equal(control("#recording-mode").value, "hold");
     assert.equal(control("#btn-fn-hotkey").hidden, platform !== "macos");
@@ -742,7 +743,7 @@ test("recording disables shortcut edits and finishing re-enables them", () => {
   const { sandbox, control } = loadRenderedUi();
   for (const state of ["recording", "transcribing", "idle"]) {
     sandbox.renderStatus({ state });
-    for (const id of ["#recording-mode", "#btn-change-hotkey", "#btn-fn-hotkey", "#hotkey-display", "#btn-reset-hotkey"]) {
+    for (const id of ["#recording-mode", "#btn-change-hotkey", "#btn-fn-hotkey", "#btn-reset-hotkey"]) {
       assert.equal(control(id).disabled, state === "recording");
     }
   }
@@ -757,4 +758,40 @@ test("failed native capture never leaves the interface intercepting key presses"
   assert.equal(sandbox.state.capturing, false);
   assert.equal(sandbox.state.captureStarting, false);
   assert.match(control("#hotkey-hint").textContent, /Finish recording first/);
+});
+
+test("the shortcut row shows the saved value and keeps alternative actions inside Change", async () => {
+  const invocations = [];
+  const { sandbox, control } = loadRenderedUi(async command => { invocations.push(command); });
+  sandbox.state.appInfo = { platform: "macos" };
+  sandbox.state.settings.hotkey = "Control+Alt+Super+KeyD";
+  sandbox.state.settings.recordingMode = "toggle";
+  sandbox.state.settings.autoPaste = true;
+  sandbox.window.addEventListener = () => {};
+  sandbox.window.removeEventListener = () => {};
+  const saved = JSON.stringify(sandbox.state.settings);
+  sandbox.renderGeneral();
+  assert.equal(control("#hotkey-editor").hidden, true);
+  assert.equal(control("#btn-fn-hotkey").hidden, true);
+  assert.equal(control("#fn-hotkey-help").hidden, true);
+  assert.equal(control("#btn-change-hotkey").getAttribute("aria-expanded"), "false");
+  const label = control("#hotkey-display").textContent;
+  assert.match(html, /<span id="hotkey-display"/);
+  await sandbox.beginCapture();
+  assert.equal(control("#hotkey-editor").hidden, false);
+  assert.equal(control("#btn-fn-hotkey").hidden, false);
+  assert.equal(control("#btn-change-hotkey").getAttribute("aria-expanded"), "true");
+  assert.equal(control("#hotkey-display").textContent, label);
+  await sandbox.endCapture();
+  assert.equal(control("#hotkey-editor").hidden, true);
+  assert.equal(control("#hotkey-hint").hidden, true);
+  assert.equal(JSON.stringify(sandbox.state.settings), saved);
+  assert.deepEqual(invocations, ["begin_hotkey_capture", "end_hotkey_capture"]);
+});
+
+test("Tab and editor-button activation are not mistaken for a new shortcut", async () => {
+  const { sandbox } = loadRenderedUi();
+  for (const key of ["Tab", "Enter", " "]) {
+    await sandbox.onCaptureKeydown({ key, target: { tagName: "BUTTON" }, preventDefault() { assert.fail("Native keyboard navigation must be allowed"); } });
+  }
 });

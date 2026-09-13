@@ -4,7 +4,10 @@ In **Settings → General**, choose a shortcut and a recording mode:
 
 - **Hold to talk** (the default, including upgrades): press and hold the shortcut, then release it to stop and transcribe.
 - **Press to start / stop**: press and release once to start, then press again to stop and transcribe. Changing tabs or apps does not stop recording. Automatic paste uses the focused app when transcription finishes, as before.
-- **Use Fn** is available on macOS. It selects the standalone Fn/Globe key without requiring a webview to recognize a modifier-only key. Other shortcut combinations remain available through **Change**. Fn is reserved for dictation while selected; choose a different shortcut if you need it as a function-layer key while dictating.
+- The shortcut row shows the saved shortcut and a single **Change** button. Additional choices appear only while editing; cancelling keeps the previous shortcut.
+- **Use Fn** is available inside **Change** on macOS. It selects the standalone Fn/Globe key without requiring a webview to recognize a modifier-only key. Other shortcut combinations remain available through **Change**. Fn is reserved for dictation while selected; choose a different shortcut if you need it as a function-layer key while dictating.
+
+Updates preserve every valid saved shortcut, recording mode and automatic-paste preference. Older settings without a recording mode keep Hold; Fn is selected only by an explicit user action.
 
 Esc cancels microphone recording without transcribing. The existing duration limit applies to both modes. Shortcut and mode edits are rejected while recording or while an input event is being processed. Provider choice, credentials, cloud entitlements and cleanup settings are unchanged.
 

@@ -1927,3 +1927,8 @@ for (const [lang, copy] of Object.entries({
     "general.fn.help": "Fn (o 🌐) è riservato alla dettatura. Se macOS apre emoji o la sua dettatura, scegli “Nessuna azione” per Fn/🌐 in Impostazioni di Sistema → Tastiera."
   }
 })) Object.assign(window.I18N[lang], copy);
+
+for (const [lang, label] of Object.entries({
+  en: "Use default shortcut", es: "Usar atajo predeterminado", pt: "Usar atalho padrão",
+  fr: "Utiliser le raccourci par défaut", de: "Standardkurzbefehl verwenden", it: "Usa scorciatoia predefinita",
+})) window.I18N[lang]["general.shortcut.default"] = label;

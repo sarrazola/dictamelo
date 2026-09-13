@@ -96,18 +96,19 @@
         <div class="row">
           <div class="label"><strong data-i18n="general.shortcut"></strong><span id="shortcut-description"></span></div>
           <div class="actions">
-            <button id="hotkey-display" class="keycap"></button>
-            <button id="btn-change-hotkey" class="ghost"></button>
-            <button id="btn-fn-hotkey" class="ghost" data-i18n="general.fn" hidden></button>
-            <button id="btn-reset-hotkey" class="ghost icon" title="reset">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
-                <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/>
-              </svg>
-            </button>
+            <span id="hotkey-display" class="keycap"></span>
+            <button id="btn-change-hotkey" class="ghost" aria-expanded="false" aria-controls="hotkey-editor"></button>
           </div>
         </div>
-        <p class="hint" id="hotkey-hint"></p>
-        <p class="hint" id="fn-hotkey-help" data-i18n="general.fn.help" hidden></p>
+        <div id="hotkey-editor" class="shortcut-editor" hidden>
+          <span id="hotkey-capture-display" class="keycap capturing" aria-live="polite"></span>
+          <div class="actions">
+            <button id="btn-fn-hotkey" class="ghost" data-i18n="general.fn" hidden></button>
+            <button id="btn-reset-hotkey" class="ghost" data-i18n="general.shortcut.default"></button>
+          </div>
+          <p class="hint" id="fn-hotkey-help" data-i18n="general.fn.help" hidden></p>
+        </div>
+        <p class="hint" id="hotkey-hint" aria-live="polite" hidden></p>
         <div class="row">
           <label class="label" for="recording-mode"><strong data-i18n="general.recording_mode"></strong><span data-i18n="general.recording_mode.desc"></span></label>
           <div class="actions"><select id="recording-mode">

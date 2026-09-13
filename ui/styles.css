@@ -183,8 +183,15 @@ button:disabled { opacity: .45; cursor: default; }
 .keycap {
   min-width: 96px; padding: 5px 12px; font-size: 14px; font-weight: 600;
   letter-spacing: .5px; text-align: center;
-  background: var(--field); border-color: var(--border-strong);
+  background: var(--field); border: 1px solid var(--border-strong); border-radius: 7px;
 }
+.shortcut-editor {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  padding: 2px 0 13px;
+}
+.shortcut-editor .hint { flex-basis: 100%; padding: 0; }
+.shortcut-editor .actions { flex-wrap: wrap; }
+
 .keycap.capturing {
   color: var(--accent); border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft); letter-spacing: 0; font-size: 12px;

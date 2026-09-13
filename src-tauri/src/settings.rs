@@ -200,6 +200,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn upgrade_keeps_each_existing_shortcut_and_paste_choice() {
+        let dir = std::env::temp_dir().join(format!("dictamelo-shortcut-upgrade-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        for hotkey in ["Alt+Shift+Space", "Control+Alt+Super+KeyD", "F13"] {
+            for auto_paste in [false, true] {
+                // Actual older disk format: recordingMode does not exist yet.
+                let legacy = serde_json::json!({
+                    "hotkey": hotkey, "autoPaste": auto_paste, "provider": "openai",
+                    "model": "whisper-1", "useOwnKey": true,
+                });
+                std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+                let upgraded = Settings::load(&path);
+                assert_eq!(upgraded.hotkey, hotkey);
+                assert_eq!(upgraded.recording_mode, RecordingMode::Hold);
+                assert_eq!(upgraded.auto_paste, auto_paste);
+                assert_eq!(upgraded.provider, "openai");
+                assert!(upgraded.use_own_key);
+                upgraded.save(&path).unwrap();
+                assert_eq!(Settings::load(&path), upgraded);
+            }
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn recording_mode_defaults_and_round_trips_without_changing_provider() {
         let legacy: Settings = serde_json::from_str(r#"{"provider":"openai","model":"whisper-1","useOwnKey":true}"#).unwrap();
         assert_eq!(legacy.recording_mode, RecordingMode::Hold);

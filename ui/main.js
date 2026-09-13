@@ -159,18 +159,21 @@ function recordingInstructions() {
 
 function renderShortcutControls() {
   const recording = ui.lastStatus?.state === "recording";
-  for (const id of ["#hotkey-display", "#btn-change-hotkey", "#btn-reset-hotkey", "#btn-fn-hotkey", "#recording-mode"]) $(id).disabled = recording;
+  for (const id of ["#btn-change-hotkey", "#btn-reset-hotkey", "#btn-fn-hotkey", "#recording-mode"]) $(id).disabled = recording;
 }
 
 function renderGeneral() {
-  $("#hotkey-display").textContent = ui.capturing ? t("general.press") : prettyHotkey(ui.settings.hotkey);
-  $("#hotkey-display").classList.toggle("capturing", ui.capturing);
+  $("#hotkey-display").textContent = prettyHotkey(ui.settings.hotkey);
+  $("#hotkey-editor").hidden = !ui.capturing;
+  $("#btn-change-hotkey").setAttribute("aria-expanded", String(ui.capturing));
+  $("#btn-change-hotkey").textContent = t(ui.capturing ? "general.cancel" : "general.change");
+  $("#hotkey-capture-display").textContent = t("general.press");
   $("#shortcut-description").textContent = recordingInstructions();
   $("#recording-mode").value = ui.settings.recordingMode || "hold";
   $("#recording-mode").disabled = ui.capturing;
-  $("#btn-fn-hotkey").hidden = ui.appInfo.platform !== "macos";
+  $("#btn-fn-hotkey").hidden = !ui.capturing || ui.appInfo.platform !== "macos";
   $("#btn-fn-hotkey").setAttribute("aria-pressed", String(ui.settings.hotkey?.toLowerCase() === "fn"));
-  $("#fn-hotkey-help").hidden = ui.appInfo.platform !== "macos" || ui.settings.hotkey?.toLowerCase() !== "fn";
+  $("#fn-hotkey-help").hidden = !ui.capturing || ui.appInfo.platform !== "macos";
   renderShortcutControls();
   $("#recording-mode").disabled ||= ui.capturing;
   $("#auto-paste").checked = ui.settings.autoPaste;
@@ -1425,6 +1428,7 @@ function resolveAutoLanguage() {
 function setHint(message, isError = false) {
   const el = $("#hotkey-hint");
   el.textContent = message;
+  el.hidden = !message;
   el.classList.toggle("error", isError);
 }
 
@@ -1448,9 +1452,13 @@ async function endCapture() {
   await invoke("end_hotkey_capture").catch(console.error);
   renderGeneral();
   $("#btn-change-hotkey").textContent = t("general.change");
+  setHint("");
 }
 
 async function onCaptureKeydown(e) {
+  // Keep editor buttons reachable with Tab and their normal Enter/Space activation.
+  const modified = e.ctrlKey || e.altKey || e.metaKey;
+  if (!modified && (e.key === "Tab" || (["Enter", " "].includes(e.key) && e.target?.tagName === "BUTTON"))) return;
   e.preventDefault();
   e.stopPropagation();
   if (e.key === "Escape") {
@@ -1465,7 +1473,7 @@ async function onCaptureKeydown(e) {
   if (e.metaKey) mods.push("Super");
   const code = e.code;
   if (!code || MODIFIER_CODES.has(code)) {
-    $("#hotkey-display").textContent = mods.length ? `${prettyHotkey(mods.join("+"))}…` : t("general.press");
+    $("#hotkey-capture-display").textContent = mods.length ? `${prettyHotkey(mods.join("+"))}…` : t("general.press");
     return;
   }
   const isFunctionKey = /^F([1-9]|1[0-9]|2[0-4])$/.test(code);
@@ -1562,7 +1570,6 @@ function wireEvents() {
       beginCapture();
     }
   });
-  $("#hotkey-display").addEventListener("click", () => !ui.capturing && beginCapture());
   $("#btn-reset-hotkey").addEventListener("click", async () => {
     if (ui.capturing) await endCapture();
     await saveSettings({ hotkey: ui.appInfo.defaultHotkey });
