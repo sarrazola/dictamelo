@@ -1,5 +1,29 @@
 # Verification record
 
+## Version 1.0.1 — macOS silence guard, October 23, 2026
+
+Application source: `268835b` (later release-record edits only change documentation). This Mac-only release includes the previously local Fn/recording-mode changes below and the merged file-job/settings fixes.
+
+- Final release preflight: 119 Rust tests passed, nine explicit live/native tests ignored; 46 UI contract/state tests, JavaScript syntax and licensed-fixture validation passed. Strict all-target Clippy passed for `aarch64-apple-darwin`. The Mac staging regression separately verified an unchanged legacy manifest, the new Mac-only manifest, checksums and refusal to overwrite a staged version.
+- The microphone gate rejects short taps, digital silence, low deterministic noise, DC offset, isolated clicks and the real macOS Tink asset at four gains and five leading-silence offsets, including low background noise. Tink is read from the OS for tests, not redistributed. The detector preserves the licensed human speech fixture, speech at one tenth amplitude, silence-padded speech and a half-second voiced excerpt. Independent local synthetic Spanish samples for `sí`, `no` and `gracias` passed the final detector; they are not a human microphone benchmark or a redistributed corpus.
+- A stricter development candidate rejected brief synthetic words. The final detector uses its recommended probability threshold plus a low frame-energy floor; that floor prevents probability hangover after a short cue from counting digital silence as additional voice. The recording cue changed from Pop to Tink. No word blacklist, audio normalization or trimming was added.
+- Scope: no Windows build, Windows CI, VM or Windows runtime test was run. Windows stays on 1.0.0. No website or backend deployment is part of this release. Physical Fn capture and arbitrary rooms/microphones are not covered by injected-audio tests; voice detection cannot guarantee that every background sound or recognition error will be rejected.
+
+### Final Mac artifacts and installed checks
+
+Apple accepted app submission `049e5116-60cd-4f33-82e2-8ccac4d633b3` and DMG submission `e4d723ac-08fa-4229-8941-8d59f049e1be`. App and DMG passed strict signing verification, stapled-ticket validation and Gatekeeper (`Notarized Developer ID`). The read-only mounted DMG contained the same five bundle files as the build. The updater archive passed independent verification with the existing public key. Final source hashes matched the build inputs.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Installed ARM64 executable, 1.0.1 | 12,213,904 | `9b9ac5dc10a31f6a5a93c6fb952784bf87f2fe83d361295cd520172dcff2f74f` |
+| Mac DMG | 7,784,244 | `7d96ca8ee39579e59883109d9d9de0d17b0f27b6131a9b8c3ac6baa718b44778` |
+| Mac updater archive | 6,398,491 | `e5bf3684307bd70c5853177c6dab2d102e8e8f260582f0a56964194f53f17dda` |
+
+- The installed signed app processed five injected microphone-pipeline cases: a 100 ms tap, one second of digital silence, low deterministic room noise, the recording cue and the cue mixed with low noise. Every case explicitly returned `SELFTEST_NO_SPEECH_OK`, empty text and unchanged history/clipboard change counter. These are post-capture pipeline tests, not physical-key or live-microphone tests.
+- The installed file-import pipeline completed the licensed human English fixture through the saved Groq/Whisper Large v3 settings. The saved dictation language was Spanish, producing Spanish output; an initial English-word assertion failed for that reason. This verifies job completion, not English transcription accuracy. A separate locally generated Spanish `gracias` file returned `gracias`. Original settings and history remained byte-for-byte identical; credentials and downloaded models were not modified.
+- Native UI readback showed 1.0.1, Fn, Hold, Spanish and automatic paste enabled. The app was left open. Earlier stricter/no-notices local candidate artifacts were never published or installed; only the hashes above identify this release.
+- Mac 1.0.1 uses `latest-macos.json`. The legacy `latest.json` stays byte-for-byte at 1.0.0 with its original platform URLs/signatures. Old Mac clients require one manual DMG upgrade; this is not claimed as an automatic 1.0.0-to-1.0.1 update. Evidence is local and ignored under `dist/v1.0.1-verification/`.
+
 ## Unreleased — Mac Fn and recording modes, September 12, 2026
 
 Based on `main` at `908bed01091baf74edb1fdfab74e35e5ed001d47`. General settings now offer Hold and Press to start/stop; macOS also offers standalone Fn/Globe. Existing settings keep Hold. See [recording controls](RECORDING_CONTROLS.md) for behavior and the manual test matrix.
