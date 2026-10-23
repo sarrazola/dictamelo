@@ -1,0 +1,22 @@
+# dictamelo
+
+> A desktop app that provides voice dictation for any application on macOS and Windows: hold a shortcut, speak, and release to paste transcribed text at the cursor.
+
+Built with Rust and Tauri 2. Installers are downloaded from releases; on macOS allow Microphone and Accessibility, on Windows allow desktop microphone access. It supports local Whisper, Canary or Parakeet models, personal provider keys (Groq, OpenAI, Mistral, Deepgram), and Free Cloud or Pro hosted plans, with a setup assistant, menu bar/tray app, file transcription, and interfaces in six languages. Building from source requires CMake and a platform compiler toolchain; a clean source build uses personal keys and leaves hosted services and automatic updates disabled.
+
+## Docs
+
+- [dictamelo README](https://raw.githubusercontent.com/sarrazola/dictamelo/main/README.md): Voice dictation for macOS and Windows, download installers, setup steps, signing notes and cloud account status.
+- [Auth and cloud configuration](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/AUTH_AND_CLOUD.md): Source contract for auth and cloud, public versus private credentials, Supabase key types and MIT license boundaries.
+- [Personal cloud providers](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/CLOUD_PROVIDERS.md): Supported transcription and cleanup providers, personal API key storage, request contracts and local-cleanup permission rules.
+- [Initial release review](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/INITIAL_RELEASE_REVIEW.md): Product decisions for the 0.5.0 release: provider choices, first-run wizard, personal-key selector and remaining production work.
+- [Local credential storage](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/LOCAL_CREDENTIALS.md): Decision to keep API keys, sessions and license credentials in the OS secure store, with macOS Keychain behavior and rationale.
+- [Local speech models](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/LOCAL_MODELS.md): On-device transcription setup, model downloads and behavior, plus the local models catalog architecture and memory considerations.
+- [Production readiness](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/PRODUCTION_READINESS.md): 1.0.0 release readiness evidence: verified artifacts, Mac and Windows installer tests, updater and offline checks.
+- [Release runbook](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/RELEASING.md): Steps to prepare, build and publish a release, with version bump files and GitHub Latest requirements.
+- [Verification record](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/TESTING.md): Test results for file-job and settings reliability: Rust, UI, Python and Deno checks with regressions.
+- [Windows build report](https://raw.githubusercontent.com/sarrazola/dictamelo/main/docs/WINDOWS_BUILD_REPORT.md): Provenance and hashes of the final Windows installers, build runs, cross-compiled ARM64 and superseded candidates.
+
+## Optional
+
+- [Changelog](https://raw.githubusercontent.com/sarrazola/dictamelo/main/CHANGELOG.md): Version-by-version changes, including local speech models, model catalog UI, personal-key providers and upgrade preservation.
