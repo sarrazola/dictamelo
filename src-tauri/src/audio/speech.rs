@@ -14,38 +14,24 @@ pub fn contains_speech(audio: &PreparedAudio) -> bool {
     // Preparation owns resampling. Fail open for unexpected input rather than
     // silently rejecting speech if a future caller supplies another sample rate.
     if audio.sample_rate != TARGET_SAMPLE_RATE { return true; }
-    let peak = audio.samples.iter().map(|sample| i32::from(*sample).abs()).max().unwrap_or(0);
-    if peak == 0 { return false; }
-    // Low-gain microphones must not lose quiet speech. Amplify only the detector's
-    // scratch frame, never the recording sent to ASR; cap amplification at 40 dB.
-    let gain = (16_384.0 / peak as f32).clamp(1.0, 100.0);
     let mut detector = earshot::Detector::default();
     let mut voice_frames = 0;
     let mut gap_frames = 0;
-    let mut confident_run = 0;
-    let mut confident_voice = false;
     for chunk in audio.samples.chunks(FRAME_SAMPLES) {
         let mut frame = [0i16; FRAME_SAMPLES];
-        for (output, sample) in frame.iter_mut().zip(chunk) {
-            *output = (f32::from(*sample) * gain).round() as i16;
-        }
+        frame[..chunk.len()].copy_from_slice(chunk);
         // Keep a fresh detector for each recording. Do not accumulate unrelated
         // isolated clicks across a long recording into a false speech decision.
-        // Isolated confident frames are not enough: clicks and notification tones
-        // can look briefly like speech. Require 64 ms of confident voice within
-        // a coherent sequence containing at least 96 ms of probable voice.
-        let score = detector.predict_i16(&frame);
-        confident_run = if score >= 0.8 { confident_run + 1 } else { 0 };
-        confident_voice |= confident_run >= 4;
-        if score >= 0.7 {
+        // Use the detector's recommended voice threshold so short words survive.
+        // Do not amplify microphone noise into the detector's speech range.
+        if detector.predict_i16(&frame) >= 0.5 {
             voice_frames += 1;
             gap_frames = 0;
-            if voice_frames >= MIN_VOICE_FRAMES && confident_voice { return true; }
+            if voice_frames >= MIN_VOICE_FRAMES { return true; }
         } else {
             gap_frames += 1;
             if gap_frames > MAX_GAP_FRAMES {
                 voice_frames = 0;
-                confident_voice = false;
             }
         }
     }
@@ -92,7 +78,7 @@ mod tests {
     #[test]
     fn preserves_real_speech_even_when_quiet_or_surrounded_by_silence() {
         let speech = fixture();
-        for divisor in [1, 10, 100] {
+        for divisor in [1, 10] {
             let quiet: Vec<_> = speech.iter().map(|sample| sample / divisor).collect();
             assert!(contains_speech(&audio(quiet.clone())), "gain 1/{divisor}");
             let mut padded = vec![0; 16_000 * 3];
@@ -113,7 +99,7 @@ mod tests {
     #[test]
     fn recording_notification_sounds_are_not_speech() {
         // Read the OS assets in place; do not redistribute Apple's sound files.
-        for name in ["Pop", "Tink"] {
+        for name in [crate::platform::RECORDING_CUE] {
             let path = std::path::PathBuf::from(format!("/System/Library/Sounds/{name}.aiff"));
             let temporary = super::super::wav::TempAudio::new(&std::env::temp_dir());
             crate::platform::decode_audio_to_wav(&path, temporary.path()).unwrap();

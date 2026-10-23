@@ -8,6 +8,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use tauri::AppHandle;
 
+// Pop resembles a vocal plosive and can be picked up by the microphone as speech.
+// Use a short non-vocal cue for both recording edges; stop plays after capture ends.
+pub(crate) const RECORDING_CUE: &str = "Tink";
+
 thread_local! {
     // Solo se toca desde el hilo principal (ver `play_sound`): así los NSSound viven lo suficiente.
     static SOUNDS: RefCell<HashMap<&'static str, Retained<NSSound>>> = RefCell::new(HashMap::new());
@@ -16,8 +20,8 @@ thread_local! {
 /// Reproduce un sonido corto del sistema, bajito, sin bloquear.
 pub fn play_sound(app: &AppHandle, kind: SoundKind) {
     let (name, volume) = match kind {
-        SoundKind::Start => ("Pop", 0.35f32),
-        SoundKind::Stop => ("Tink", 0.3),
+        SoundKind::Start => (RECORDING_CUE, 0.35f32),
+        SoundKind::Stop => (RECORDING_CUE, 0.3),
         SoundKind::Error => ("Basso", 0.3),
     };
     let _ = app.run_on_main_thread(move || {

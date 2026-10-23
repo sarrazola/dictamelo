@@ -14,6 +14,8 @@ pub use audio_decode::decode_audio_to_wav;
 pub use clipboard::clipboard_backend;
 pub use locale::system_language;
 pub use sound::play_sound;
+#[cfg(test)]
+pub(crate) use sound::RECORDING_CUE;
 pub use keyboard::{install_cancel_key_monitor, press_hotkey_for_test, send_paste_keystroke};
 pub use permissions::{
     open_permission_settings, permissions_status, request_accessibility_permission,

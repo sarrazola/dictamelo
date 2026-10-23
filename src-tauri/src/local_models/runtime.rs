@@ -140,7 +140,7 @@ impl Runtime {
             // A queued job may have passed its first check before shutdown drained the cache.
             // The same mutex protects shutdown and every path that can create native resources.
             if self.is_stopping() || job.token.is_cancelled() { return Err(CANCELLED.into()); }
-            if loaded.as_ref().map_or(true, |m| m.id != catalog.id) {
+            if loaded.as_ref().is_none_or(|m| m.id != catalog.id) {
                 // Free the previous model before allocating its replacement.
                 loaded.take();
                 #[cfg(test)]
