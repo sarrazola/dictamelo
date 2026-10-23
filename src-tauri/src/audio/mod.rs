@@ -3,6 +3,8 @@
 pub mod recorder;
 pub mod resample;
 pub mod wav;
+#[cfg(target_os = "macos")]
+pub mod speech;
 
 pub use recorder::{RawRecording, Recorder};
 

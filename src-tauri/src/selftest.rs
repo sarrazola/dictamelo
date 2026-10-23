@@ -220,6 +220,14 @@ async fn run_with_hotkey(app: &AppHandle, hold_secs: f64) -> Result<String, Stri
 
 /// Modo WAV: transcribe un archivo existente con el pipeline normal (sin micrófono ni atajo).
 async fn run(app: &AppHandle, path: &Path) -> Result<String, String> {
+    use tauri::Manager;
+    let expect_no_speech = std::env::var("DICTAMELO_SELFTEST_EXPECT_NO_SPEECH").as_deref() == Ok("1");
+    let state = app.state::<crate::state::AppState>();
+    let history_before = crate::util::lock(&state.history).entries();
+    // Observe the change counter only; never print clipboard contents.
+    let clipboard_before = if expect_no_speech {
+        Some(crate::clipboard::backend().change_count().map_err(|e| e.to_string())?)
+    } else { None };
     let mut reader = hound::WavReader::open(path).map_err(|e| format!("no se pudo abrir {}: {e}", path.display()))?;
     let spec = reader.spec();
     let samples: Vec<f32> = match spec.sample_format {
@@ -236,7 +244,17 @@ async fn run(app: &AppHandle, path: &Path) -> Result<String, String> {
 
     pipeline::set_status(app, Status::Transcribing);
     match pipeline::transcribe_and_deliver(app, prepared).await {
-        Some(text) => Ok(text),
+        Some(text) => {
+            if let Some(before) = clipboard_before {
+                let unchanged = before == crate::clipboard::backend().change_count().map_err(|e| e.to_string())?
+                    && history_before == crate::util::lock(&state.history).entries();
+                if !text.is_empty() || !unchanged {
+                    return Err("Expected silence to leave transcript, history and clipboard empty/unchanged".into());
+                }
+                println!("SELFTEST_NO_SPEECH_OK history_and_clipboard_unchanged");
+            }
+            Ok(text)
+        },
         None => Err(pipeline::current_status(app).label("en")),
     }
 }

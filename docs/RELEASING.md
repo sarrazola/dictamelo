@@ -2,7 +2,25 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current release: 1.0.0
+## Current release: macOS 1.0.1; Windows 1.0.0
+
+Version 1.0.1 is an explicitly Mac-only stable release. Use the exception below; do not run Windows builds, Windows CI, VM tests or the all-platform staging script for this release. The following complete-release procedure remains the default when both platforms are authorized.
+
+### Mac-only stable releases
+
+The legacy desktop clients share a static updater manifest with one top-level version. Raising that version while retaining old Windows installer URLs would offer Windows users the same old installer indefinitely. Preserve the previous `latest.json` **byte-for-byte**, including every platform URL and signature. Starting with Mac 1.0.1, `tauri.macos.conf.json` selects `latest-macos.json`, so subsequent Mac releases can advance independently.
+
+1. Fetch current `main`, preserve intended local work, choose a new version, synchronize all five manifests/lockfiles and update English notes, CHANGELOG, README and verification records.
+2. Run Mac unit/UI checks and strict Clippy, then the existing Developer ID/notarization/stapling build script. Use the existing Developer ID identity and updater key. Apple Distribution credentials are a separate signing workflow and must not replace Developer ID.
+3. Download the current public `latest.json` into an ignored verification directory. Run `python3 scripts/stage-macos-release.py X.Y.Z /absolute/path/to/previous/latest.json`. This refuses to overwrite a staging directory and does not read or package Windows installers.
+4. Verify the Mac archive using `cargo run --release --target aarch64-apple-darwin --manifest-path src-tauri/Cargo.toml --example verify_artifact -- /absolute/path/to/archive /absolute/path/to/archive.sig`. Verify signing, notarization, stapling, Gatekeeper, mounted DMG contents and installed execution separately.
+5. Commit explicit source paths, fast-forward `main`, push only `main` and the new version tag, then create a draft release with `gh release create vX.Y.Z --draft --verify-tag --title "Dictámelo X.Y.Z — macOS" --notes-file docs/releases/X.Y.Z.md`.
+6. Upload the DMG, updater archive and signature first. Upload `SHA256SUMS.txt`, the unchanged legacy `latest.json` and complete `latest-macos.json` afterward. Download the draft assets into a fresh directory and compare hashes/signatures before publishing with `gh release edit vX.Y.Z --draft=false --prerelease=false --latest`.
+7. Read back the public latest release and anonymously download both manifests and the Mac artifacts. Confirm the legacy manifest is unchanged, the Mac manifest points to the new immutable asset, and the installed new app reports its version current. Do not claim that an older Mac updater followed the new channel: **1.0.0 users need one manual DMG installation** to migrate.
+
+Keep both manifest filenames present in future releases, including complete releases, until old clients are retired. A complete release can advance the legacy manifest only when all its platform artifacts match the advertised version. New Mac clients always need a matching `latest-macos.json`. Do not deploy the website as part of this exception without a separate request.
+
+## Complete releases
 
 This iteration adds local speech inference on macOS and both Windows targets, a compact model catalog, more personal-key providers and clearer cloud/key controls. Push the reviewed, tested source to `main` before asking the Windows machine to pull and build. Keep the same source commit, version and public cloud metadata across all three artifacts. Record the actual results in [Testing](TESTING.md).
 

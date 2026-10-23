@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 — macOS, October 23, 2026
+
+- Detect speech locally before microphone transcription to avoid invented words from silent taps, low background noise and recording notification sounds.
+- Preserve spoken short phrases and the original audio; no transcript word blacklist is used. Rejected recordings do not invoke a provider, consume cloud transcription quota, change the clipboard or create history entries.
+- Ship the Mac Fn shortcut, hold/toggle recording modes and simpler shortcut editor previously available in local builds. Preserve existing shortcuts and automatic-paste preferences.
+- Include the merged file-job/settings reliability improvements: retain completed file segments on later failure and serialize settings saves.
+- Publish Apple Silicon macOS artifacts only. Windows remains on 1.0.0; no Windows build or execution was performed for this release.
+- Use a separate Mac updater manifest starting with this version. Install 1.0.1 manually once when upgrading from 1.0.0; future Mac releases can update independently of Windows.
+
 ## 1.0.0
 
 - Enable downloadable local speech models on macOS and Windows ARM64/x64.

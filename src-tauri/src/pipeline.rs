@@ -286,10 +286,6 @@ async fn stop_and_transcribe(app: &AppHandle) {
     let prepared = audio::prepare(&raw);
     let secs = prepared.duration_secs();
     log::info!("Grabación de {secs:.2}s ({} Hz, {} canal(es))", raw.sample_rate, raw.channels);
-    if secs < MIN_RECORDING_SECS {
-        set_status(app, Status::Done { message: t(&lang, "msg.too_short").into() });
-        return;
-    }
     set_status(app, Status::Transcribing);
     let app = app.clone();
     tauri::async_runtime::spawn(async move { transcribe_with_plan(&app, prepared, plan).await; });
@@ -306,6 +302,15 @@ async fn transcribe_with_plan(app: &AppHandle, audio: PreparedAudio, plan: Trans
     let state = app.state::<AppState>();
     let settings = &plan.settings;
     let lang = settings.ui_lang();
+    // Reject accidental taps and non-speech before reading credentials, writing a
+    // temporary WAV, spending cloud quota or invoking any transcription model.
+    // File imports use their separate pipeline and retain their original audio.
+    if let Some(message) = microphone_rejection(&audio) {
+        *lock(&state.last_failed) = None;
+        tray::set_retry_enabled(app, false);
+        set_status(app, Status::Done { message: t(&lang, message).into() });
+        return Some(String::new());
+    }
     let source = match transcription_source(&state, &plan).await {
         Ok(pair) => pair,
         Err(e) => {
@@ -391,6 +396,29 @@ async fn transcribe_with_plan(app: &AppHandle, audio: PreparedAudio, plan: Trans
             fail(app, tf(&lang, "err.retry_hint", &[("e", &e.localized(&lang))]));
             None
         }
+    }
+}
+
+fn microphone_rejection(audio: &PreparedAudio) -> Option<&'static str> {
+    if audio.duration_secs() < MIN_RECORDING_SECS { return Some("msg.too_short"); }
+    #[cfg(target_os = "macos")]
+    if !audio::speech::contains_speech(audio) { return Some("msg.no_speech"); }
+    None
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod microphone_gate_tests {
+    use super::*;
+
+    #[test]
+    fn accidental_taps_and_silent_microphone_audio_never_need_asr() {
+        let make = |samples| PreparedAudio { samples, sample_rate: audio::TARGET_SAMPLE_RATE };
+        assert_eq!(microphone_rejection(&make(vec![100; 1000])), Some("msg.too_short"));
+        assert_eq!(microphone_rejection(&make(vec![0; 5600])), Some("msg.no_speech"));
+        assert_eq!(microphone_rejection(&make(vec![0; 16_000 * 5])), Some("msg.no_speech"));
+        let speech = hound::WavReader::open(concat!(env!("CARGO_MANIFEST_DIR"), "/../tests/fixtures/english-speech.wav"))
+            .unwrap().samples::<i16>().map(Result::unwrap).collect();
+        assert_eq!(microphone_rejection(&make(speech)), None);
     }
 }
 

@@ -8,15 +8,17 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 ## Download
 
-**[Download Dictámelo 1.0.0](https://github.com/sarrazola/dictamelo/releases/latest):** choose the installer for your computer below.
+**[Download Dictámelo](https://github.com/sarrazola/dictamelo/releases/latest):** macOS **1.0.1** · Windows **1.0.0**. Choose the installer for your computer below.
 
 | Your computer | Installer |
 | --- | --- |
-| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_aarch64.dmg) |
+| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.1/Dictamelo_1.0.1_aarch64.dmg) |
 | Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_x86_64-setup.exe) |
 | Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_aarch64-setup.exe) |
 
-[Checksums](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/SHA256SUMS.txt) · [Release notes and signatures](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.0)
+[Mac checksums and release notes](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.1) · [Windows checksums and release notes](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.0)
+
+Mac 1.0.1 adds local speech detection before microphone transcription to avoid invented words from silent presses. **Upgrading from 1.0.0 requires installing the Mac DMG once.** Later Mac builds use their own updater manifest; the legacy shared manifest remains at 1.0.0 to avoid offering Windows an unchanged installer as a new version.
 
 On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
@@ -29,7 +31,7 @@ Mac releases require Developer ID signing, Apple notarization and stapling. Wind
 1. On the first launch, choose local models, your own keys, Free Cloud or Pro in the setup assistant. **Skip** is available on every step; you can configure everything later in Settings.
 2. For offline transcription, download a model in **Models → On this computer**, then select **Use model**. With your own keys, choose Groq, OpenAI, Mistral or Deepgram and save the provider key. **Whisper Large v3** is recommended on Groq. Saved keys appear masked with explicit Change/Cancel actions. Neither mode requires a Dictámelo account.
 3. Use **Continue with Google** for Free Cloud, or **Create free account** with email/password and enter the confirmation code sent to your inbox. Returning users can **Sign in**; password recovery also uses an emailed code. Existing Pro licenses can be activated in **Plan**.
-4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release.
+4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release. On Mac, you can also select Fn or choose **Press to start / stop** in General. Updates preserve your existing shortcut.
 5. Open **Files** to transcribe a recording. You can also expand **Import using a local path**. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
 
 ## Three plans
@@ -85,7 +87,7 @@ Supabase URLs, anon/publishable keys, client IDs and checkout identifiers are pu
 
 ## Development
 
-Install Rust stable, Node.js 20+, Python 3 and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs CMake and Xcode Command Line Tools. Windows requires MSVC, Windows SDK, CMake, Ninja, Clang and NASM as documented in the [release guide](docs/RELEASING.md). Backend checks require Deno.
+Install Rust stable (at least 1.87), Node.js 20+, Python 3 and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs CMake and Xcode Command Line Tools. Windows requires MSVC, Windows SDK, CMake, Ninja, Clang and NASM as documented in the [release guide](docs/RELEASING.md). Backend checks require Deno.
 
 ```sh
 npm ci
