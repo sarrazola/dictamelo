@@ -3,6 +3,7 @@
 ## 1.0.1 — macOS, October 23, 2026
 
 - Detect speech locally before microphone transcription to avoid invented words from silent taps, low background noise and recording notification sounds.
+- Replace the vocal-sounding Mac start cue with a short Tink cue so the app does not mistake its own feedback for dictation.
 - Preserve spoken short phrases and the original audio; no transcript word blacklist is used. Rejected recordings do not invoke a provider, consume cloud transcription quota, change the clipboard or create history entries.
 - Ship the Mac Fn shortcut, hold/toggle recording modes and simpler shortcut editor previously available in local builds. Preserve existing shortcuts and automatic-paste preferences.
 - Include the merged file-job/settings reliability improvements: retain completed file segments on later failure and serialize settings saves.

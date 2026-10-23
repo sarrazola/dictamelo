@@ -9,6 +9,9 @@ use super::{PreparedAudio, TARGET_SAMPLE_RATE};
 const FRAME_SAMPLES: usize = 256; // Earshot requires 16 ms at 16 kHz.
 const MIN_VOICE_FRAMES: usize = 6; // 96 ms of voice in a short, coherent sequence.
 const MAX_GAP_FRAMES: usize = 2;
+// About -58 dBFS: discard the detector's probability tail after a brief click,
+// without counting digitally silent frames as additional spoken syllables.
+const MIN_FRAME_POWER: f64 = 40.0 * 40.0;
 
 pub fn contains_speech(audio: &PreparedAudio) -> bool {
     // Preparation owns resampling. Fail open for unexpected input rather than
@@ -24,7 +27,10 @@ pub fn contains_speech(audio: &PreparedAudio) -> bool {
         // isolated clicks across a long recording into a false speech decision.
         // Use the detector's recommended voice threshold so short words survive.
         // Do not amplify microphone noise into the detector's speech range.
-        if detector.predict_i16(&frame) >= 0.5 {
+        let probability = detector.predict_i16(&frame);
+        let power = frame.iter().map(|&sample| f64::from(sample).powi(2)).sum::<f64>()
+            / FRAME_SAMPLES as f64;
+        if probability >= 0.5 && power >= MIN_FRAME_POWER {
             voice_frames += 1;
             gap_frames = 0;
             if voice_frames >= MIN_VOICE_FRAMES { return true; }
@@ -105,11 +111,17 @@ mod tests {
             crate::platform::decode_audio_to_wav(&path, temporary.path()).unwrap();
             let sound: Vec<_> = hound::WavReader::open(temporary.path()).unwrap()
                 .samples::<i16>().map(Result::unwrap).collect();
-            for divisor in [1, 3, 10, 100] {
-                let mut samples = vec![0; 1600];
-                samples.extend(sound.iter().map(|sample| sample / divisor));
-                samples.extend(vec![0; 16_000]);
-                assert!(!contains_speech(&audio(samples)), "{name} at gain 1/{divisor}");
+            for prefix in [0, 800, 1600, 3200, 8000] {
+                for divisor in [1, 3, 10, 100] {
+                    let mut samples = vec![0; prefix];
+                    samples.extend(sound.iter().map(|sample| sample / divisor));
+                    samples.extend(vec![0; 16_000]);
+                    assert!(!contains_speech(&audio(samples.clone())), "{name} at gain 1/{divisor}, offset {prefix}");
+                    for (index, sample) in samples.iter_mut().enumerate() {
+                        *sample = sample.saturating_add((index % 25) as i16 - 12);
+                    }
+                    assert!(!contains_speech(&audio(samples)), "{name} with low background noise");
+                }
             }
         }
     }
