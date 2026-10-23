@@ -24,6 +24,8 @@ Apple accepted app submission `049e5116-60cd-4f33-82e2-8ccac4d633b3` and DMG sub
 - Native UI readback showed 1.0.1, Fn, Hold, Spanish and automatic paste enabled. The app was left open. Earlier stricter/no-notices local candidate artifacts were never published or installed; only the hashes above identify this release.
 - Mac 1.0.1 uses `latest-macos.json`. The legacy `latest.json` stays byte-for-byte at 1.0.0 with its original platform URLs/signatures. Old Mac clients require one manual DMG upgrade; this is not claimed as an automatic 1.0.0-to-1.0.1 update. Evidence is local and ignored under `dist/v1.0.1-verification/`.
 
+- Public delivery: `v1.0.1` is a stable GitHub Latest release. All six assets were downloaded anonymously and matched staging byte-for-byte; the public updater archive signature and both latest-manifest aliases passed. The installed Mac's **Check now** action returned **You are up to date**. This confirms the new Mac channel, not an automatic migration from 1.0.0.
+
 ## Unreleased — Mac Fn and recording modes, September 12, 2026
 
 Based on `main` at `908bed01091baf74edb1fdfab74e35e5ed001d47`. General settings now offer Hold and Press to start/stop; macOS also offers standalone Fn/Globe. Existing settings keep Hold. See [recording controls](RECORDING_CONTROLS.md) for behavior and the manual test matrix.
