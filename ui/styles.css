@@ -490,8 +490,10 @@ input[type="email"] { -webkit-user-select: text; user-select: text; }
 .source-option[aria-pressed="true"], .provider-choice[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-soft); }
 .source-symbol { font-size: 20px; color: var(--accent); }
 .source-option > span:last-child { color: var(--muted); font-size: 12px; line-height: 1.4; }
-.provider-choices { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
-.provider-choice { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--field); border: 1px solid var(--border); border-radius: 8px; }
+.provider-choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; padding-top: 8px; }
+.provider-choice { display: flex; align-items: center; justify-content: center; min-width: 0; gap: 6px; padding: 10px 8px; font-size: 12px; background: var(--field); border: 1px solid var(--border); border-radius: 8px; }
+.provider-choice > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-choice .provider-logo { width: 20px; height: 20px; }
 .provider-logo { width: 23px; height: 23px; flex: none; object-fit: contain; }
 .provider-select-with-logo { display: flex; align-items: center; gap: 9px; }
 .local-model-list { display: flex; flex-direction: column; margin: 14px 0; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }

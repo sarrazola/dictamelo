@@ -269,13 +269,15 @@ function renderProviderChoices() {
     const button = document.createElement("button");
     button.className = "provider-choice";
     button.dataset.provider = provider.id;
+    button.setAttribute("aria-label", provider.name);
+    button.title = provider.name;
     button.setAttribute("aria-pressed", String(provider.id === ui.settings.provider));
     const logo = document.createElement("img");
     logo.className = "provider-logo";
     logo.alt = "";
     setProviderLogo(logo, provider.id);
     const label = document.createElement("span");
-    label.textContent = provider.name;
+    label.textContent = provider.id === "azure" ? "Microsoft" : provider.name;
     button.append(logo, label);
     container.appendChild(button);
   }

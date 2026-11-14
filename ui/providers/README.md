@@ -6,3 +6,5 @@ Bundled SVGs are displayed locally; opening Settings does not request remote ico
 - Deepgram: [Simple Icons](https://github.com/simple-icons/simple-icons/blob/777807a262bb7384ff406fd4b35fdcd02e9514c3/icons/deepgram.svg), CC0 license (included).
 
 Provider names and marks identify the selected service or model publisher. They remain the property of their respective owners and do not imply endorsement.
+
+The Microsoft mark is adapted to monochrome to match the provider selector; dark mode inverts all provider icons consistently.

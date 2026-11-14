@@ -3,7 +3,7 @@
 ## 1.0.2 — Local Mac development build, not published
 
 - Add Microsoft Azure Speech MAI-Transcribe-2 as a personal-key transcription provider for dictation and imported audio.
-- Add resource endpoint setup, masked credential management, a bundled Microsoft logo and translated setup guidance in all six languages.
+- Add resource endpoint setup, masked credential management, a bundled monochrome Microsoft logo and translated setup guidance in all six languages. Keep all five personal-key providers in one compact row.
 - Preserve automatic language detection, explicit language hints and vocabulary. Pin the model and use verbatim transcripts without an ASR fallback.
 - Restrict credential-bearing requests to validated HTTPS Azure resource endpoints and disable redirects; keep raw response errors out of logs.
 - Preserve other providers, accounts, licenses, saved shortcuts and automatic paste. No Windows build or runtime test is included in this Mac development pass.
