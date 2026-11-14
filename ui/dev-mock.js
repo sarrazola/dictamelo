@@ -6,7 +6,7 @@ if (!window.__TAURI__) {
     hotkey: "Alt+Shift+Space", provider: "groq", model: "whisper-large-v3", language: "auto",
     uiLanguage: "auto", autoPaste: true, restoreClipboard: true, showOverlay: true,
     inputDevice: null, maxHistory: 50, maxRecordingSecs: 300,
-    useOwnKey: true, launchAtLogin: true, playSounds: true, vocabulary: "", localCleanupCloudEnabled: false,
+    azureSpeechEndpoint: "", useOwnKey: true, launchAtLogin: true, playSounds: true, vocabulary: "", localCleanupCloudEnabled: false,
     cleanupEnabled: false, cleanupProvider: "groq", cleanupModel: "openai/gpt-oss-120b", cleanupPrompt: "",
   };
   const history = [
@@ -15,6 +15,7 @@ if (!window.__TAURI__) {
   ];
   const listeners = {};
   const providers = [
+    { id: "azure", name: "Microsoft Azure", requiresApiKey: true, keyUrl: "https://portal.azure.com/", defaultModel: "MAI-Transcribe-2", verified: true, models: [{ id: "MAI-Transcribe-2", name: "MAI-Transcribe-2", description: "model.desc.mai_transcribe_2" }] },
     { id: "groq", name: "Groq", requiresApiKey: true, keyUrl: "https://console.groq.com/keys", defaultModel: "whisper-large-v3", verified: true,
       models: [
         { id: "whisper-large-v3", name: "Whisper Large v3", description: "model.desc.whisper_v3" },
@@ -540,7 +541,7 @@ if (!window.__TAURI__) {
   let signedIn = false;
   const commands = {
     get_app_info: () => ({
-      version: "1.0.1", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
+      version: "1.0.2", platform: "macos", cloudAvailable: true, proTrialAvailable: false, defaultHotkey: "Alt+Shift+Space",
       logDir: "~/Library/Logs/com.dictamelo.desktop",
       configDir: "~/Library/Application Support/com.dictamelo.desktop",
       uiLanguages: ["es", "en", "pt", "fr", "de", "it"], resolvedUiLanguage: "es",

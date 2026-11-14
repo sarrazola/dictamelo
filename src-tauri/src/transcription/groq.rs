@@ -129,6 +129,7 @@ mod live_tests {
 
         let provider = GroqProvider::new(shared_http_client());
         let request = TranscriptionRequest {
+        endpoint: None,
             audio_path: wav.clone(),
             model: "whisper-large-v3-turbo".into(),
             language: Some("es".into()),
@@ -156,7 +157,7 @@ mod live_tests {
         let wav = crate::audio::wav::new_temp_path(&dir);
         crate::audio::wav::write_wav_mono_i16(&wav, &vec![0i16; 16_000], 16_000).unwrap();
         let provider = GroqProvider::new(shared_http_client());
-        let request = TranscriptionRequest { audio_path: wav.clone(), model: "whisper-large-v3-turbo".into(), language: None, prompt: None };
+        let request = TranscriptionRequest { endpoint: None, audio_path: wav.clone(), model: "whisper-large-v3-turbo".into(), language: None, prompt: None };
         let err = provider.transcribe(Some("gsk_clave_invalida"), &request).await.unwrap_err();
         assert!(matches!(err, TranscriptionError::Unauthorized), "{err:?}");
         assert!(matches!(provider.transcribe(None, &request).await.unwrap_err(), TranscriptionError::MissingApiKey));

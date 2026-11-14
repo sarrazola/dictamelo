@@ -1,5 +1,17 @@
 # Verification record
 
+## Local 1.0.2 — Microsoft MAI-Transcribe-2, November 14, 2026
+
+This Mac-only development build adds Azure Speech as a personal-key transcription provider. Public downloads remain at macOS 1.0.1 and Windows 1.0.0; no updater manifest, GitHub release, backend or website deployment is included.
+
+- Offline checks: 126 Rust tests passed, ten explicit live/native tests remained ignored; 48 UI contract/state tests, JavaScript syntax and licensed-fixture validation passed. Strict all-target Clippy passed on this Mac. The additional tests cover native Azure multipart data, endpoint restrictions, rejected redirects, language/vocabulary fields, response parsing, retryable errors, key/endpoint onboarding readiness and old-settings migration.
+- Live Azure: the shared MAI script and the app's native Rust adapter each transcribed the licensed English speech fixture with MAI-Transcribe-2. The fixture is 5.855 seconds; the service reported 5.86 seconds and returned the expected Quilter/gospel sentence. Requests pin the exact model; no ASR fallback was used. These results prove availability for the tested resource only.
+- Installed Mac: the local ARM64 1.0.2 build passed strict Developer ID signature verification; its designated requirement matches installed 1.0.1. The previous application/settings/history were backed up before replacement. Microsoft Azure, MAI-Transcribe-2 and the endpoint were selected through the native UI, and the subscription key was saved through the existing masked-key/Keychain flow without a password prompt.
+- Two separate installed-app launches completed the actual file-import pipeline for the licensed WAV and an AAC/M4A conversion of that same fixture. Both returned `SELFTEST_OK` with the expected Quilter/gospel sentence, taking 5.02 and 5.05 seconds including application startup/shutdown. Tests temporarily used automatic language and disabled cleanup to isolate MAI; original Spanish/cleanup settings were restored. Only provider, model and the new endpoint field changed permanently; Fn, Hold, automatic paste and history were preserved. This is file-pipeline verification, not a physical microphone/paste test.
+- Packaging boundary: Apple's notarization API returned HTTP 403 for a missing or expired developer agreement, including a second check after compilation. This local build is Developer ID signed **but not notarized or stapled**, and must not be represented as a finished distributable release. No new DMG or public release was published. Installed executable SHA-256: `234835fd6ccbd3b8dc73aad3fc5694941f1652fee1011c3fe3a0760b7c2a2bbb`.
+- Boundaries: no Windows build/CI/VM test, local ASR inference/model download, or new live ASR request to another provider was performed. Existing provider behavior and historical test attribution remain unchanged. Physical microphone/hotkey capture is not covered by the fixture tests.
+- Local evidence is ignored under `dist/azure-mai-verification/`; subscription keys and the user's resource endpoint are not included in source or reports.
+
 ## Version 1.0.1 — macOS silence guard, October 23, 2026
 
 Application source: `268835b` (later release-record edits only change documentation). This Mac-only release includes the previously local Fn/recording-mode changes below and the merged file-job/settings fixes.

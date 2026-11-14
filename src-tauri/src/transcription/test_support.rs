@@ -14,6 +14,15 @@ pub async fn http_fixture(
     status: u16,
     response: &str,
 ) -> (String, tokio::task::JoinHandle<CapturedRequest>) {
+    http_fixture_with_headers(status, response, &[]).await
+}
+
+pub async fn http_fixture_with_headers(
+    status: u16,
+    response: &str,
+    extra_headers: &[(&str, &str)],
+) -> (String, tokio::task::JoinHandle<CapturedRequest>) {
+    let extra_headers: String = extra_headers.iter().map(|(name, value)| format!("{name}: {value}\r\n")).collect();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let response = response.to_owned();
@@ -45,7 +54,7 @@ pub async fn http_fixture(
                 assert!(n > 0, "request ended before body");
                 received.extend_from_slice(&chunk[..n]);
             }
-            let reply = format!("HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len());
+            let reply = format!("HTTP/1.1 {status} Test\r\n{extra_headers}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len());
             socket.write_all(reply.as_bytes()).await.unwrap();
             CapturedRequest { method, path, headers, body: received[header_end..header_end + length].to_vec() }
         }).await.expect("loopback request timed out")
@@ -55,6 +64,7 @@ pub async fn http_fixture(
 
 pub fn audio_request(model: &str) -> super::TranscriptionRequest {
     super::TranscriptionRequest {
+        endpoint: None,
         audio_path: std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../tests/fixtures/english-speech.wav"),
         model: model.into(),

@@ -7,6 +7,7 @@
 //! Nada más cambia: la UI lista los proveedores/modelos a partir de `ProviderInfo`.
 
 pub mod cloud_catalog;
+pub mod azure;
 pub mod deepgram;
 pub mod dictamelo;
 pub mod groq;
@@ -26,6 +27,8 @@ use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct TranscriptionRequest {
+    /// Optional per-user service endpoint, captured with the recording's settings.
+    pub endpoint: Option<String>,
     /// Archivo de audio (WAV mono 16 kHz) a transcribir.
     pub audio_path: PathBuf,
     pub model: String,
@@ -53,6 +56,8 @@ pub enum TranscriptionError {
     Local(String),
     #[error("Falta la API key del proveedor")]
     MissingApiKey,
+    #[error("Configure a valid Azure Speech resource endpoint in Models")]
+    InvalidEndpoint,
     #[error("API key inválida o sin autorización")]
     Unauthorized,
     #[error("Límite de uso del proveedor alcanzado; espera unos segundos")]
@@ -79,6 +84,7 @@ impl TranscriptionError {
             TranscriptionError::Cancelled => t(lang, "msg.cancelled").into(),
             TranscriptionError::Local(error) => crate::local_models::messages::localize(error, lang),
             TranscriptionError::MissingApiKey => t(lang, "tr.missing_key").into(),
+            TranscriptionError::InvalidEndpoint => t(lang, "tr.azure_endpoint").into(),
             TranscriptionError::Unauthorized => t(lang, "tr.unauthorized").into(),
             TranscriptionError::RateLimited => t(lang, "tr.rate").into(),
             TranscriptionError::Network(_) => t(lang, "tr.network").into(),
@@ -148,6 +154,7 @@ impl ProviderRegistry {
         registry.register(Arc::new(openai::OpenAiProvider::new(http.clone())));
         registry.register(Arc::new(mistral::MistralProvider::new(http.clone())));
         registry.register(Arc::new(deepgram::DeepgramProvider::new(http)));
+        registry.register(Arc::new(azure::AzureSpeechProvider::new()));
         registry
     }
 

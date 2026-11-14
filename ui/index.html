@@ -263,6 +263,11 @@
         </div>
         <p id="model-description" class="desc"></p>
         <p id="legacy-provider-note" class="footnote" hidden></p>
+        <div id="azure-endpoint-row" class="row stack" hidden>
+          <label for="azure-endpoint" data-i18n="models.azure.endpoint"></label>
+          <div class="actions full"><input id="azure-endpoint" type="url" autocomplete="off" spellcheck="false" placeholder="https://your-resource.cognitiveservices.azure.com" aria-describedby="azure-endpoint-hint"><button id="btn-save-azure-endpoint" type="button" class="ghost" data-i18n="models.save"></button></div>
+          <p id="azure-endpoint-hint" class="footnote" data-i18n="models.azure.hint"></p>
+        </div>
         <div class="row stack">
           <div class="label"><strong data-i18n="models.apikey"></strong><span id="key-status" role="status"></span></div>
           <div class="actions full">
@@ -468,6 +473,11 @@
             <label><span data-i18n="models.model"></span><select id="onboarding-model"></select></label>
           </div>
           <p id="onboarding-key-status" class="footnote" role="status"></p>
+          <div id="onboarding-azure-endpoint-row" class="row stack" hidden>
+            <label for="onboarding-azure-endpoint" data-i18n="models.azure.endpoint"></label>
+            <div class="actions full"><input id="onboarding-azure-endpoint" type="url" autocomplete="off" spellcheck="false" placeholder="https://your-resource.cognitiveservices.azure.com" aria-describedby="onboarding-azure-endpoint-hint"><button id="btn-save-onboarding-azure-endpoint" type="button" class="ghost" data-i18n="models.save"></button></div>
+            <p id="onboarding-azure-endpoint-hint" class="footnote" data-i18n="models.azure.hint"></p>
+          </div>
           <label><span data-i18n="models.apikey"></span><input id="onboarding-api-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="onboarding-key-status"></label>
           <div class="actions"><button id="btn-save-onboarding-key" type="submit" class="primary" data-i18n="models.save"></button><button id="btn-change-onboarding-key" type="button" class="ghost" hidden data-i18n="models.apikey.change"></button><button id="btn-cancel-onboarding-key" type="button" class="ghost" hidden data-i18n="general.cancel"></button><button id="onboarding-get-key" type="button" class="link" data-i18n="models.getkey"></button></div>
           <p class="footnote" data-i18n="models.privacy"></p>

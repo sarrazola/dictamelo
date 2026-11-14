@@ -41,6 +41,8 @@ pub struct Settings {
     pub use_own_key: bool,
     /// Identificador del modelo dentro del proveedor.
     pub model: String,
+    /// Public resource URL only. The Azure subscription key stays in the secret store.
+    pub azure_speech_endpoint: String,
     /// Código ISO-639-1 del idioma del dictado, o "auto" para detección automática.
     pub language: String,
     /// Idioma de la interfaz y de los mensajes ("auto" = el del sistema).
@@ -86,6 +88,7 @@ impl Default for Settings {
             provider: DEFAULT_PROVIDER.to_string(),
             use_own_key: false,
             model: DEFAULT_MODEL.to_string(),
+            azure_speech_endpoint: String::new(),
             language: "auto".to_string(),
             ui_language: "auto".to_string(),
             auto_paste: true,
@@ -159,12 +162,17 @@ impl Settings {
         self.provider == "local"
     }
 
+    pub fn transcription_endpoint(&self) -> Option<String> {
+        (self.provider == "azure").then(|| self.azure_speech_endpoint.clone())
+    }
+
     pub fn should_clean_transcript(&self) -> bool {
         self.cleanup_enabled && (!self.uses_local_transcription() || self.local_cleanup_cloud_enabled)
     }
 
     /// Normaliza valores fuera de rango o vacíos.
     pub fn sanitized(mut self) -> Self {
+        self.azure_speech_endpoint = self.azure_speech_endpoint.trim().trim_end_matches('/').to_string();
         self.max_history = self.max_history.clamp(1, 500);
         self.max_recording_secs = self.max_recording_secs.clamp(5, 900);
         if self.hotkey.trim().is_empty() {
@@ -198,6 +206,23 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn azure_endpoint_is_optional_for_older_settings_and_captured_per_request() {
+        let mut settings: Settings = serde_json::from_str(r#"{"provider":"groq"}"#).unwrap();
+        assert!(settings.azure_speech_endpoint.is_empty());
+        assert_eq!(settings.transcription_endpoint(), None);
+        settings.azure_speech_endpoint = " https://example.cognitiveservices.azure.com/ ".into();
+        settings.provider = "azure".into();
+        let saved = settings.sanitized();
+        assert_eq!(saved.transcription_endpoint().as_deref(), Some("https://example.cognitiveservices.azure.com"));
+        let captured = saved.transcription_endpoint();
+        let mut later = saved.clone();
+        later.azure_speech_endpoint = "https://another.cognitiveservices.azure.com".into();
+        assert_ne!(captured, later.transcription_endpoint());
+        let roundtrip: Settings = serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert_eq!(roundtrip, saved);
+    }
 
     #[test]
     fn upgrade_keeps_each_existing_shortcut_and_paste_choice() {

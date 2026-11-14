@@ -319,7 +319,7 @@ mod tests {
         assert!(job.token.is_cancelled());
         assert!(runtime.begin(Path::new("late.wav")).is_err());
         let catalog: super::super::Catalog = serde_json::from_str(include_str!("catalog.json")).unwrap();
-        let request = TranscriptionRequest { audio_path: "queued.wav".into(), model: catalog.models[0].id.clone(), language: Some("en".into()), prompt: None };
+        let request = TranscriptionRequest { endpoint: None, audio_path: "queued.wav".into(), model: catalog.models[0].id.clone(), language: Some("en".into()), prompt: None };
         assert!(matches!(runtime.transcribe(&catalog.models[0], Path::new("missing-model"), &request, job), Err(InferenceError::Cancelled)));
         runtime.request_shutdown(); runtime.finish_shutdown();
         assert!(runtime.loaded.lock().unwrap().is_none());

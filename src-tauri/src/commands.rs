@@ -21,6 +21,10 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
 pub fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings) -> Result<Settings, String> {
     let _update = lock(&state.settings_update);
     let new = settings.sanitized();
+    if !new.azure_speech_endpoint.is_empty() {
+        crate::transcription::azure::transcription_url(&new.azure_speech_endpoint)
+            .map_err(|error| error.localized(&new.ui_lang()))?;
+    }
     hotkey::validate(&new.hotkey)?;
     let provider = state
         .providers

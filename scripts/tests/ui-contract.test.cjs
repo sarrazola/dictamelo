@@ -401,7 +401,7 @@ test("the selected local model cannot be deleted from the catalog", async () => 
 });
 
 test("provider logos are bundled SVG assets with accompanying licenses", () => {
-  for (const provider of ["groq", "openai", "mistral", "deepgram", "nvidia"]) {
+  for (const provider of ["groq", "openai", "mistral", "deepgram", "microsoft", "nvidia"]) {
     const svg = read(`ui/providers/${provider}.svg`);
     assert.match(svg, /<svg\b/);
     assert.doesNotMatch(svg, /<(script|foreignObject)\b|(?:href|src)\s*=\s*["']https?:/i);
@@ -794,4 +794,38 @@ test("Tab and editor-button activation are not mistaken for a new shortcut", asy
   for (const key of ["Tab", "Enter", " "]) {
     await sandbox.onCaptureKeydown({ key, target: { tagName: "BUTTON" }, preventDefault() { assert.fail("Native keyboard navigation must be allowed"); } });
   }
+});
+
+test("Azure endpoint appears only for Microsoft and is shared with onboarding", async () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.provider = "azure";
+  sandbox.state.settings.azureSpeechEndpoint = "https://example.cognitiveservices.azure.com";
+  sandbox.renderAzureEndpoint();
+  sandbox.renderAzureEndpoint("onboarding-");
+  assert.equal(control("#azure-endpoint-row").hidden, false);
+  assert.equal(control("#onboarding-azure-endpoint").value, sandbox.state.settings.azureSpeechEndpoint);
+  const patches = [];
+  sandbox.saveSettings = async patch => { patches.push(patch); return true; };
+  control("#azure-endpoint").value = " https://another.cognitiveservices.azure.com ";
+  await sandbox.saveAzureEndpoint();
+  assert.equal(patches[0].azureSpeechEndpoint, "https://another.cognitiveservices.azure.com");
+  assert.deepEqual(Object.keys(patches[0]), ["azureSpeechEndpoint"]);
+  sandbox.state.settings.provider = "groq";
+  sandbox.renderAzureEndpoint();
+  assert.equal(control("#azure-endpoint-row").hidden, true);
+});
+
+test("Azure onboarding needs both a saved key and resource endpoint, and still permits Skip", () => {
+  const { sandbox, control } = loadRenderedUi();
+  sandbox.state.settings.provider = "azure";
+  sandbox.state.onboarding = { step: 2, mode: "own", keyConfigured: true };
+  sandbox.renderOnboardingNext();
+  assert.equal(control("#btn-onboarding-next").disabled, true);
+  sandbox.state.settings.azureSpeechEndpoint = "https://example.cognitiveservices.azure.com";
+  sandbox.renderOnboardingNext();
+  assert.equal(control("#btn-onboarding-next").disabled, false);
+  sandbox.state.onboarding.keyConfigured = false;
+  sandbox.renderOnboardingNext();
+  assert.equal(control("#btn-onboarding-next").disabled, true);
+  assert.match(main, /\$\("#btn-onboarding-later"\)\.hidden = false/);
 });

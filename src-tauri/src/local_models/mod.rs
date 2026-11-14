@@ -511,7 +511,7 @@ mod tests {
         model.download_url = format!("http://{address}/fixture"); manager.catalog = vec![model.clone()];
         std::fs::write(root.join(&model.filename), b"wrong").unwrap();
         assert!(manager.list()[0].installed);
-        let request = TranscriptionRequest { audio_path: Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("tests/fixtures/english-speech.wav"), model: model.id.clone(), language: Some("en".into()), prompt: None };
+        let request = TranscriptionRequest { endpoint: None, audio_path: Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("tests/fixtures/english-speech.wav"), model: model.id.clone(), language: Some("en".into()), prompt: None };
         assert!(manager.transcribe(&request).await.is_err());
         assert!(!manager.list()[0].installed); assert_eq!(manager.list()[0].status, "error");
         let server = tokio::spawn(async move {
@@ -558,7 +558,7 @@ mod tests {
             let started = Instant::now();
             manager.download(id, Arc::new(|_| {})).await.unwrap_or_else(|error| panic!("{id} download: {error}"));
             let download_secs = started.elapsed().as_secs_f64();
-            let request = TranscriptionRequest { audio_path: audio.clone(), model: id.into(), language: Some(language.clone()), prompt: None };
+            let request = TranscriptionRequest { endpoint: None, audio_path: audio.clone(), model: id.into(), language: Some(language.clone()), prompt: None };
             let started = Instant::now();
             let result = local.transcribe(None, &request).await.unwrap_or_else(|error| panic!("{id} inference: {error}"));
             let elapsed = started.elapsed().as_secs_f64();
@@ -602,7 +602,7 @@ mod tests {
         let mut silence_models_passed = 0;
         for id in ids.split(',') {
             let model = manager.catalog().iter().find(|model| model.id == id).unwrap_or_else(|| panic!("unknown local test model: {id}"));
-            let request = TranscriptionRequest { audio_path: silence.clone(), model: model.id.clone(), language: Some("en".into()), prompt: None };
+            let request = TranscriptionRequest { endpoint: None, audio_path: silence.clone(), model: model.id.clone(), language: Some("en".into()), prompt: None };
             let result = manager.transcribe(&request).await.unwrap(); assert!(result.text.is_empty(), "{} hallucinated on digital silence", model.id);
             silence_models_passed += 1;
             // Base lost whole speech windows when Whisper timestamps were disabled.
@@ -629,7 +629,7 @@ mod tests {
             let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
             let root = std::env::var_os("DICTAMELO_LOCAL_TEST_DIR").map(PathBuf::from).unwrap_or_else(|| repo.join("dist/local-model-release/models"));
             let manager = LocalModelManager::new(root).unwrap();
-            let request = TranscriptionRequest { audio_path: repo.join("tests/fixtures/english-speech.wav"), model: "whisper-base".into(), language: Some("en".into()), prompt: None };
+            let request = TranscriptionRequest { endpoint: None, audio_path: repo.join("tests/fixtures/english-speech.wav"), model: "whisper-base".into(), language: Some("en".into()), prompt: None };
             let result = manager.transcribe(&request).await.unwrap();
             assert!(result.text.to_lowercase().contains("gospel"));
             manager.shutdown(); manager.shutdown();
@@ -659,7 +659,7 @@ mod tests {
         let manager = LocalModelManager::new(root.clone()).unwrap();
         let model = manager.model("whisper-tiny").unwrap();
         std::fs::copy(downloaded.join(&model.filename), root.join(&model.filename)).unwrap();
-        let request = TranscriptionRequest { audio_path: repo.join("tests/fixtures/english-speech.wav"), model: model.id.clone(), language: Some("en".into()), prompt: None };
+        let request = TranscriptionRequest { endpoint: None, audio_path: repo.join("tests/fixtures/english-speech.wav"), model: model.id.clone(), language: Some("en".into()), prompt: None };
         let result = manager.transcribe(&request).await.unwrap();
         assert!(result.text.to_lowercase().contains("gospel"), "{}", result.text);
         // Windows refuses deletion while a native mapping still owns the file.

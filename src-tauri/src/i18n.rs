@@ -37,6 +37,14 @@ pub fn resolve(lang: &str) -> String {
 /// Devuelve el texto de `key` en `lang`. Las claves desconocidas se devuelven tal cual.
 pub fn t<'a>(lang: &str, key: &'a str) -> &'a str {
     match key {
+        "tr.azure_endpoint" => pick(lang, [
+            "En Modelos, guarda la dirección HTTPS de tu recurso Azure Speech (*.cognitiveservices.azure.com).",
+            "In Models, save your Azure Speech resource HTTPS endpoint (*.cognitiveservices.azure.com).",
+            "Em Modelos, salve o endereço HTTPS do seu recurso Azure Speech (*.cognitiveservices.azure.com).",
+            "Dans Modèles, enregistrez l’adresse HTTPS de votre ressource Azure Speech (*.cognitiveservices.azure.com).",
+            "Speichere unter Modelle die HTTPS-Adresse deiner Azure-Speech-Ressource (*.cognitiveservices.azure.com).",
+            "In Modelli, salva l’indirizzo HTTPS della tua risorsa Azure Speech (*.cognitiveservices.azure.com).",
+        ]),
         "err.cloud_signin_required" => pick(lang, [
             "Inicia sesión o activa tu licencia Pro para usar la nube de Dictámelo.",
             "Sign in or activate your Pro license to use Dictámelo Cloud.",

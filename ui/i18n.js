@@ -1932,3 +1932,36 @@ for (const [lang, label] of Object.entries({
   en: "Use default shortcut", es: "Usar atajo predeterminado", pt: "Usar atalho padrão",
   fr: "Utiliser le raccourci par défaut", de: "Standardkurzbefehl verwenden", it: "Usa scorciatoia predefinita",
 })) window.I18N[lang]["general.shortcut.default"] = label;
+
+for (const [lang, copy] of Object.entries({
+  "en": {
+    "models.azure.endpoint": "Azure Speech endpoint",
+    "models.azure.hint": "Copy the endpoint from your Speech resource → Keys and Endpoint in Azure. The key goes in the separate field below. Azure bills your usage.",
+    "model.desc.mai_transcribe_2": "Microsoft speech recognition with language detection and vocabulary hints. Your audio goes to your Azure resource."
+  },
+  "es": {
+    "models.azure.endpoint": "Dirección de Azure Speech",
+    "models.azure.hint": "Copia el endpoint de tu recurso de Speech → Claves y punto de conexión en Azure. La clave va en el campo separado de abajo. Azure cobra tu consumo.",
+    "model.desc.mai_transcribe_2": "Reconocimiento de voz de Microsoft con detección de idioma y vocabulario. Tu audio se envía a tu recurso de Azure."
+  },
+  "pt": {
+    "models.azure.endpoint": "Endereço do Azure Speech",
+    "models.azure.hint": "Copie o endpoint do seu recurso Speech → Chaves e ponto de extremidade no Azure. A chave vai no campo separado abaixo. O Azure cobra pelo uso.",
+    "model.desc.mai_transcribe_2": "Reconhecimento de fala da Microsoft com detecção de idioma e vocabulário. Seu áudio é enviado ao seu recurso Azure."
+  },
+  "fr": {
+    "models.azure.endpoint": "Adresse Azure Speech",
+    "models.azure.hint": "Copiez le point de terminaison dans votre ressource Speech → Clés et point de terminaison sur Azure. Saisissez la clé séparément ci-dessous. Azure facture votre utilisation.",
+    "model.desc.mai_transcribe_2": "Reconnaissance vocale Microsoft avec détection de langue et vocabulaire. Votre audio est envoyé à votre ressource Azure."
+  },
+  "de": {
+    "models.azure.endpoint": "Azure-Speech-Adresse",
+    "models.azure.hint": "Kopiere den Endpunkt aus deiner Speech-Ressource → Schlüssel und Endpunkt in Azure. Der Schlüssel gehört in das separate Feld darunter. Azure berechnet die Nutzung.",
+    "model.desc.mai_transcribe_2": "Microsoft-Spracherkennung mit automatischer Erkennung der Sprache und Vokabularhinweisen. Dein Audio wird an deine Azure-Ressource gesendet."
+  },
+  "it": {
+    "models.azure.endpoint": "Indirizzo Azure Speech",
+    "models.azure.hint": "Copia l’endpoint dalla tua risorsa Speech → Chiavi ed endpoint in Azure. Inserisci la chiave nel campo separato sotto. Azure addebita il consumo.",
+    "model.desc.mai_transcribe_2": "Riconoscimento vocale Microsoft con rilevamento della lingua e vocabolario. L’audio viene inviato alla tua risorsa Azure."
+  }
+})) Object.assign(window.I18N[lang], copy);

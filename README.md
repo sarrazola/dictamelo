@@ -128,7 +128,7 @@ scripts/                     Checks, configuration, building and release tools
 docs/                        Setup, operations and verification records
 ```
 
-Personal-key setup offers Groq, OpenAI, Mistral and Deepgram. The additional OpenAI, Mistral and Deepgram adapters have offline request/response contract coverage; live calls with their respective provider accounts remain pending. Existing credentials and settings remain compatible. Add a provider through `TranscriptionProvider` or `TextCleaner`, register it, and verify it with the speech fixture.
+Personal-key setup offers Groq, OpenAI, Mistral and Deepgram. The 1.0.2 development build also adds Microsoft Azure MAI-Transcribe-2 with a per-user Speech endpoint and securely stored key; see [Azure setup](docs/CLOUD_PROVIDERS.md#microsoft-azure-setup). Public downloads above remain 1.0.1 until a new release is published. The additional OpenAI, Mistral and Deepgram adapters have offline request/response contract coverage; live calls with their respective provider accounts remain pending. Existing credentials and settings remain compatible. Add a provider through `TranscriptionProvider` or `TextCleaner`, register it, and verify it with the speech fixture.
 
 ## Releasing a version
 

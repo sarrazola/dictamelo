@@ -187,6 +187,7 @@ async fn run(app: &AppHandle, plan: &TranscriptionPlan, path: &Path, id: &str) -
     let extension = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
     let size = std::fs::metadata(path).map(|m| m.len()).map_err(|e| tf(&lang, "file.read_failed", &[("e", &e.to_string())]))?;
     let request = |audio_path: PathBuf| TranscriptionRequest {
+        endpoint: settings.transcription_endpoint(),
         audio_path,
         model: source.model.clone(),
         language: settings.language_code(),
@@ -194,7 +195,9 @@ async fn run(app: &AppHandle, plan: &TranscriptionPlan, path: &Path, id: &str) -
     };
 
     // 1) Formato nativo y tamaño razonable: se sube tal cual.
-    if direct_upload(source.route, &extension, size)? {
+    // Azure receives bounded mono WAV chunks even for compressed/video inputs.
+    // This avoids depending on container support or compressed duration estimates.
+    if source.provider.info().id != "azure" && direct_upload(source.route, &extension, size)? {
         if !update(app, id, |j| {
             j.stage = Stage::Transcribing;
             j.chunk = 1;

@@ -168,6 +168,13 @@ async fn start_recording(app: &AppHandle) {
         return;
     };
     let info = provider.info();
+    if info.id == "azure" {
+        if let Err(error) = crate::transcription::azure::transcription_url(&settings.azure_speech_endpoint) {
+            fail(app, error.localized(&lang));
+            app_windows::show_settings(app);
+            return;
+        }
+    }
     if settings.uses_local_transcription() {
         if let Err(error) = state.local_models.validate_ready(&settings.model, settings.language_code().as_deref()) {
             fail(app, crate::local_models::messages::localize(&error, &lang));
@@ -325,6 +332,7 @@ async fn transcribe_with_plan(app: &AppHandle, audio: PreparedAudio, plan: Trans
         return None;
     }
     let request = TranscriptionRequest {
+        endpoint: settings.transcription_endpoint(),
         audio_path: path.clone(),
         model: source.model.clone(),
         language: settings.language_code(),

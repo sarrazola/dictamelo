@@ -160,10 +160,11 @@ mod tests {
         let root = std::env::temp_dir().join(format!("dictamelo-app-registry-{}", uuid::Uuid::new_v4()));
         let models = Arc::new(crate::local_models::LocalModelManager::new(root.clone()).unwrap());
         let providers = provider_registry(models.clone());
-        for id in ["groq", "openai", "mistral", "deepgram"] { assert!(providers.get(id).is_some()); }
+        for id in ["groq", "openai", "mistral", "deepgram", "azure"] { assert!(providers.get(id).is_some()); }
         let local = providers.get("local").expect("the installed app must register local transcription");
         let info = local.info(); assert!(!info.requires_api_key); assert_eq!(info.models.len(), 6);
         let error = local.transcribe(None, &crate::transcription::TranscriptionRequest {
+        endpoint: None,
             audio_path: root.join("speech.wav"), model: "whisper-tiny".into(), language: Some("en".into()), prompt: None,
         }).await.unwrap_err();
         assert!(matches!(error, crate::transcription::TranscriptionError::Local(ref message) if message == "Download the selected local model first"));

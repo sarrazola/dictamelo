@@ -243,7 +243,17 @@ function selectableProviders() {
   return ui.providers.filter(provider => provider.id !== "local");
 }
 
-const PROVIDER_LOGOS = Object.freeze({ groq: "providers/groq.svg", openai: "providers/openai.svg", mistral: "providers/mistral.svg", deepgram: "providers/deepgram.svg", nvidia: "providers/nvidia.svg" });
+const PROVIDER_LOGOS = Object.freeze({ groq: "providers/groq.svg", openai: "providers/openai.svg", mistral: "providers/mistral.svg", deepgram: "providers/deepgram.svg", azure: "providers/microsoft.svg", nvidia: "providers/nvidia.svg" });
+
+function renderAzureEndpoint(prefix = "") {
+  $(`#${prefix}azure-endpoint-row`).hidden = ui.settings.provider !== "azure";
+  const input = $(`#${prefix}azure-endpoint`);
+  if (document.activeElement !== input) input.value = ui.settings.azureSpeechEndpoint || "";
+}
+
+async function saveAzureEndpoint(prefix = "") {
+  return saveSettings({ azureSpeechEndpoint: $(`#${prefix}azure-endpoint`).value.trim() });
+}
 
 function setProviderLogo(image, provider) {
   const source = PROVIDER_LOGOS[provider];
@@ -344,6 +354,7 @@ function renderModels() {
   renderProviderChoices();
   renderLocalModels();
   const selected = renderProviderSelection($("#provider-select"), $("#model-select"));
+  renderAzureEndpoint();
   const model = selected?.models.find(item => item.id === ui.settings.model);
   $("#model-description").textContent = model ? modelDescription(model) : "";
   $("#legacy-provider-note").hidden = !!selected;
@@ -1153,7 +1164,8 @@ function closeOnboarding() {
 
 function renderOnboardingNext() {
   const { step, mode, keyConfigured } = ui.onboarding;
-  const ready = mode === "local" ? isLocalMode() && ui.localModels.some(model => model.id === ui.settings.model && model.installed) : mode === "own" ? keyConfigured : mode === "free" ? ui.account.signedIn : ui.license.active;
+  const endpointReady = ui.settings.provider !== "azure" || !!ui.settings.azureSpeechEndpoint;
+  const ready = mode === "local" ? isLocalMode() && ui.localModels.some(model => model.id === ui.settings.model && model.installed) : mode === "own" ? keyConfigured && endpointReady : mode === "free" ? ui.account.signedIn : ui.license.active;
   $("#btn-onboarding-next").disabled = step === 2 && !ready;
   $("#btn-onboarding-next").textContent = t(step === 3 ? "onboarding.done" : "onboarding.next");
 }
@@ -1182,6 +1194,7 @@ function renderOnboarding() {
   }
   if (step === 2 && mode === "own") {
     renderProviderSelection($("#onboarding-provider"), $("#onboarding-model"));
+    renderAzureEndpoint("onboarding-");
     refreshOnboardingKey();
   }
   if (step === 2 && mode === "local") {
@@ -1507,6 +1520,12 @@ function wireEvents() {
   $("#provider-choices").addEventListener("click", e => { const provider = e.target.closest("[data-provider]"); if (provider) selectByokProvider(provider.dataset.provider); });
   $("#provider-select").addEventListener("change", e => selectByokProvider(e.target.value));
   $("#model-select").addEventListener("change", e => saveSettings({ model: e.target.value }));
+  for (const prefix of ["", "onboarding-"]) {
+    $(`#btn-save-${prefix}azure-endpoint`).addEventListener("click", () => saveAzureEndpoint(prefix));
+    $(`#${prefix}azure-endpoint`).addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); saveAzureEndpoint(prefix); }
+    });
+  }
   $("#btn-refresh-local-models").addEventListener("click", refreshLocalModels);
   $("#local-model-list").addEventListener("click", e => {
     const button = e.target.closest("[data-local-action]");
