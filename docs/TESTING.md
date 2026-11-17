@@ -13,6 +13,9 @@ This Mac release adds Azure Speech as a personal-key transcription provider. The
 - Boundaries: no Windows build/CI/VM test, local ASR inference/model download, or new live ASR request to another provider was performed. Existing provider behavior and historical test attribution remain unchanged. Physical microphone/hotkey capture is not covered by the fixture tests.
 - Local evidence is ignored under `dist/azure-mai-verification/`; subscription keys and the user's resource endpoint are not included in source or reports. Final native UI/screenshot readback showed all five providers in one compact row, a monochrome Microsoft mark, version 1.0.2, Microsoft selected and the saved key masked; the app was left open.
 
+
+- Public delivery: GitHub lists `v1.0.2` as the latest stable release. All six assets were downloaded anonymously and matched the staged files byte-for-byte. Public checksums and the updater archive signature passed. The legacy latest alias still matches the previous shared manifest exactly. The Mac alias returned the 1.0.2 manifest on a fresh request and briefly served the previous redirect on repeated requests during publication. The installed 1.0.2 app reported **You are up to date**. The 1.0.1-to-1.0.2 installation was not replayed on the user profile.
+
 ## Version 1.0.1 — macOS silence guard, October 23, 2026
 
 Application source: `268835b` (later release-record edits only change documentation). This Mac-only release includes the previously local Fn/recording-mode changes below and the merged file-job/settings fixes.
