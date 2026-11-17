@@ -10,7 +10,7 @@ Dictámelo keeps the transcription and cleanup adapters separate. Personal API k
 | OpenAI | GPT-4o mini Transcribe (default), GPT-4o Transcribe, Whisper | GPT-4.1 mini (default), GPT-4o mini |
 | Mistral | Voxtral Mini Transcribe 2 (`voxtral-mini-latest`) | Mistral Small (`mistral-small-latest`) |
 | Deepgram | Nova-3 (default), Nova-2 | Select a separate cleanup provider |
-| Microsoft Azure (1.0.2 development build) | MAI-Transcribe-2 | Select a separate cleanup provider |
+| Microsoft Azure (macOS 1.0.2) | MAI-Transcribe-2 | Select a separate cleanup provider |
 
 Each cleanup provider uses its own saved API key. Transcription and cleanup can use different providers. Provider charges, language support, availability and account limits are controlled by the provider. Mistral's `latest` aliases may change the served model without a Dictámelo release.
 
@@ -18,7 +18,7 @@ Local transcription does not require any cloud key. Sending its resulting text t
 
 ## Microsoft Azure setup
 
-The Mac 1.0.2 development build adds **Models → Your API keys → Microsoft Azure → MAI-Transcribe-2**. Public 1.0.1 downloads do not contain this adapter yet.
+On Mac 1.0.2, open **Models → Your API keys → Microsoft Azure → MAI-Transcribe-2**.
 
 1. Copy the HTTPS endpoint from your Azure Speech resource's **Keys and Endpoint** page. Enter the resource origin (`https://your-resource.cognitiveservices.azure.com`), without a transcription path, query string or key, and save it.
 2. Save the resource's subscription key in the separate API-key field. It uses the existing system credential store and readonly masked-key UI. The endpoint is ordinary user configuration; no user's endpoint or key is compiled into the app.
@@ -52,7 +52,7 @@ Never log API keys, authorization headers or raw provider response bodies. Succe
 
 The OpenAI, Mistral and Deepgram adapters have loopback HTTP tests using the bundled licensed English WAV. Those tests inspect actual request bodies and return controlled provider responses. They do not contact paid endpoints or prove that a user's account has model access. Live verification remains a separate step and must not be inferred from the catalog or the presence of a provider logo.
 
-This development pass targets macOS. Windows integration and hardware verification must be completed before publishing matching Windows installers.
+The MAI-Transcribe-2 integration was verified on macOS for 1.0.2. The published Windows installers are version 1.0.0.
 
 Azure was checked against the official MAI documentation on November 14, 2026. Both the shared Azure script and the native Rust adapter passed a live request with the licensed 5.855-second speech fixture. See `TESTING.md` for installed-build coverage. This verifies the tested resource, not universal regional availability.
 

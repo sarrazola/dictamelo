@@ -8,17 +8,17 @@ Voice dictation for any app on **macOS and Windows**. Hold a shortcut, speak, an
 
 ## Download
 
-**[Download Dictámelo](https://github.com/sarrazola/dictamelo/releases/latest):** macOS **1.0.1** · Windows **1.0.0**. Choose the installer for your computer below.
+**[Download Dictámelo](https://github.com/sarrazola/dictamelo/releases/latest):** macOS **1.0.2** · Windows **1.0.0**. Choose the installer for your computer below.
 
 | Your computer | Installer |
 | --- | --- |
-| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.1/Dictamelo_1.0.1_aarch64.dmg) |
+| Apple Silicon Mac — M1, M2, M3, M4 and later | [Download for Mac (.dmg)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.2/Dictamelo_1.0.2_aarch64.dmg) |
 | Windows — Intel or AMD 64-bit | [Download for Windows Intel/AMD (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_x86_64-setup.exe) |
 | Windows 11 — ARM64 | [Download for Windows ARM64 (.exe)](https://github.com/sarrazola/dictamelo/releases/download/v1.0.0/Dictamelo_1.0.0_aarch64-setup.exe) |
 
-[Mac checksums and release notes](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.1) · [Windows checksums and release notes](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.0)
+[Mac checksums and release notes](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.2) · [Windows checksums and release notes](https://github.com/sarrazola/dictamelo/releases/tag/v1.0.0)
 
-Mac 1.0.1 adds local speech detection before microphone transcription to avoid invented words from silent presses. **Upgrading from 1.0.0 requires installing the Mac DMG once.** Later Mac builds use their own updater manifest; the legacy shared manifest remains at 1.0.0 to avoid offering Windows an unchanged installer as a new version.
+Mac 1.0.2 adds Microsoft MAI-Transcribe-2 and puts the five personal-key providers in one row. **On Mac 1.0.1, use Check for Updates.** On Mac 1.0.0, install the new DMG once to switch to the Mac updater channel.
 
 On macOS, open the DMG and drag Dictámelo into Applications. Allow Microphone and Accessibility when requested. On Windows, run the installer and allow desktop microphone access in Windows Settings. Intel Macs, 32-bit Windows and Linux installers are not provided.
 
@@ -29,7 +29,7 @@ Mac releases require Developer ID signing, Apple notarization and stapling. Wind
 ## Get started
 
 1. On the first launch, choose local models, your own keys, Free Cloud or Pro in the setup assistant. **Skip** is available on every step; you can configure everything later in Settings.
-2. For offline transcription, download a model in **Models → On this computer**, then select **Use model**. With your own keys, choose Groq, OpenAI, Mistral or Deepgram and save the provider key. **Whisper Large v3** is recommended on Groq. Saved keys appear masked with explicit Change/Cancel actions. Neither mode requires a Dictámelo account.
+2. For offline transcription, download a model in **Models → On this computer**, then select **Use model**. In **Your API keys**, choose Groq, OpenAI, Mistral or Deepgram and save the provider key. Mac 1.0.2 also offers Microsoft Azure, which requires your own Speech resource endpoint and key. **Whisper Large v3** is recommended on Groq. Saved keys appear masked with explicit Change/Cancel actions. Neither mode requires a Dictámelo account.
 3. Use **Continue with Google** for Free Cloud, or **Create free account** with email/password and enter the confirmation code sent to your inbox. Returning users can **Sign in**; password recovery also uses an emailed code. Existing Pro licenses can be activated in **Plan**.
 4. Review language, shortcut and permissions. Hold **Alt/Option + Shift + Space**, speak, and release. On Mac, you can also select Fn or choose **Press to start / stop** in General. Updates preserve your existing shortcut.
 5. Open **Files** to transcribe a recording. You can also expand **Import using a local path**. Optional AI cleanup applies to dictation and uploaded files. If cleanup fails, the original transcript stays available.
@@ -128,7 +128,7 @@ scripts/                     Checks, configuration, building and release tools
 docs/                        Setup, operations and verification records
 ```
 
-Personal-key setup offers Groq, OpenAI, Mistral and Deepgram. The 1.0.2 development build also adds Microsoft Azure MAI-Transcribe-2 with a per-user Speech endpoint and securely stored key; see [Azure setup](docs/CLOUD_PROVIDERS.md#microsoft-azure-setup). Public downloads above remain 1.0.1 until a new release is published. The additional OpenAI, Mistral and Deepgram adapters have offline request/response contract coverage; live calls with their respective provider accounts remain pending. Existing credentials and settings remain compatible. Add a provider through `TranscriptionProvider` or `TextCleaner`, register it, and verify it with the speech fixture.
+Mac 1.0.2 adds Microsoft Azure MAI-Transcribe-2 with a per-user Speech endpoint and a key stored in Keychain. See [Azure setup](docs/CLOUD_PROVIDERS.md#microsoft-azure-setup). The OpenAI, Mistral and Deepgram adapters have offline request/response contract coverage. Add a provider through `TranscriptionProvider` or `TextCleaner`, register it, and verify it with the speech fixture.
 
 ## Releasing a version
 

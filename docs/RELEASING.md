@@ -2,9 +2,9 @@
 
 Release artifacts live in GitHub Releases. Source, release notes, and these instructions live in Git. `.gitignore` only excludes generated files and credentials; `AGENTS.md` tells coding assistants to follow this runbook.
 
-## Current release: macOS 1.0.1; Windows 1.0.0
+## Current release: macOS 1.0.2; Windows 1.0.0
 
-Version 1.0.1 is an explicitly Mac-only stable release. Use the exception below; do not run Windows builds, Windows CI, VM tests or the all-platform staging script for this release. The following complete-release procedure remains the default when both platforms are authorized.
+Versions 1.0.1 and 1.0.2 use the Mac-only stable release process below. Use the complete-release process for a release that includes both platforms.
 
 ### Mac-only stable releases
 
